@@ -1,0 +1,240 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  // Runtime (Supabase pooler, porta 6543, com ?pgbouncer=true)
+  url       = env("DATABASE_URL")
+  // Migrações (conexão direta, porta 5432)
+  directUrl = env("DIRECT_URL")
+}
+
+enum TruckStatus {
+  ATIVO
+  MANUTENCAO
+  PARADO
+}
+
+enum DriverStatus {
+  ATIVO
+  INATIVO
+  FERIAS
+}
+
+enum FuelType {
+  DIESEL_S10
+  DIESEL_S500
+}
+
+enum MaintenanceType {
+  PREVENTIVA
+  CORRETIVA
+}
+
+enum MaintenanceCategory {
+  OLEO_FILTROS
+  FREIOS
+  SUSPENSAO
+  MOTOR
+  CAIXA
+  ARLA_ELETRICA
+  OUTROS
+}
+
+enum AxlePosition {
+  DIRECAO
+  TRACAO
+  TRUCK
+}
+
+enum TireStatus {
+  NOVO
+  RECAPADO
+  SUCATA
+}
+
+model Truck {
+  id                 String      @id @default(uuid()) @db.Uuid
+  plate              String      @unique
+  model              String
+  brand              String
+  year               Int
+  tankCapacityLiters Int         @map("tank_capacity_liters")
+  initialOdometer    Int         @map("initial_odometer")
+  currentOdometer    Int         @map("current_odometer")
+  status             TruckStatus @default(ATIVO)
+  createdAt          DateTime    @default(now()) @map("created_at")
+
+  fuelLogs        FuelLog[]
+  maintenanceLogs MaintenanceLog[]
+  tires           Tire[]
+  trips           FreightTrip[]
+
+  @@map("trucks")
+}
+
+model Driver {
+  id          String       @id @default(uuid()) @db.Uuid
+  name        String
+  cnhNumber   String       @unique @map("cnh_number")
+  cnhCategory String       @map("cnh_category")
+  phone       String
+  status      DriverStatus @default(ATIVO)
+
+  fuelLogs FuelLog[]
+  trips    FreightTrip[]
+
+  @@map("drivers")
+}
+
+model FuelLog {
+  id              String   @id @default(uuid()) @db.Uuid
+  truckId         String   @map("truck_id") @db.Uuid
+  driverId        String   @map("driver_id") @db.Uuid
+  date            DateTime
+  odometer        Int
+  fuelType        FuelType @default(DIESEL_S10) @map("fuel_type")
+  liters          Decimal  @db.Decimal(10, 2)
+  pricePerLiter   Decimal  @map("price_per_liter") @db.Decimal(8, 3)
+  totalAmount     Decimal  @map("total_amount") @db.Decimal(12, 2)
+  arlaLiters      Decimal  @default(0) @map("arla_liters") @db.Decimal(10, 2)
+  arlaAmount      Decimal  @default(0) @map("arla_amount") @db.Decimal(12, 2)
+  isFullTank      Boolean  @default(false) @map("is_full_tank")
+  gasStationName  String   @map("gas_station_name")
+  receiptPhotoUrl String?  @map("receipt_photo_url")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  truck  Truck  @relation(fields: [truckId], references: [id])
+  driver Driver @relation(fields: [driverId], references: [id])
+
+  @@index([truckId, date])
+  @@index([truckId, odometer])
+  @@map("fuel_logs")
+}
+
+model MaintenanceLog {
+  id                       String              @id @default(uuid()) @db.Uuid
+  truckId                  String              @map("truck_id") @db.Uuid
+  date                     DateTime
+  odometerAtService        Int                 @map("odometer_at_service")
+  type                     MaintenanceType
+  category                 MaintenanceCategory
+  description              String
+  partsCost                Decimal             @default(0) @map("parts_cost") @db.Decimal(12, 2)
+  laborCost                Decimal             @default(0) @map("labor_cost") @db.Decimal(12, 2)
+  totalCost                Decimal             @map("total_cost") @db.Decimal(12, 2)
+  supplierName             String              @map("supplier_name")
+  nextServiceOdometerAlert Int?                @map("next_service_odometer_alert")
+  receiptPhotoUrl          String?             @map("receipt_photo_url")
+  createdAt                DateTime            @default(now()) @map("created_at")
+
+  truck Truck @relation(fields: [truckId], references: [id])
+
+  @@index([truckId, date])
+  @@map("maintenance_logs")
+}
+
+model Tire {
+  id           String       @id @default(uuid()) @db.Uuid
+  truckId      String?      @map("truck_id") @db.Uuid
+  fireCode     String       @unique @map("fire_code")
+  brand        String
+  model        String
+  axlePosition AxlePosition @map("axle_position")
+  status       TireStatus   @default(NOVO)
+  currentKm    Int          @default(0) @map("current_km")
+  purchaseCost Decimal      @map("purchase_cost") @db.Decimal(12, 2)
+
+  truck Truck? @relation(fields: [truckId], references: [id])
+
+  @@map("tires")
+}
+
+model FreightTrip {
+  id                    String    @id @default(uuid()) @db.Uuid
+  truckId               String    @map("truck_id") @db.Uuid
+  driverId              String    @map("driver_id") @db.Uuid
+  customerId            String?   @map("customer_id") @db.Uuid
+  customerName          String    @map("customer_name")
+  origin                String
+  destination           String
+  startDate             DateTime  @map("start_date")
+  endDate               DateTime? @map("end_date")
+  initialKm             Int       @map("initial_km")
+  finalKm               Int?      @map("final_km")
+  distanceKm            Int?      @map("distance_km")
+  cargoDescription      String?   @map("cargo_description")
+  cargoWeightKg         Int?      @map("cargo_weight_kg")
+  paymentTerms          String?   @map("payment_terms")
+  status                String    @default("PLANEJADO")
+  notes                 String?
+  grossFreightValue     Decimal   @map("gross_freight_value") @db.Decimal(12, 2)
+  tollCosts             Decimal   @default(0) @map("toll_costs") @db.Decimal(12, 2)
+  loadingUnloadingCosts Decimal   @default(0) @map("loading_unloading_costs") @db.Decimal(12, 2)
+  otherExpenses         Decimal   @default(0) @map("other_expenses") @db.Decimal(12, 2)
+  netFreightValue       Decimal   @default(0) @map("net_freight_value") @db.Decimal(12, 2)
+
+  truck    Truck     @relation(fields: [truckId], references: [id])
+  driver   Driver    @relation(fields: [driverId], references: [id])
+  customer Customer? @relation(fields: [customerId], references: [id])
+
+  @@index([truckId, startDate])
+  @@map("freight_trips")
+}
+
+model Customer {
+  id               String  @id @default(uuid()) @db.Uuid
+  name             String
+  cnpj             String  @unique
+  contactName      String  @map("contact_name")
+  phone            String
+  email            String
+  city             String
+  state            String
+  paymentTermsDays Int     @default(30) @map("payment_terms_days")
+  notes            String?
+
+  trips     FreightTrip[]
+  schedules CargoSchedule[]
+
+  @@map("customers")
+}
+
+model TireSupplier {
+  id          String  @id @default(uuid()) @db.Uuid
+  name        String
+  cnpj        String  @unique
+  contactName String  @map("contact_name")
+  phone       String
+  email       String
+  city        String
+  state       String
+  brandsSold  String  @map("brands_sold")
+  notes       String?
+
+  @@map("tire_suppliers")
+}
+
+model CargoSchedule {
+  id               String    @id @default(uuid()) @db.Uuid
+  customerId       String    @map("customer_id") @db.Uuid
+  truckId          String?   @map("truck_id") @db.Uuid
+  driverId         String?   @map("driver_id") @db.Uuid
+  origin           String
+  destination      String
+  distanceKm       Int       @map("distance_km")
+  cargoDescription String    @map("cargo_description")
+  cargoWeightKg    Int       @map("cargo_weight_kg")
+  pickupDate       DateTime  @map("pickup_date")
+  deliveryDate     DateTime? @map("delivery_date")
+  freightValue     Decimal   @map("freight_value") @db.Decimal(12, 2)
+  status           String    @default("AGENDADA")
+  notes            String?
+
+  customer Customer @relation(fields: [customerId], references: [id])
+
+  @@index([pickupDate])
+  @@map("cargo_schedules")
+}
+
