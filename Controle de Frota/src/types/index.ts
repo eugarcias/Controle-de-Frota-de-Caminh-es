@@ -29,7 +29,7 @@ export interface Truck {
 export interface Driver {
   id: string;
   name: string;
-  cnhNumber: string;
+  cnhNumber?: string | null;
   cnhCategory: string;
   phone: string;
   status: DriverStatus;
@@ -89,6 +89,9 @@ export interface FreightTrip {
   customerName: string;
   origin: string;
   destination: string;
+  /** Obrigatórios em novos fretes; '' em registros antigos */
+  destinationCity: string;
+  destinationState: string;
   startDate: string;
   endDate?: string | null;
   initialKm: number;
@@ -114,7 +117,7 @@ export type ScheduleStatus = 'AGENDADA' | 'EM_TRANSITO' | 'CONCLUIDA' | 'CANCELA
 export interface Customer {
   id: string;
   name: string; // Razão social
-  cnpj: string;
+  cnpj?: string | null;
   contactName: string;
   phone: string;
   email: string;

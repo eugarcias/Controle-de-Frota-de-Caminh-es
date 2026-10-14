@@ -4,13 +4,16 @@ import React, { useEffect } from 'react';
 import { X } from 'lucide-react';
 
 export const inputCls =
-  'w-full text-sm p-2.5 bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-sky-500 focus:border-sky-500 focus:outline-none';
+  'w-full min-h-11 sm:min-h-10 text-base sm:text-sm px-3 py-2 bg-white rounded-xl shadow-sm ring-1 ring-slate-200 placeholder:text-slate-400 focus:ring-2 focus:ring-sky-500 focus:outline-none';
 
 export const primaryBtn =
-  'inline-flex items-center justify-center gap-2 bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold px-4 py-2.5 rounded-xl shadow-md shadow-sky-500/20 transition-all active:scale-95';
+  'inline-flex items-center justify-center gap-2 min-h-11 sm:min-h-10 bg-sky-500 hover:bg-sky-400 text-slate-950 text-sm font-semibold px-4 py-2 rounded-xl shadow-md shadow-sky-500/20 transition-all active:scale-[0.98] disabled:opacity-50';
 
 export const secondaryBtn =
-  'inline-flex items-center justify-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-800 font-semibold px-4 py-2.5 rounded-xl transition-all';
+  'inline-flex items-center justify-center gap-2 min-h-11 sm:min-h-10 bg-slate-100 hover:bg-slate-200 text-slate-800 text-sm font-semibold px-4 py-2 rounded-xl transition-all';
+
+/** Cartão padrão: sem borda, sombra suave */
+export const cardCls = 'bg-white rounded-2xl shadow-sm';
 
 export const formatBRL = (val: number) =>
   new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val || 0);

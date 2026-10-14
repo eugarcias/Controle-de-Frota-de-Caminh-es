@@ -109,6 +109,8 @@ async function main() {
       customerName: t.customerName,
       origin: t.origin,
       destination: t.destination,
+      destinationCity: t.destinationCity,
+      destinationState: t.destinationState,
       startDate: new Date(t.startDate),
       endDate: t.endDate ? new Date(t.endDate) : null,
       initialKm: t.initialKm,

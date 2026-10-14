@@ -57,12 +57,12 @@ enum TireStatus {
 model Truck {
   id                 String      @id @default(uuid()) @db.Uuid
   plate              String      @unique
-  model              String
-  brand              String
-  year               Int
-  tankCapacityLiters Int         @map("tank_capacity_liters")
-  initialOdometer    Int         @map("initial_odometer")
-  currentOdometer    Int         @map("current_odometer")
+  model              String      @default("Não informado")
+  brand              String      @default("Não informada")
+  year               Int         @default(0)
+  tankCapacityLiters Int         @default(0) @map("tank_capacity_liters")
+  initialOdometer    Int         @default(0) @map("initial_odometer")
+  currentOdometer    Int         @default(0) @map("current_odometer")
   status             TruckStatus @default(ATIVO)
   createdAt          DateTime    @default(now()) @map("created_at")
 
@@ -77,8 +77,9 @@ model Truck {
 model Driver {
   id          String       @id @default(uuid()) @db.Uuid
   name        String
-  cnhNumber   String       @unique @map("cnh_number")
-  cnhCategory String       @map("cnh_category")
+  // CNH opcional no cadastro rápido (NULL não conflita com @unique)
+  cnhNumber   String?      @unique @map("cnh_number")
+  cnhCategory String       @default("") @map("cnh_category")
   phone       String
   status      DriverStatus @default(ATIVO)
 
@@ -159,6 +160,9 @@ model FreightTrip {
   customerName          String    @map("customer_name")
   origin                String
   destination           String
+  // Obrigatórios em novos fretes (validado na API); default '' só cobre registros antigos
+  destinationCity       String    @default("") @map("destination_city")
+  destinationState      String    @default("") @map("destination_state")
   startDate             DateTime  @map("start_date")
   endDate               DateTime? @map("end_date")
   initialKm             Int       @map("initial_km")
@@ -180,18 +184,19 @@ model FreightTrip {
   customer Customer? @relation(fields: [customerId], references: [id])
 
   @@index([truckId, startDate])
+  @@index([destinationState, destinationCity])
   @@map("freight_trips")
 }
 
 model Customer {
   id               String  @id @default(uuid()) @db.Uuid
   name             String
-  cnpj             String  @unique
-  contactName      String  @map("contact_name")
+  cnpj             String? @unique
+  contactName      String  @default("") @map("contact_name")
   phone            String
-  email            String
-  city             String
-  state            String
+  email            String  @default("")
+  city             String  @default("")
+  state            String  @default("")
   paymentTermsDays Int     @default(30) @map("payment_terms_days")
   notes            String?
 

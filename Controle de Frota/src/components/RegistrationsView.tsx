@@ -29,7 +29,7 @@ interface Props {
 type Tab = 'drivers' | 'trucks' | 'customers' | 'tireSuppliers';
 
 const PLATE_RE = /^[A-Z]{3}-?[0-9][A-Z0-9][0-9]{2}$/;
-const digits = (s: string) => s.replace(/\D/g, '');
+const digits = (s?: string | null) => (s ?? '').replace(/\D/g, '');
 
 function useForm<T extends Record<string, string>>(initial: T) {
   const [v, setV] = useState<T>(initial);
@@ -182,7 +182,7 @@ function PartyForm<T extends Customer | TireSupplier>({
   onCancel,
 }: {
   kind: 'customer' | 'supplier';
-  existing: { cnpj: string }[];
+  existing: { cnpj?: string | null }[];
   onSave: (x: T) => void;
   onCancel: () => void;
 }) {
@@ -264,8 +264,10 @@ function PartyForm<T extends Customer | TireSupplier>({
 
 /* ---------------- Tela principal ---------------- */
 
-const formatCnpj = (c: string) =>
-  digits(c).replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5');
+const formatCnpj = (c?: string | null) => {
+  if (!c) return 'Não informado';
+  return digits(c).replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5');
+};
 
 const Row = ({
   title,

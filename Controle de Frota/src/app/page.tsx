@@ -12,6 +12,7 @@ import { computeDashboardMetrics } from '@/mock-data';
 import { useFleetStore } from '@/lib/store';
 import { newId } from '@/components/ui';
 import { CargoSchedule, FreightTrip } from '@/types';
+import { splitDestination } from '@/lib/geo';
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState<string>('dashboard');
@@ -37,6 +38,10 @@ export default function Home() {
     const customer = data.customers.find((c) => c.id === s.customerId);
     if (!truck || !s.driverId) return;
 
+    const parsedDest = splitDestination(s.destination);
+    const destCity = parsedDest?.city ?? s.destination;
+    const destState = parsedDest?.state ?? 'SP';
+
     const fuel = (s.distanceKm / (metrics.fleetAverageKmL || 2.1)) * lastDieselPrice;
     const trip: FreightTrip = {
       id: newId(),
@@ -46,6 +51,8 @@ export default function Home() {
       customerName: customer?.name ?? 'Cliente',
       origin: s.origin,
       destination: s.destination,
+      destinationCity: destCity,
+      destinationState: destState,
       startDate: s.pickupDate,
       endDate: s.deliveryDate ?? null,
       initialKm: truck.currentOdometer,
@@ -70,8 +77,11 @@ export default function Home() {
 
   if (loading && data.trucks.length === 0) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-black text-sky-300 text-sm font-semibold">
-        Carregando dados da frota...
+      <div className="min-h-screen flex items-center justify-center bg-slate-950 text-emerald-400 text-sm font-semibold">
+        <div className="flex items-center gap-2">
+          <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping" />
+          <span>Carregando dados da frota...</span>
+        </div>
       </div>
     );
   }
@@ -98,10 +108,16 @@ export default function Home() {
         </div>
       )}
 
-
-      <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8">
+      <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:auto">
         {activeTab === 'dashboard' && (
-          <DashboardView metrics={metrics} onOpenQuickEntry={() => setActiveTab('quick-entry')} />
+          <DashboardView
+            trucks={data.trucks}
+            drivers={data.drivers}
+            fuelLogs={data.fuelLogs}
+            maintenanceLogs={data.maintenanceLogs}
+            trips={data.trips}
+            onOpenQuickEntry={() => setActiveTab('quick-entry')}
+          />
         )}
 
         {activeTab === 'quick-entry' && (
@@ -123,6 +139,9 @@ export default function Home() {
             estDieselPrice={lastDieselPrice}
             onAdd={(t) => addItem('trips', t)}
             onUpdate={(id, patch) => updateItem('trips', id, patch)}
+            onAddCustomer={(c) => addItem('customers', c)}
+            onAddDriver={(d) => addItem('drivers', d)}
+            onAddTruck={(t) => addItem('trucks', t)}
           />
         )}
 
@@ -158,8 +177,8 @@ export default function Home() {
         )}
       </main>
 
-      <footer className="bg-black text-slate-400 border-t-2 border-sky-500 py-4 text-center text-xs">
-        <span className="text-sky-400 font-bold">VSM Garcia</span> • Gestão de Frota • &copy; 2026
+      <footer className="bg-slate-950 text-slate-400 border-t-2 border-emerald-500 py-4 text-center text-xs">
+        <span className="text-emerald-400 font-bold">VSM Garcia</span> • Gestão de Frota • &copy; 2026
       </footer>
     </div>
   );

@@ -5,34 +5,41 @@ const money = z.number().nonnegative();
 const wholeNumber = z.number().nonnegative().transform((n) => Math.round(n));
 const optionalText = z.string().optional().nullable();
 
+// Texto opcional: string vazia/ausente vira null (evita violar colunas @unique com "")
+const nullableTrimmed = z
+  .string()
+  .optional()
+  .nullable()
+  .transform((s) => (s && s.trim() ? s.trim() : null));
+
 export const TruckSchema = z.object({
   plate: z.string().min(7).max(8).transform((s) => s.toUpperCase()),
-  model: z.string().min(2),
-  brand: z.string().min(2),
-  year: z.number().int().min(1990).max(2035),
-  tankCapacityLiters: z.number().int().positive(),
-  initialOdometer: z.number().int().nonnegative(),
-  currentOdometer: z.number().int().nonnegative(),
+  model: z.string().min(2).default('Não informado'),
+  brand: z.string().min(2).default('Não informada'),
+  year: z.number().int().min(0).max(2035).default(0),
+  tankCapacityLiters: z.number().int().nonnegative().default(0),
+  initialOdometer: z.number().int().nonnegative().default(0),
+  currentOdometer: z.number().int().nonnegative().default(0),
   status: z.enum(['ATIVO', 'MANUTENCAO', 'PARADO']).default('ATIVO'),
 });
 
 export const DriverSchema = z.object({
   name: z.string().min(3),
-  cnhNumber: z.string().min(9),
-  cnhCategory: z.string().min(1),
+  cnhNumber: nullableTrimmed,
+  cnhCategory: z.string().default(''),
   phone: z.string().min(8),
   status: z.enum(['ATIVO', 'INATIVO', 'FERIAS']).default('ATIVO'),
 });
 
 export const CustomerSchema = z.object({
   name: z.string().min(2),
-  cnpj: z.string().min(14),
-  contactName: z.string().min(2),
+  cnpj: nullableTrimmed,
+  contactName: z.string().default(''),
   phone: z.string().min(8),
-  email: z.string(),
-  city: z.string().min(2),
-  state: z.string().min(2).max(2),
-  paymentTermsDays: z.number().int().nonnegative(),
+  email: z.string().default(''),
+  city: z.string().default(''),
+  state: z.string().max(2).default(''),
+  paymentTermsDays: z.number().int().nonnegative().default(30),
   notes: optionalText,
 });
 
@@ -86,6 +93,12 @@ export const FreightTripSchema = z.object({
   customerName: z.string().min(2),
   origin: z.string().min(2),
   destination: z.string().min(2),
+  destinationCity: z.string().trim().min(2, 'informe a cidade de destino'),
+  destinationState: z
+    .string()
+    .trim()
+    .length(2, 'informe a UF de destino (2 letras)')
+    .transform((s) => s.toUpperCase()),
   startDate: isoDate,
   endDate: isoDate.optional().nullable(),
   initialKm: wholeNumber,
