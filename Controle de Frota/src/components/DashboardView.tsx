@@ -36,7 +36,8 @@ import {
 } from 'recharts';
 import { DashboardMetrics, Truck, Driver, FuelLog, MaintenanceLog, FreightTrip } from '@/types';
 import { computeDashboardMetrics } from '@/mock-data';
-import { MultiSelect, ComboOption } from '@/components/ui/combobox';
+import { DashboardFilterBar } from '@/components/DashboardFilterBar';
+import { DashboardFilters, defaultDashboardFilters, isDateInFilter } from '@/lib/dashboardFilters';
 import { formatBRL } from '@/components/ui';
 import { routeLabel } from '@/lib/geo';
 
@@ -49,39 +50,6 @@ interface DashboardViewProps {
   onOpenQuickEntry: () => void;
 }
 
-type PeriodType = 'ALL' | 'THIS_MONTH' | 'LAST_30_DAYS' | 'LAST_90_DAYS' | 'THIS_YEAR';
-
-const periodLabels: Record<PeriodType, string> = {
-  ALL: 'Todo o Histórico',
-  THIS_MONTH: 'Mês Atual',
-  LAST_30_DAYS: 'Últimos 30 Dias',
-  LAST_90_DAYS: 'Últimos 90 Dias',
-  THIS_YEAR: 'Este Ano',
-};
-
-function isWithinPeriod(dateStr: string, period: PeriodType): boolean {
-  if (period === 'ALL') return true;
-  const d = new Date(dateStr);
-  const now = new Date();
-  if (isNaN(d.getTime())) return true;
-
-  if (period === 'THIS_MONTH') {
-    return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
-  }
-  if (period === 'LAST_30_DAYS') {
-    const diff = (now.getTime() - d.getTime()) / (1000 * 60 * 60 * 24);
-    return diff >= 0 && diff <= 30;
-  }
-  if (period === 'LAST_90_DAYS') {
-    const diff = (now.getTime() - d.getTime()) / (1000 * 60 * 60 * 24);
-    return diff >= 0 && diff <= 90;
-  }
-  if (period === 'THIS_YEAR') {
-    return d.getFullYear() === now.getFullYear();
-  }
-  return true;
-}
-
 export const DashboardView: React.FC<DashboardViewProps> = ({
   trucks,
   drivers,
@@ -91,36 +59,15 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   onOpenQuickEntry,
 }) => {
   // Filtros Globais Dinâmicos
-  const [period, setPeriod] = useState<PeriodType>('ALL');
-  const [selectedTruckIds, setSelectedTruckIds] = useState<string[]>([]);
-  const [selectedDriverIds, setSelectedDriverIds] = useState<string[]>([]);
-
-  // Opções para os MultiSelects
-  const truckOptions: ComboOption[] = useMemo(
-    () =>
-      trucks.map((t) => ({
-        value: t.id,
-        label: t.plate,
-        hint: t.model,
-      })),
-    [trucks]
-  );
-
-  const driverOptions: ComboOption[] = useMemo(
-    () =>
-      drivers.map((d) => ({
-        value: d.id,
-        label: d.name,
-      })),
-    [drivers]
-  );
+  const [filters, setFilters] = useState<DashboardFilters>(defaultDashboardFilters);
+  const { truckIds: selectedTruckIds, driverIds: selectedDriverIds } = filters;
 
   // Aplicação dos Filtros Dinâmicos
   const filteredData = useMemo(() => {
     // 1. Filtra Fretes
     const filteredTrips = trips.filter((t) => {
       if (t.status === 'CANCELADO') return false;
-      if (!isWithinPeriod(t.startDate, period)) return false;
+      if (!isDateInFilter(t.startDate, filters)) return false;
       if (selectedTruckIds.length > 0 && !selectedTruckIds.includes(t.truckId)) return false;
       if (selectedDriverIds.length > 0 && !selectedDriverIds.includes(t.driverId)) return false;
       return true;
@@ -128,7 +75,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
     // 2. Filtra Abastecimentos
     const filteredFuelLogs = fuelLogs.filter((f) => {
-      if (!isWithinPeriod(f.date, period)) return false;
+      if (!isDateInFilter(f.date, filters)) return false;
       if (selectedTruckIds.length > 0 && !selectedTruckIds.includes(f.truckId)) return false;
       if (selectedDriverIds.length > 0 && !selectedDriverIds.includes(f.driverId)) return false;
       return true;
@@ -136,7 +83,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
     // 3. Filtra Manutenções
     const filteredMaintenanceLogs = maintenanceLogs.filter((m) => {
-      if (!isWithinPeriod(m.date, period)) return false;
+      if (!isDateInFilter(m.date, filters)) return false;
       if (selectedTruckIds.length > 0 && !selectedTruckIds.includes(m.truckId)) return false;
       return true;
     });
@@ -190,17 +137,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       targetTrucks,
       routeList,
     };
-  }, [trucks, drivers, fuelLogs, maintenanceLogs, trips, period, selectedTruckIds, selectedDriverIds]);
+  }, [trucks, drivers, fuelLogs, maintenanceLogs, trips, filters]);
 
   const { metrics, routeList } = filteredData;
-  const hasActiveFilters =
-    period !== 'ALL' || selectedTruckIds.length > 0 || selectedDriverIds.length > 0;
-
-  const resetFilters = () => {
-    setPeriod('ALL');
-    setSelectedTruckIds([]);
-    setSelectedDriverIds([]);
-  };
 
   return (
     <div className="space-y-6">
@@ -230,84 +169,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       </div>
 
       {/* BARRA DE FILTROS GLOBAIS DINÂMICOS NO TOPO */}
-      <div className="bg-white p-4 sm:p-5 rounded-2xl shadow-sm ring-1 ring-slate-200 space-y-3">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
-          <div className="flex items-center gap-2 text-xs font-bold text-slate-800 uppercase tracking-wider">
-            <Filter className="w-4 h-4 text-emerald-600" />
-            <span>Filtros Globais em Tempo Real</span>
-          </div>
-          {hasActiveFilters && (
-            <button
-              onClick={resetFilters}
-              className="text-xs font-semibold text-rose-600 hover:text-rose-700 flex items-center gap-1 self-start sm:self-auto"
-            >
-              <RefreshCw className="w-3.5 h-3.5" />
-              Limpar Filtros
-            </button>
-          )}
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          {/* 1. Filtro de Período */}
-          <div>
-            <label className="block text-[11px] font-bold text-slate-500 uppercase mb-1 flex items-center gap-1">
-              <Calendar className="w-3 h-3 text-slate-400" />
-              Período
-            </label>
-            <select
-              aria-label="Filtrar por período"
-              value={period}
-              onChange={(e) => setPeriod(e.target.value as PeriodType)}
-              className="w-full min-h-11 sm:min-h-10 text-base sm:text-sm px-3 py-2 bg-slate-50 rounded-xl ring-1 ring-slate-200 font-medium text-slate-800 focus:ring-2 focus:ring-sky-500 focus:outline-none"
-            >
-              {(Object.keys(periodLabels) as PeriodType[]).map((p) => (
-                <option key={p} value={p}>
-                  {periodLabels[p]}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* 2. Multiselect de Veículos (Placas) */}
-          <div>
-            <label className="block text-[11px] font-bold text-slate-500 uppercase mb-1 flex items-center gap-1">
-              <TruckIcon className="w-3 h-3 text-slate-400" />
-              Veículos (Placas)
-            </label>
-            <MultiSelect
-              options={truckOptions}
-              value={selectedTruckIds}
-              onChange={setSelectedTruckIds}
-              allLabel="Todos os Veículos"
-              searchPlaceholder="Filtrar por placa..."
-              aria-label="Filtro de veículos"
-            />
-          </div>
-
-          {/* 3. Multiselect de Motoristas */}
-          <div>
-            <label className="block text-[11px] font-bold text-slate-500 uppercase mb-1 flex items-center gap-1">
-              <Users className="w-3 h-3 text-slate-400" />
-              Motoristas
-            </label>
-            <MultiSelect
-              options={driverOptions}
-              value={selectedDriverIds}
-              onChange={setSelectedDriverIds}
-              allLabel="Todos os Motoristas"
-              searchPlaceholder="Filtrar por motorista..."
-              aria-label="Filtro de motoristas"
-            />
-          </div>
-        </div>
-
-        {hasActiveFilters && (
-          <div className="pt-1 text-[11px] text-slate-500 flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            Exibindo dados recalculados dinamicamente para os filtros selecionados.
-          </div>
-        )}
-      </div>
+      <DashboardFilterBar
+        trucks={trucks}
+        drivers={drivers}
+        value={filters}
+        onChange={setFilters}
+        resultCount={filteredData.filteredTrips.length + filteredData.filteredFuelLogs.length + filteredData.filteredMaintenanceLogs.length}
+      />
 
       {/* Cards de KPIs Principais (Refatorados com Hierarquia Financeira) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

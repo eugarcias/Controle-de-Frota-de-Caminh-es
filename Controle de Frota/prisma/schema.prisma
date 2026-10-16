@@ -10,6 +10,10 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
+// ════════════════════════════════════════════════════════════════
+// ENUMS
+// ════════════════════════════════════════════════════════════════
+
 enum TruckStatus {
   ATIVO
   MANUTENCAO
@@ -25,6 +29,11 @@ enum DriverStatus {
 enum FuelType {
   DIESEL_S10
   DIESEL_S500
+}
+
+enum FuelSource {
+  POSTO_EXTERNO
+  BOMBA_PROPRIA
 }
 
 enum MaintenanceType {
@@ -54,6 +63,130 @@ enum TireStatus {
   SUCATA
 }
 
+enum TripStatus {
+  PLANEJADO
+  EM_VIAGEM
+  CONCLUIDO
+  CANCELADO
+}
+
+enum SettlementStatus {
+  RASCUNHO
+  EM_CONFERENCIA
+  FECHADO
+  PAGO
+}
+
+enum AdvanceType {
+  DINHEIRO
+  PIX
+  CARTAO_COMBUSTIVEL
+  OUTRO
+}
+
+enum TripExpenseCategory {
+  PEDAGIO
+  CHAPA
+  ESTADIA
+  ALIMENTACAO
+  BORRACHARIA
+  BALSA
+  LAVAGEM
+  MULTA
+  OUTROS
+}
+
+enum ContractStatus {
+  RASCUNHO
+  EMITIDO
+  ASSINADO
+  CANCELADO
+}
+
+enum RpaStatus {
+  EMITIDO
+  PAGO
+  CANCELADO
+}
+
+enum PartyKind {
+  FORNECEDOR_GERAL
+  OFICINA
+  POSTO
+  BORRACHARIA
+  RECAPADORA
+  OUTRO
+}
+
+enum BankAccountType {
+  CORRENTE
+  POUPANCA
+  CAIXA
+}
+
+enum FinanceStatus {
+  ABERTO
+  PARCIAL
+  PAGO
+  VENCIDO
+  CANCELADO
+}
+
+enum TransactionDirection {
+  CREDITO
+  DEBITO
+}
+
+enum ReconciliationStatus {
+  PENDENTE
+  SUGERIDO
+  CONCILIADO
+  IGNORADO
+}
+
+enum CategoryKind {
+  RECEITA
+  DESPESA
+}
+
+enum ServiceOrderStatus {
+  ABERTA
+  EM_EXECUCAO
+  AGUARDANDO_PECA
+  CONCLUIDA
+  CANCELADA
+}
+
+enum WorkshopType {
+  INTERNA
+  EXTERNA
+}
+
+enum InfractionStatus {
+  PENDENTE
+  RECURSO
+  PAGA
+  CANCELADA
+}
+
+enum InfractionLiability {
+  EMPRESA
+  MOTORISTA
+}
+
+enum TireEventType {
+  MONTAGEM
+  DESMONTAGEM
+  RODIZIO
+  RECAPAGEM
+  CALIBRAGEM
+  DESCARTE
+}
+
+// ════════════════════════════════════════════════════════════════
+// CADASTROS BASE
+// ════════════════════════════════════════════════════════════════
+
 model Truck {
   id                 String      @id @default(uuid()) @db.Uuid
   plate              String      @unique
@@ -63,94 +196,110 @@ model Truck {
   tankCapacityLiters Int         @default(0) @map("tank_capacity_liters")
   initialOdometer    Int         @default(0) @map("initial_odometer")
   currentOdometer    Int         @default(0) @map("current_odometer")
+  renavam            String?
+  chassis            String?
   status             TruckStatus @default(ATIVO)
   createdAt          DateTime    @default(now()) @map("created_at")
 
-  fuelLogs        FuelLog[]
-  maintenanceLogs MaintenanceLog[]
-  tires           Tire[]
-  trips           FreightTrip[]
+  fuelLogs         FuelLog[]
+  maintenanceLogs  MaintenanceLog[]
+  maintenancePlans MaintenancePlan[]
+  serviceOrders    ServiceOrder[]
+  tires            Tire[]
+  tireEvents       TireEvent[]
+  trips            FreightTrip[]
+  infractions      Infraction[]
 
   @@map("trucks")
 }
 
 model Driver {
-  id          String       @id @default(uuid()) @db.Uuid
-  name        String
+  id           String       @id @default(uuid()) @db.Uuid
+  name         String
   // CNH opcional no cadastro rápido (NULL não conflita com @unique)
-  cnhNumber   String?      @unique @map("cnh_number")
-  cnhCategory String       @default("") @map("cnh_category")
-  phone       String
-  status      DriverStatus @default(ATIVO)
+  cnhNumber    String?      @unique @map("cnh_number")
+  cnhCategory  String       @default("") @map("cnh_category")
+  cnhExpiry    DateTime?    @map("cnh_expiry")
+  phone        String
+  // Dados para RPA (autônomo)
+  cpf          String?      @unique
+  pisNit       String?      @map("pis_nit")
+  isAutonomous Boolean      @default(false) @map("is_autonomous")
+  pixKey       String?      @map("pix_key")
+  bankInfo     String?      @map("bank_info")
+  status       DriverStatus @default(ATIVO)
 
-  fuelLogs FuelLog[]
-  trips    FreightTrip[]
+  fuelLogs     FuelLog[]
+  trips        FreightTrip[]
+  settlements  TripSettlement[]
+  advances     TripAdvance[]
+  rpas         Rpa[]
+  contracts    FreightContract[]
+  driverTables DriverFreightTable[]
+  infractions  Infraction[]
+  payables     Payable[]
 
   @@map("drivers")
 }
 
-model FuelLog {
-  id              String   @id @default(uuid()) @db.Uuid
-  truckId         String   @map("truck_id") @db.Uuid
-  driverId        String   @map("driver_id") @db.Uuid
-  date            DateTime
-  odometer        Int
-  fuelType        FuelType @default(DIESEL_S10) @map("fuel_type")
-  liters          Decimal  @db.Decimal(10, 2)
-  pricePerLiter   Decimal  @map("price_per_liter") @db.Decimal(8, 3)
-  totalAmount     Decimal  @map("total_amount") @db.Decimal(12, 2)
-  arlaLiters      Decimal  @default(0) @map("arla_liters") @db.Decimal(10, 2)
-  arlaAmount      Decimal  @default(0) @map("arla_amount") @db.Decimal(12, 2)
-  isFullTank      Boolean  @default(false) @map("is_full_tank")
-  gasStationName  String   @map("gas_station_name")
-  receiptPhotoUrl String?  @map("receipt_photo_url")
-  createdAt       DateTime @default(now()) @map("created_at")
+model Customer {
+  id               String  @id @default(uuid()) @db.Uuid
+  name             String
+  cnpj             String? @unique
+  contactName      String  @default("") @map("contact_name")
+  phone            String
+  email            String  @default("")
+  city             String  @default("")
+  state            String  @default("")
+  paymentTermsDays Int     @default(30) @map("payment_terms_days")
+  notes            String?
 
-  truck  Truck  @relation(fields: [truckId], references: [id])
-  driver Driver @relation(fields: [driverId], references: [id])
+  trips         FreightTrip[]
+  schedules     CargoSchedule[]
+  freightTables FreightTable[]
+  receivables   Receivable[]
 
-  @@index([truckId, date])
-  @@index([truckId, odometer])
-  @@map("fuel_logs")
+  @@map("customers")
 }
 
-model MaintenanceLog {
-  id                       String              @id @default(uuid()) @db.Uuid
-  truckId                  String              @map("truck_id") @db.Uuid
-  date                     DateTime
-  odometerAtService        Int                 @map("odometer_at_service")
-  type                     MaintenanceType
-  category                 MaintenanceCategory
-  description              String
-  partsCost                Decimal             @default(0) @map("parts_cost") @db.Decimal(12, 2)
-  laborCost                Decimal             @default(0) @map("labor_cost") @db.Decimal(12, 2)
-  totalCost                Decimal             @map("total_cost") @db.Decimal(12, 2)
-  supplierName             String              @map("supplier_name")
-  nextServiceOdometerAlert Int?                @map("next_service_odometer_alert")
-  receiptPhotoUrl          String?             @map("receipt_photo_url")
-  createdAt                DateTime            @default(now()) @map("created_at")
+/// Fornecedores gerais (oficinas, postos, recapadoras...). TireSupplier segue existente.
+model Supplier {
+  id          String    @id @default(uuid()) @db.Uuid
+  name        String
+  cnpjCpf     String?   @unique @map("cnpj_cpf")
+  kind        PartyKind @default(FORNECEDOR_GERAL)
+  contactName String    @default("") @map("contact_name")
+  phone       String    @default("")
+  email       String    @default("")
+  city        String    @default("")
+  state       String    @default("")
+  notes       String?
 
-  truck Truck @relation(fields: [truckId], references: [id])
+  payables      Payable[]
+  serviceOrders ServiceOrder[]
+  retreads      TireRetread[]
 
-  @@index([truckId, date])
-  @@map("maintenance_logs")
+  @@map("suppliers")
 }
 
-model Tire {
-  id           String       @id @default(uuid()) @db.Uuid
-  truckId      String?      @map("truck_id") @db.Uuid
-  fireCode     String       @unique @map("fire_code")
-  brand        String
-  model        String
-  axlePosition AxlePosition @map("axle_position")
-  status       TireStatus   @default(NOVO)
-  currentKm    Int          @default(0) @map("current_km")
-  purchaseCost Decimal      @map("purchase_cost") @db.Decimal(12, 2)
+model TireSupplier {
+  id          String  @id @default(uuid()) @db.Uuid
+  name        String
+  cnpj        String  @unique
+  contactName String  @map("contact_name")
+  phone       String
+  email       String
+  city        String
+  state       String
+  brandsSold  String  @map("brands_sold")
+  notes       String?
 
-  truck Truck? @relation(fields: [truckId], references: [id])
-
-  @@map("tires")
+  @@map("tire_suppliers")
 }
+
+// ════════════════════════════════════════════════════════════════
+// 1. FRETES: PRECIFICAÇÃO, CONTRATO, RPA, ACERTO
+// ════════════════════════════════════════════════════════════════
 
 model FreightTrip {
   id                    String    @id @default(uuid()) @db.Uuid
@@ -171,6 +320,7 @@ model FreightTrip {
   cargoDescription      String?   @map("cargo_description")
   cargoWeightKg         Int?      @map("cargo_weight_kg")
   paymentTerms          String?   @map("payment_terms")
+  // Mantido String para compatibilidade com dados legados; valores = TripStatus
   status                String    @default("PLANEJADO")
   notes                 String?
   grossFreightValue     Decimal   @map("gross_freight_value") @db.Decimal(12, 2)
@@ -178,47 +328,173 @@ model FreightTrip {
   loadingUnloadingCosts Decimal   @default(0) @map("loading_unloading_costs") @db.Decimal(12, 2)
   otherExpenses         Decimal   @default(0) @map("other_expenses") @db.Decimal(12, 2)
   netFreightValue       Decimal   @default(0) @map("net_freight_value") @db.Decimal(12, 2)
+  freightTableId        String?   @map("freight_table_id") @db.Uuid
 
-  truck    Truck     @relation(fields: [truckId], references: [id])
-  driver   Driver    @relation(fields: [driverId], references: [id])
-  customer Customer? @relation(fields: [customerId], references: [id])
+  truck        Truck            @relation(fields: [truckId], references: [id])
+  driver       Driver           @relation(fields: [driverId], references: [id])
+  customer     Customer?        @relation(fields: [customerId], references: [id])
+  freightTable FreightTable?    @relation(fields: [freightTableId], references: [id])
+  contract     FreightContract?
+  settlement   TripSettlement?
+  advances     TripAdvance[]
+  expenses     TripExpense[]
+  rpas         Rpa[]
+  receivables  Receivable[]
 
   @@index([truckId, startDate])
+  @@index([driverId, startDate])
   @@index([destinationState, destinationCity])
   @@map("freight_trips")
 }
 
-model Customer {
-  id               String  @id @default(uuid()) @db.Uuid
+/// Tabela de preços de frete (por cliente / rota)
+model FreightTable {
+  id               String    @id @default(uuid()) @db.Uuid
+  customerId       String?   @map("customer_id") @db.Uuid
   name             String
-  cnpj             String? @unique
-  contactName      String  @default("") @map("contact_name")
-  phone            String
-  email            String  @default("")
-  city             String  @default("")
-  state            String  @default("")
-  paymentTermsDays Int     @default(30) @map("payment_terms_days")
-  notes            String?
+  originCity       String    @default("") @map("origin_city")
+  originState      String    @default("") @map("origin_state")
+  destinationCity  String    @map("destination_city")
+  destinationState String    @map("destination_state")
+  ratePerTon       Decimal?  @map("rate_per_ton") @db.Decimal(12, 2)
+  ratePerKm        Decimal?  @map("rate_per_km") @db.Decimal(10, 4)
+  fixedValue       Decimal?  @map("fixed_value") @db.Decimal(12, 2)
+  validFrom        DateTime  @default(now()) @map("valid_from")
+  validUntil       DateTime? @map("valid_until")
+  active           Boolean   @default(true)
 
-  trips     FreightTrip[]
-  schedules CargoSchedule[]
+  customer Customer?     @relation(fields: [customerId], references: [id])
+  trips    FreightTrip[]
 
-  @@map("customers")
+  @@index([destinationState, destinationCity])
+  @@map("freight_tables")
 }
 
-model TireSupplier {
-  id          String  @id @default(uuid()) @db.Uuid
-  name        String
-  cnpj        String  @unique
-  contactName String  @map("contact_name")
-  phone       String
-  email       String
-  city        String
-  state       String
-  brandsSold  String  @map("brands_sold")
-  notes       String?
+/// Tabela de frete específica do motorista (valor/comissão pago ao motorista por rota)
+model DriverFreightTable {
+  id               String    @id @default(uuid()) @db.Uuid
+  driverId         String    @map("driver_id") @db.Uuid
+  originCity       String    @default("") @map("origin_city")
+  destinationCity  String    @map("destination_city")
+  destinationState String    @map("destination_state")
+  // Modelo de remuneração: percentual do frete OU valor fixo OU por tonelada
+  commissionPct    Decimal?  @map("commission_pct") @db.Decimal(5, 2)
+  fixedValue       Decimal?  @map("fixed_value") @db.Decimal(12, 2)
+  ratePerTon       Decimal?  @map("rate_per_ton") @db.Decimal(12, 2)
+  validFrom        DateTime  @default(now()) @map("valid_from")
+  validUntil       DateTime? @map("valid_until")
+  active           Boolean   @default(true)
 
-  @@map("tire_suppliers")
+  driver Driver @relation(fields: [driverId], references: [id])
+
+  @@index([driverId, destinationState, destinationCity])
+  @@map("driver_freight_tables")
+}
+
+model FreightContract {
+  id          String         @id @default(uuid()) @db.Uuid
+  number      String         @unique
+  tripId      String         @unique @map("trip_id") @db.Uuid
+  driverId    String         @map("driver_id") @db.Uuid
+  value       Decimal        @db.Decimal(12, 2)
+  terms       String?
+  status      ContractStatus @default(RASCUNHO)
+  issuedAt    DateTime       @default(now()) @map("issued_at")
+  signedAt    DateTime?      @map("signed_at")
+  documentUrl String?        @map("document_url")
+
+  trip   FreightTrip @relation(fields: [tripId], references: [id])
+  driver Driver      @relation(fields: [driverId], references: [id])
+
+  @@map("freight_contracts")
+}
+
+/// Recibo de Pagamento a Autônomo
+model Rpa {
+  id           String    @id @default(uuid()) @db.Uuid
+  number       String    @unique
+  driverId     String    @map("driver_id") @db.Uuid
+  tripId       String?   @map("trip_id") @db.Uuid
+  settlementId String?   @unique @map("settlement_id") @db.Uuid
+  competence   DateTime
+  description  String
+  grossAmount  Decimal   @map("gross_amount") @db.Decimal(12, 2)
+  inssAmount   Decimal   @default(0) @map("inss_amount") @db.Decimal(12, 2)
+  irrfAmount   Decimal   @default(0) @map("irrf_amount") @db.Decimal(12, 2)
+  issAmount    Decimal   @default(0) @map("iss_amount") @db.Decimal(12, 2)
+  netAmount    Decimal   @map("net_amount") @db.Decimal(12, 2)
+  status       RpaStatus @default(EMITIDO)
+  issuedAt     DateTime  @default(now()) @map("issued_at")
+  paidAt       DateTime? @map("paid_at")
+
+  driver     Driver          @relation(fields: [driverId], references: [id])
+  trip       FreightTrip?    @relation(fields: [tripId], references: [id])
+  settlement TripSettlement? @relation(fields: [settlementId], references: [id])
+  payable    Payable?
+
+  @@index([driverId, competence])
+  @@map("rpas")
+}
+
+model TripAdvance {
+  id       String      @id @default(uuid()) @db.Uuid
+  tripId   String      @map("trip_id") @db.Uuid
+  driverId String      @map("driver_id") @db.Uuid
+  date     DateTime
+  type     AdvanceType @default(DINHEIRO)
+  amount   Decimal     @db.Decimal(12, 2)
+  notes    String?
+
+  trip   FreightTrip @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  driver Driver      @relation(fields: [driverId], references: [id])
+
+  @@index([tripId])
+  @@map("trip_advances")
+}
+
+model TripExpense {
+  id           String              @id @default(uuid()) @db.Uuid
+  tripId       String              @map("trip_id") @db.Uuid
+  date         DateTime
+  category     TripExpenseCategory @default(OUTROS)
+  description  String?
+  amount       Decimal             @db.Decimal(12, 2)
+  // true = motorista pagou do bolso (reembolsável); false = custo já pago pela empresa
+  paidByDriver Boolean             @default(true) @map("paid_by_driver")
+  receiptUrl   String?             @map("receipt_url")
+  approved     Boolean             @default(false)
+
+  trip FreightTrip @relation(fields: [tripId], references: [id], onDelete: Cascade)
+
+  @@index([tripId])
+  @@map("trip_expenses")
+}
+
+/// Acerto financeiro da viagem (prestação de contas do motorista)
+model TripSettlement {
+  id              String           @id @default(uuid()) @db.Uuid
+  tripId          String           @unique @map("trip_id") @db.Uuid
+  driverId        String           @map("driver_id") @db.Uuid
+  status          SettlementStatus @default(RASCUNHO)
+  grossFreight    Decimal          @map("gross_freight") @db.Decimal(12, 2)
+  // Parcela do motorista (comissão/valor combinado) antes de deduções
+  driverShare     Decimal          @map("driver_share") @db.Decimal(12, 2)
+  totalAdvances   Decimal          @default(0) @map("total_advances") @db.Decimal(12, 2)
+  // Despesas pagas pelo motorista e aprovadas (somam ao valor a receber)
+  reimbursements  Decimal          @default(0) @map("reimbursements") @db.Decimal(12, 2)
+  // Despesas/multas/avarias debitadas do motorista
+  otherDeductions Decimal          @default(0) @map("other_deductions") @db.Decimal(12, 2)
+  // driverShare + reimbursements - totalAdvances - otherDeductions (pode ser negativo => motorista devolve)
+  netToDriver     Decimal          @map("net_to_driver") @db.Decimal(12, 2)
+  notes           String?
+  closedAt        DateTime?        @map("closed_at")
+  createdAt       DateTime         @default(now()) @map("created_at")
+
+  trip   FreightTrip @relation(fields: [tripId], references: [id])
+  driver Driver      @relation(fields: [driverId], references: [id])
+  rpa    Rpa?
+
+  @@map("trip_settlements")
 }
 
 model CargoSchedule {
@@ -243,3 +519,436 @@ model CargoSchedule {
   @@map("cargo_schedules")
 }
 
+// ════════════════════════════════════════════════════════════════
+// 2. FINANCEIRO: CONTAS, OFX, ORÇAMENTO
+// ════════════════════════════════════════════════════════════════
+
+model FinancialCategory {
+  id       String       @id @default(uuid()) @db.Uuid
+  name     String
+  kind     CategoryKind
+  parentId String?      @map("parent_id") @db.Uuid
+
+  parent      FinancialCategory?  @relation("CategoryTree", fields: [parentId], references: [id])
+  children    FinancialCategory[] @relation("CategoryTree")
+  payables    Payable[]
+  receivables Receivable[]
+  budgetLines BudgetLine[]
+
+  @@unique([name, kind])
+  @@map("financial_categories")
+}
+
+model BankAccount {
+  id             String          @id @default(uuid()) @db.Uuid
+  name           String
+  bankCode       String          @default("") @map("bank_code")
+  agency         String          @default("")
+  accountNumber  String          @default("") @map("account_number")
+  type           BankAccountType @default(CORRENTE)
+  initialBalance Decimal         @default(0) @map("initial_balance") @db.Decimal(14, 2)
+  active         Boolean         @default(true)
+
+  transactions BankTransaction[]
+  imports      OfxImport[]
+  payables     Payable[]
+  receivables  Receivable[]
+
+  @@map("bank_accounts")
+}
+
+model OfxImport {
+  id            String    @id @default(uuid()) @db.Uuid
+  bankAccountId String    @map("bank_account_id") @db.Uuid
+  fileName      String    @map("file_name")
+  periodStart   DateTime? @map("period_start")
+  periodEnd     DateTime? @map("period_end")
+  totalImported Int       @default(0) @map("total_imported")
+  totalSkipped  Int       @default(0) @map("total_skipped")
+  importedAt    DateTime  @default(now()) @map("imported_at")
+
+  bankAccount  BankAccount       @relation(fields: [bankAccountId], references: [id])
+  transactions BankTransaction[]
+
+  @@map("ofx_imports")
+}
+
+model BankTransaction {
+  id             String               @id @default(uuid()) @db.Uuid
+  bankAccountId  String               @map("bank_account_id") @db.Uuid
+  ofxImportId    String?              @map("ofx_import_id") @db.Uuid
+  // FITID do OFX: garante idempotência na reimportação do mesmo extrato
+  fitId          String?              @map("fit_id")
+  date           DateTime
+  amount         Decimal              @db.Decimal(14, 2)
+  direction      TransactionDirection
+  memo           String
+  checkNumber    String?              @map("check_number")
+  reconciliation ReconciliationStatus @default(PENDENTE)
+  reconciledAt   DateTime?            @map("reconciled_at")
+
+  bankAccount BankAccount @relation(fields: [bankAccountId], references: [id])
+  ofxImport   OfxImport?  @relation(fields: [ofxImportId], references: [id])
+  payable     Payable?
+  receivable  Receivable?
+
+  @@unique([bankAccountId, fitId])
+  @@index([bankAccountId, date])
+  @@index([reconciliation])
+  @@map("bank_transactions")
+}
+
+model Payable {
+  id                String        @id @default(uuid()) @db.Uuid
+  description       String
+  supplierId        String?       @map("supplier_id") @db.Uuid
+  driverId          String?       @map("driver_id") @db.Uuid
+  categoryId        String?       @map("category_id") @db.Uuid
+  bankAccountId     String?       @map("bank_account_id") @db.Uuid
+  amount            Decimal       @db.Decimal(14, 2)
+  paidAmount        Decimal       @default(0) @map("paid_amount") @db.Decimal(14, 2)
+  issueDate         DateTime      @default(now()) @map("issue_date")
+  dueDate           DateTime      @map("due_date")
+  paidDate          DateTime?     @map("paid_date")
+  status            FinanceStatus @default(ABERTO)
+  documentNumber    String?       @map("document_number")
+  installment       Int           @default(1)
+  totalInstallments Int           @default(1) @map("total_installments")
+  // Origem (rastreabilidade para análise de gargalos)
+  rpaId             String?       @unique @map("rpa_id") @db.Uuid
+  serviceOrderId    String?       @map("service_order_id") @db.Uuid
+  infractionId      String?       @map("infraction_id") @db.Uuid
+  // Conciliação bancária
+  bankTransactionId String?       @unique @map("bank_transaction_id") @db.Uuid
+
+  supplier        Supplier?          @relation(fields: [supplierId], references: [id])
+  driver          Driver?            @relation(fields: [driverId], references: [id])
+  category        FinancialCategory? @relation(fields: [categoryId], references: [id])
+  bankAccount     BankAccount?       @relation(fields: [bankAccountId], references: [id])
+  rpa             Rpa?               @relation(fields: [rpaId], references: [id])
+  serviceOrder    ServiceOrder?      @relation(fields: [serviceOrderId], references: [id])
+  infraction      Infraction?        @relation(fields: [infractionId], references: [id])
+  bankTransaction BankTransaction?   @relation(fields: [bankTransactionId], references: [id])
+
+  @@index([dueDate, status])
+  @@map("payables")
+}
+
+model Receivable {
+  id                String        @id @default(uuid()) @db.Uuid
+  description       String
+  customerId        String?       @map("customer_id") @db.Uuid
+  tripId            String?       @map("trip_id") @db.Uuid
+  categoryId        String?       @map("category_id") @db.Uuid
+  bankAccountId     String?       @map("bank_account_id") @db.Uuid
+  amount            Decimal       @db.Decimal(14, 2)
+  receivedAmount    Decimal       @default(0) @map("received_amount") @db.Decimal(14, 2)
+  issueDate         DateTime      @default(now()) @map("issue_date")
+  dueDate           DateTime      @map("due_date")
+  receivedDate      DateTime?     @map("received_date")
+  status            FinanceStatus @default(ABERTO)
+  documentNumber    String?       @map("document_number")
+  bankTransactionId String?       @unique @map("bank_transaction_id") @db.Uuid
+
+  customer        Customer?          @relation(fields: [customerId], references: [id])
+  trip            FreightTrip?       @relation(fields: [tripId], references: [id])
+  category        FinancialCategory? @relation(fields: [categoryId], references: [id])
+  bankAccount     BankAccount?       @relation(fields: [bankAccountId], references: [id])
+  bankTransaction BankTransaction?   @relation(fields: [bankTransactionId], references: [id])
+
+  @@index([dueDate, status])
+  @@map("receivables")
+}
+
+model Budget {
+  id     String  @id @default(uuid()) @db.Uuid
+  name   String
+  year   Int
+  active Boolean @default(true)
+
+  lines BudgetLine[]
+
+  @@unique([name, year])
+  @@map("budgets")
+}
+
+model BudgetLine {
+  id         String  @id @default(uuid()) @db.Uuid
+  budgetId   String  @map("budget_id") @db.Uuid
+  categoryId String  @map("category_id") @db.Uuid
+  month      Int
+  planned    Decimal @db.Decimal(14, 2)
+
+  budget   Budget            @relation(fields: [budgetId], references: [id], onDelete: Cascade)
+  category FinancialCategory @relation(fields: [categoryId], references: [id])
+
+  @@unique([budgetId, categoryId, month])
+  @@map("budget_lines")
+}
+
+// ════════════════════════════════════════════════════════════════
+// 3. FROTA: ABASTECIMENTO, MANUTENÇÃO/OS, PNEUS, MULTAS
+// ════════════════════════════════════════════════════════════════
+
+/// Tanque/bomba própria da empresa
+model FuelStorageTank {
+  id              String  @id @default(uuid()) @db.Uuid
+  name            String
+  capacityLiters  Int     @map("capacity_liters")
+  currentLiters   Decimal @default(0) @map("current_liters") @db.Decimal(12, 2)
+  avgCostPerLiter Decimal @default(0) @map("avg_cost_per_liter") @db.Decimal(8, 3)
+
+  entries  FuelStorageEntry[]
+  fuelLogs FuelLog[]
+
+  @@map("fuel_storage_tanks")
+}
+
+model FuelStorageEntry {
+  id            String   @id @default(uuid()) @db.Uuid
+  tankId        String   @map("tank_id") @db.Uuid
+  date          DateTime
+  liters        Decimal  @db.Decimal(12, 2)
+  pricePerLiter Decimal  @map("price_per_liter") @db.Decimal(8, 3)
+  invoiceNumber String?  @map("invoice_number")
+
+  tank FuelStorageTank @relation(fields: [tankId], references: [id])
+
+  @@map("fuel_storage_entries")
+}
+
+model FuelLog {
+  id              String     @id @default(uuid()) @db.Uuid
+  truckId         String     @map("truck_id") @db.Uuid
+  driverId        String     @map("driver_id") @db.Uuid
+  date            DateTime
+  odometer        Int
+  fuelType        FuelType   @default(DIESEL_S10) @map("fuel_type")
+  source          FuelSource @default(POSTO_EXTERNO)
+  storageTankId   String?    @map("storage_tank_id") @db.Uuid
+  liters          Decimal    @db.Decimal(10, 2)
+  pricePerLiter   Decimal    @map("price_per_liter") @db.Decimal(8, 3)
+  totalAmount     Decimal    @map("total_amount") @db.Decimal(12, 2)
+  arlaLiters      Decimal    @default(0) @map("arla_liters") @db.Decimal(10, 2)
+  arlaAmount      Decimal    @default(0) @map("arla_amount") @db.Decimal(12, 2)
+  isFullTank      Boolean    @default(false) @map("is_full_tank")
+  gasStationName  String     @map("gas_station_name")
+  receiptPhotoUrl String?    @map("receipt_photo_url")
+  // Auditoria da leitura por IA (/api/ocr-fuel)
+  ocrExtracted    Boolean    @default(false) @map("ocr_extracted")
+  ocrRawJson      Json?      @map("ocr_raw_json")
+  createdAt       DateTime   @default(now()) @map("created_at")
+
+  truck       Truck            @relation(fields: [truckId], references: [id])
+  driver      Driver           @relation(fields: [driverId], references: [id])
+  storageTank FuelStorageTank? @relation(fields: [storageTankId], references: [id])
+
+  @@index([truckId, date])
+  @@index([truckId, odometer])
+  @@map("fuel_logs")
+}
+
+model MaintenanceLog {
+  id                       String              @id @default(uuid()) @db.Uuid
+  truckId                  String              @map("truck_id") @db.Uuid
+  serviceOrderId           String?             @map("service_order_id") @db.Uuid
+  date                     DateTime
+  odometerAtService        Int                 @map("odometer_at_service")
+  type                     MaintenanceType
+  category                 MaintenanceCategory
+  description              String
+  partsCost                Decimal             @default(0) @map("parts_cost") @db.Decimal(12, 2)
+  laborCost                Decimal             @default(0) @map("labor_cost") @db.Decimal(12, 2)
+  totalCost                Decimal             @map("total_cost") @db.Decimal(12, 2)
+  supplierName             String              @map("supplier_name")
+  nextServiceOdometerAlert Int?                @map("next_service_odometer_alert")
+  receiptPhotoUrl          String?             @map("receipt_photo_url")
+  createdAt                DateTime            @default(now()) @map("created_at")
+
+  truck        Truck         @relation(fields: [truckId], references: [id])
+  serviceOrder ServiceOrder? @relation(fields: [serviceOrderId], references: [id])
+
+  @@index([truckId, date])
+  @@map("maintenance_logs")
+}
+
+/// Plano de revisão: gera alertas por km e/ou dias
+model MaintenancePlan {
+  id              String              @id @default(uuid()) @db.Uuid
+  truckId         String              @map("truck_id") @db.Uuid
+  category        MaintenanceCategory
+  description     String
+  intervalKm      Int?                @map("interval_km")
+  intervalDays    Int?                @map("interval_days")
+  lastDoneKm      Int?                @map("last_done_km")
+  lastDoneDate    DateTime?           @map("last_done_date")
+  // Antecedência do alerta
+  alertBeforeKm   Int                 @default(1000) @map("alert_before_km")
+  alertBeforeDays Int                 @default(15) @map("alert_before_days")
+  active          Boolean             @default(true)
+
+  truck Truck @relation(fields: [truckId], references: [id])
+
+  @@index([truckId, active])
+  @@map("maintenance_plans")
+}
+
+model ServiceOrder {
+  id              String             @id @default(uuid()) @db.Uuid
+  number          String             @unique
+  truckId         String             @map("truck_id") @db.Uuid
+  supplierId      String?            @map("supplier_id") @db.Uuid
+  workshopType    WorkshopType       @default(EXTERNA) @map("workshop_type")
+  type            MaintenanceType
+  status          ServiceOrderStatus @default(ABERTA)
+  openedAt        DateTime           @default(now()) @map("opened_at")
+  expectedAt      DateTime?          @map("expected_at")
+  closedAt        DateTime?          @map("closed_at")
+  odometer        Int
+  problemReported String             @map("problem_reported")
+  diagnosis       String?
+  mechanicName    String?            @map("mechanic_name")
+  partsTotal      Decimal            @default(0) @map("parts_total") @db.Decimal(12, 2)
+  laborTotal      Decimal            @default(0) @map("labor_total") @db.Decimal(12, 2)
+  totalCost       Decimal            @default(0) @map("total_cost") @db.Decimal(12, 2)
+
+  truck           Truck              @relation(fields: [truckId], references: [id])
+  supplier        Supplier?          @relation(fields: [supplierId], references: [id])
+  items           ServiceOrderItem[]
+  maintenanceLogs MaintenanceLog[]
+  payables        Payable[]
+
+  @@index([truckId, openedAt])
+  @@index([status])
+  @@map("service_orders")
+}
+
+model ServiceOrderItem {
+  id             String              @id @default(uuid()) @db.Uuid
+  serviceOrderId String              @map("service_order_id") @db.Uuid
+  category       MaintenanceCategory @default(OUTROS)
+  description    String
+  isLabor        Boolean             @default(false) @map("is_labor")
+  quantity       Decimal             @default(1) @db.Decimal(10, 2)
+  unitCost       Decimal             @map("unit_cost") @db.Decimal(12, 2)
+  totalCost      Decimal             @map("total_cost") @db.Decimal(12, 2)
+
+  serviceOrder ServiceOrder @relation(fields: [serviceOrderId], references: [id], onDelete: Cascade)
+
+  @@index([serviceOrderId])
+  @@map("service_order_items")
+}
+
+model Tire {
+  id              String       @id @default(uuid()) @db.Uuid
+  truckId         String?      @map("truck_id") @db.Uuid
+  /// Marca de fogo
+  fireCode        String       @unique @map("fire_code")
+  serialNumber    String?      @unique @map("serial_number")
+  dot             String?
+  brand           String
+  model           String
+  size            String?
+  axlePosition    AxlePosition @map("axle_position")
+  /// Posição física atual (ex.: "1E", "2DI") ; null = estoque
+  wheelPosition   String?      @map("wheel_position")
+  status          TireStatus   @default(NOVO)
+  currentKm       Int          @default(0) @map("current_km")
+  purchaseCost    Decimal      @map("purchase_cost") @db.Decimal(12, 2)
+  purchaseDate    DateTime?    @map("purchase_date")
+  // Vida útil
+  retreadCount    Int          @default(0) @map("retread_count")
+  maxRetreads     Int          @default(2) @map("max_retreads")
+  expectedLifeKm  Int          @default(0) @map("expected_life_km")
+  newTreadDepthMm Decimal?     @map("new_tread_depth_mm") @db.Decimal(4, 1)
+  minTreadDepthMm Decimal      @default(3.0) @map("min_tread_depth_mm") @db.Decimal(4, 1)
+  scrappedAt      DateTime?    @map("scrapped_at")
+
+  truck        Truck?            @relation(fields: [truckId], references: [id])
+  events       TireEvent[]
+  measurements TireMeasurement[]
+  retreads     TireRetread[]
+
+  @@index([truckId])
+  @@map("tires")
+}
+
+/// Histórico: montagem, rodízio, desmontagem...
+model TireEvent {
+  id           String        @id @default(uuid()) @db.Uuid
+  tireId       String        @map("tire_id") @db.Uuid
+  truckId      String?       @map("truck_id") @db.Uuid
+  type         TireEventType
+  date         DateTime
+  odometer     Int?
+  fromPosition String?       @map("from_position")
+  toPosition   String?       @map("to_position")
+  notes        String?
+
+  tire  Tire   @relation(fields: [tireId], references: [id], onDelete: Cascade)
+  truck Truck? @relation(fields: [truckId], references: [id])
+
+  @@index([tireId, date])
+  @@map("tire_events")
+}
+
+/// Medição de profundidade de sulco
+model TireMeasurement {
+  id          String   @id @default(uuid()) @db.Uuid
+  tireId      String   @map("tire_id") @db.Uuid
+  date        DateTime
+  odometer    Int?
+  depthMm     Decimal  @map("depth_mm") @db.Decimal(4, 1)
+  pressurePsi Int?     @map("pressure_psi")
+  notes       String?
+
+  tire Tire @relation(fields: [tireId], references: [id], onDelete: Cascade)
+
+  @@index([tireId, date])
+  @@map("tire_measurements")
+}
+
+model TireRetread {
+  id            String    @id @default(uuid()) @db.Uuid
+  tireId        String    @map("tire_id") @db.Uuid
+  supplierId    String?   @map("supplier_id") @db.Uuid
+  sentAt        DateTime  @map("sent_at")
+  returnedAt    DateTime? @map("returned_at")
+  cost          Decimal   @db.Decimal(12, 2)
+  kmAtRetread   Int       @map("km_at_retread")
+  retreadNumber Int       @map("retread_number")
+  rejected      Boolean   @default(false)
+
+  tire     Tire      @relation(fields: [tireId], references: [id], onDelete: Cascade)
+  supplier Supplier? @relation(fields: [supplierId], references: [id])
+
+  @@map("tire_retreads")
+}
+
+model Infraction {
+  id                   String              @id @default(uuid()) @db.Uuid
+  autoNumber           String              @unique @map("auto_number")
+  truckId              String              @map("truck_id") @db.Uuid
+  driverId             String?             @map("driver_id") @db.Uuid
+  date                 DateTime
+  location             String?
+  infractionCode       String?             @map("infraction_code")
+  description          String
+  points               Int                 @default(0)
+  amount               Decimal             @db.Decimal(12, 2)
+  discountedAmount     Decimal?            @map("discounted_amount") @db.Decimal(12, 2)
+  dueDate              DateTime?           @map("due_date")
+  status               InfractionStatus    @default(PENDENTE)
+  liability            InfractionLiability @default(EMPRESA)
+  // true => valor é debitado no acerto de viagem do motorista
+  deductFromSettlement Boolean             @default(false) @map("deduct_from_settlement")
+  documentUrl          String?             @map("document_url")
+
+  truck    Truck     @relation(fields: [truckId], references: [id])
+  driver   Driver?   @relation(fields: [driverId], references: [id])
+  payables Payable[]
+
+  @@index([truckId, date])
+  @@index([driverId, date])
+  @@map("infractions")
+}
