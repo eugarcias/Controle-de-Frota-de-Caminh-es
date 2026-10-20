@@ -209,6 +209,7 @@ model Truck {
   tireEvents       TireEvent[]
   trips            FreightTrip[]
   infractions      Infraction[]
+  profiles         UserProfile[]
 
   @@map("trucks")
 }
@@ -229,15 +230,17 @@ model Driver {
   bankInfo     String?      @map("bank_info")
   status       DriverStatus @default(ATIVO)
 
-  fuelLogs     FuelLog[]
-  trips        FreightTrip[]
-  settlements  TripSettlement[]
-  advances     TripAdvance[]
-  rpas         Rpa[]
-  contracts    FreightContract[]
-  driverTables DriverFreightTable[]
-  infractions  Infraction[]
-  payables     Payable[]
+  fuelLogs       FuelLog[]
+  trips          FreightTrip[]
+  settlements    TripSettlement[]
+  advances       TripAdvance[]
+  rpas           Rpa[]
+  contracts      FreightContract[]
+  driverTables   DriverFreightTable[]
+  infractions    Infraction[]
+  payables       Payable[]
+  profiles       UserProfile[]
+  travelExpenses TravelExpense[]
 
   @@map("drivers")
 }
@@ -330,16 +333,17 @@ model FreightTrip {
   netFreightValue       Decimal   @default(0) @map("net_freight_value") @db.Decimal(12, 2)
   freightTableId        String?   @map("freight_table_id") @db.Uuid
 
-  truck        Truck            @relation(fields: [truckId], references: [id])
-  driver       Driver           @relation(fields: [driverId], references: [id])
-  customer     Customer?        @relation(fields: [customerId], references: [id])
-  freightTable FreightTable?    @relation(fields: [freightTableId], references: [id])
-  contract     FreightContract?
-  settlement   TripSettlement?
-  advances     TripAdvance[]
-  expenses     TripExpense[]
-  rpas         Rpa[]
-  receivables  Receivable[]
+  truck          Truck            @relation(fields: [truckId], references: [id])
+  driver         Driver           @relation(fields: [driverId], references: [id])
+  customer       Customer?        @relation(fields: [customerId], references: [id])
+  freightTable   FreightTable?    @relation(fields: [freightTableId], references: [id])
+  contract       FreightContract?
+  settlement     TripSettlement?
+  advances       TripAdvance[]
+  expenses       TripExpense[]
+  travelExpenses TravelExpense[]
+  rpas           Rpa[]
+  receivables    Receivable[]
 
   @@index([truckId, startDate])
   @@index([driverId, startDate])
@@ -951,4 +955,65 @@ model Infraction {
   @@index([truckId, date])
   @@index([driverId, date])
   @@map("infractions")
+}
+
+// ---------------------------------------------------------------------------
+// Autenticação / RBAC
+// O login em si é do Supabase Auth (schema auth.users). Esta tabela guarda o
+// perfil de negócio: papel (ADMIN | DRIVER) e a quem o usuário está vinculado.
+// id = auth.users.id (sem FK no Prisma porque o schema auth é gerenciado pelo Supabase).
+// ---------------------------------------------------------------------------
+enum UserRole {
+  ADMIN
+  DRIVER
+}
+
+model UserProfile {
+  id        String   @id @db.Uuid
+  email     String   @unique
+  name      String
+  role      UserRole @default(DRIVER)
+  active    Boolean  @default(true)
+  // Motorista vinculado (obrigatório na prática para role DRIVER)
+  driverId  String?  @map("driver_id") @db.Uuid
+  // Caminhão padrão do motorista (além dos de fretes em aberto)
+  truckId   String?  @map("truck_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at")
+
+  driver Driver? @relation(fields: [driverId], references: [id])
+  truck  Truck?  @relation(fields: [truckId], references: [id])
+
+  @@map("user_profiles")
+}
+
+// ---------------------------------------------------------------------------
+// Despesas de viagem lançadas pelo motorista na estrada
+// (separado de TripExpense, que é a prestação de contas feita pelo escritório no acerto)
+// ---------------------------------------------------------------------------
+enum ExpenseCategory {
+  ALIMENTACAO
+  ESTACIONAMENTO
+  CHAPA
+  HOSPEDAGEM
+  OUTROS
+}
+
+model TravelExpense {
+  id              String          @id @default(uuid()) @db.Uuid
+  tripId          String          @map("trip_id") @db.Uuid
+  driverId        String          @map("driver_id") @db.Uuid
+  date            DateTime
+  category        ExpenseCategory
+  amount          Decimal         @db.Decimal(12, 2)
+  description     String          @default("")
+  // Caminho do arquivo no bucket privado 'receipts' do Supabase Storage
+  receiptPhotoUrl String?         @map("receipt_photo_url")
+  createdAt       DateTime        @default(now()) @map("created_at")
+
+  trip   FreightTrip @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  driver Driver      @relation(fields: [driverId], references: [id])
+
+  @@index([tripId])
+  @@index([driverId, date])
+  @@map("travel_expenses")
 }

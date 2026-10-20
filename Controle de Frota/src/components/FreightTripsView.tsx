@@ -15,7 +15,7 @@ import {
   MapPin,
   TrendingUp,
 } from 'lucide-react';
-import { FreightTrip, Truck, Driver, Customer, TripStatus } from '@/types';
+import { FreightTrip, Truck, Driver, Customer, TripStatus, FuelLog } from '@/types';
 import {
   Field,
   Modal,
@@ -30,6 +30,7 @@ import {
   newId,
 } from '@/components/ui';
 import { Combobox } from '@/components/ui/combobox';
+import { ProfitSimulator } from '@/components/ProfitSimulator';
 import { BR_STATES, splitDestination, routeLabel } from '@/lib/geo';
 
 interface FreightTripsViewProps {
@@ -37,6 +38,8 @@ interface FreightTripsViewProps {
   trucks: Truck[];
   drivers: Driver[];
   customers: Customer[];
+  /** Histórico de abastecimentos (base do km/L real usado no simulador) */
+  fuelLogs: FuelLog[];
   /** Consumo médio da frota (km/L) e último preço do diesel */
   estKmL: number;
   estDieselPrice: number;
@@ -86,6 +89,7 @@ export const FreightTripsView: React.FC<FreightTripsViewProps> = ({
   trucks,
   drivers,
   customers,
+  fuelLogs,
   estKmL,
   estDieselPrice,
   onAdd,
@@ -326,6 +330,13 @@ export const FreightTripsView: React.FC<FreightTripsViewProps> = ({
           </button>
         </div>
       </div>
+
+      <ProfitSimulator
+        trucks={trucks}
+        fuelLogs={fuelLogs}
+        fleetKmL={estKmL}
+        fleetDieselPrice={estDieselPrice}
+      />
 
       {filteredTrips.length === 0 && <EmptyState text="Nenhum frete encontrado para este filtro." />}
 

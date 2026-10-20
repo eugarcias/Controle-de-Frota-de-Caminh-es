@@ -135,6 +135,7 @@ export default function Home() {
             trucks={data.trucks}
             drivers={data.drivers}
             customers={data.customers}
+            fuelLogs={data.fuelLogs}
             estKmL={metrics.fleetAverageKmL || 2.1}
             estDieselPrice={lastDieselPrice}
             onAdd={(t) => addItem('trips', t)}

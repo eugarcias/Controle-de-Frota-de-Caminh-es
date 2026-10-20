@@ -194,3 +194,63 @@ export function formatCategory(cat: string): string {
   };
   return dict[cat] || cat;
 }
+
+/**
+ * 5. EFICIÊNCIA HISTÓRICA REAL DE UM CAMINHÃO (base do simulador de viagem)
+ *
+ * Usa apenas intervalos válidos de tanque cheio (calculateFuelConsumption) e faz a
+ * média PONDERADA: Σ km / Σ litros. Isso é mais fiel que a média simples dos km/L,
+ * pois um intervalo de 2.000 km pesa mais que um de 200 km.
+ * Intervalos distorcidos (< 1.8 ou > 4.5 km/L) são descartados como ruído de lançamento.
+ */
+export function calculateTruckEfficiency(logs: FuelLog[]): {
+  kmPerLiter: number | null;
+  sampleKm: number;
+  sampleLiters: number;
+  intervals: number;
+} {
+  const valid = calculateFuelConsumption(logs).filter(
+    (r) => r.averageKmL !== null && !r.isDistorted && r.kmTraveled > 0 && r.litersUsed > 0
+  );
+  const sampleKm = valid.reduce((a, r) => a + r.kmTraveled, 0);
+  const sampleLiters = valid.reduce((a, r) => a + r.litersUsed, 0);
+  return {
+    kmPerLiter: sampleLiters > 0 ? Number((sampleKm / sampleLiters).toFixed(2)) : null,
+    sampleKm,
+    sampleLiters: Number(sampleLiters.toFixed(2)),
+    intervals: valid.length,
+  };
+}
+
+/**
+ * 6. PROJEÇÃO DE RENTABILIDADE DE UMA CARGA
+ * diesel = (distância / km·L⁻¹) × preço do litro
+ * lucro  = frete − diesel − pedágios − outras despesas
+ */
+export function projectTripProfit(input: {
+  distanceKm: number;
+  grossFreight: number;
+  kmPerLiter: number;
+  dieselPrice: number;
+  tolls?: number;
+  otherCosts?: number;
+}) {
+  const { distanceKm, grossFreight, kmPerLiter, dieselPrice } = input;
+  const tolls = input.tolls ?? 0;
+  const otherCosts = input.otherCosts ?? 0;
+  const liters = kmPerLiter > 0 ? distanceKm / kmPerLiter : 0;
+  const dieselCost = liters * dieselPrice;
+  const totalCost = dieselCost + tolls + otherCosts;
+  const netProfit = grossFreight - totalCost;
+  return {
+    liters,
+    dieselCost,
+    totalCost,
+    netProfit,
+    marginPercent: grossFreight > 0 ? (netProfit / grossFreight) * 100 : 0,
+    // frete mínimo para não ter prejuízo
+    breakEvenFreight: totalCost,
+    freightPerKm: distanceKm > 0 ? grossFreight / distanceKm : 0,
+    costPerKm: distanceKm > 0 ? totalCost / distanceKm : 0,
+  };
+}
