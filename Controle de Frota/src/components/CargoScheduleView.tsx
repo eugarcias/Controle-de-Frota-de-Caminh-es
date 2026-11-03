@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useMemo, useState } from 'react';
-import { CalendarClock, Plus, ArrowRight, Package, Route, Play, Trash2, AlertTriangle } from 'lucide-react';
+import { CalendarClock, Plus, ArrowRight, Package, Route, Play, Trash2, AlertTriangle, UserPlus, UserCheck, Loader2 } from 'lucide-react';
 import { CargoSchedule, Customer, Driver, ScheduleStatus, Truck } from '@/types';
 import {
   Field,
@@ -20,7 +20,10 @@ interface Props {
   customers: Customer[];
   trucks: Truck[];
   drivers: Driver[];
-  onAdd: (s: CargoSchedule) => void;
+  /** Deve devolver o registro salvo (ou null em caso de erro) */
+  onAdd: (s: CargoSchedule) => Promise<unknown>;
+  /** Cadastro básico do cliente feito no próprio agendamento; devolve o cliente salvo (com o id do banco) */
+  onAddCustomer: (c: Customer) => Promise<Customer | null>;
   onUpdate: (id: string, patch: Partial<CargoSchedule>) => void;
   onRemove: (id: string) => void;
   /** Converte o agendamento em um frete (viagem) efetivo */
@@ -41,7 +44,12 @@ const statusTone: Record<ScheduleStatus, 'amber' | 'green' | 'slate' | 'red'> = 
 };
 
 const emptyForm = {
-  customerId: '',
+  // Cliente: digita o nome; se não existir, os campos abaixo viram o cadastro básico
+  customerName: '',
+  customerPhone: '',
+  customerCnpj: '',
+  customerCity: '',
+  customerState: '',
   truckId: '',
   driverId: '',
   origin: '',
@@ -62,6 +70,7 @@ export const CargoScheduleView: React.FC<Props> = ({
   trucks,
   drivers,
   onAdd,
+  onAddCustomer,
   onUpdate,
   onRemove,
   onConvert,
@@ -69,10 +78,21 @@ export const CargoScheduleView: React.FC<Props> = ({
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState(emptyForm);
   const [filter, setFilter] = useState<'ATIVAS' | 'TODAS'>('ATIVAS');
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const set = (k: keyof typeof emptyForm) => (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
   ) => setForm((f) => ({ ...f, [k]: e.target.value }));
+
+  // Cliente digitado já existe? (compara sem acento/maiúsculas/espaços extras)
+  const norm = (s: string) =>
+    s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().replace(/\s+/g, ' ').toLowerCase();
+  const matchedCustomer = useMemo(() => {
+    const n = norm(form.customerName);
+    return n ? customers.find((c) => norm(c.name) === n) ?? null : null;
+  }, [customers, form.customerName]);
+  const isNewCustomer = form.customerName.trim().length >= 2 && !matchedCustomer;
 
   const list = useMemo(
     () =>
@@ -105,32 +125,78 @@ export const CargoScheduleView: React.FC<Props> = ({
   const openModal = () => {
     setForm({
       ...emptyForm,
-      customerId: customers[0]?.id ?? '',
       pickupDate: new Date().toISOString().slice(0, 10),
     });
+    setSaveError(null);
     setOpen(true);
   };
 
-  const submit = (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const s: CargoSchedule = {
-      id: newId(),
-      customerId: form.customerId,
-      truckId: form.truckId || null,
-      driverId: form.driverId || null,
-      origin: form.origin.trim(),
-      destination: form.destination.trim(),
-      distanceKm: Number(form.distanceKm),
-      cargoDescription: form.cargoDescription.trim(),
-      cargoWeightKg: Number(form.cargoWeightKg) || 0,
-      pickupDate: `${form.pickupDate}T${form.pickupTime || '07:00'}:00.000Z`,
-      deliveryDate: form.deliveryDate ? `${form.deliveryDate}T12:00:00.000Z` : null,
-      freightValue: Number(form.freightValue),
-      status: 'AGENDADA',
-      notes: form.notes.trim(),
-    };
-    onAdd(s);
-    setOpen(false);
+    if (saving) return;
+    setSaveError(null);
+
+    const customerName = form.customerName.trim().replace(/\s+/g, ' ');
+    if (customerName.length < 2) {
+      setSaveError('Informe o nome do cliente.');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      // 1) Cliente: usa o existente ou faz o cadastro básico agora
+      let customerId = matchedCustomer?.id;
+      if (!customerId) {
+        const phone = form.customerPhone.trim();
+        if (phone.replace(/\D/g, '').length < 8) {
+          setSaveError('Informe um telefone válido para cadastrar o novo cliente.');
+          return;
+        }
+        const created = await onAddCustomer({
+          id: newId(), // o banco gera o id definitivo; usamos o que voltar da API
+          name: customerName,
+          contactName: customerName,
+          phone,
+          cnpj: form.customerCnpj.trim() || null,
+          email: '',
+          city: form.customerCity.trim(),
+          state: form.customerState.trim().toUpperCase().slice(0, 2),
+          paymentTermsDays: 30,
+        });
+        if (!created?.id) {
+          setSaveError('Não foi possível cadastrar o cliente (CNPJ já cadastrado ou sem conexão). Confira e tente de novo.');
+          return;
+        }
+        customerId = created.id;
+      }
+
+      // 2) Agendamento
+      const s: CargoSchedule = {
+        id: newId(),
+        customerId,
+        truckId: form.truckId || null,
+        driverId: form.driverId || null,
+        origin: form.origin.trim(),
+        destination: form.destination.trim(),
+        distanceKm: Number(form.distanceKm),
+        cargoDescription: form.cargoDescription.trim(),
+        cargoWeightKg: Number(form.cargoWeightKg) || 0,
+        pickupDate: `${form.pickupDate}T${form.pickupTime || '07:00'}:00.000Z`,
+        deliveryDate: form.deliveryDate ? `${form.deliveryDate}T12:00:00.000Z` : null,
+        freightValue: Number(form.freightValue),
+        status: 'AGENDADA',
+        notes: form.notes.trim(),
+      };
+      const saved = await onAdd(s);
+      if (!saved) {
+        // O cliente (se novo) já ficou salvo; ao tentar de novo ele é reconhecido pelo nome.
+        setSaveError('Não foi possível salvar o agendamento. Verifique a conexão e tente novamente.');
+        return;
+      }
+      setOpen(false);
+    } finally {
+      setSaving(false);
+    }
   };
 
   const fmtDateTime = (iso: string) =>
@@ -155,17 +221,17 @@ export const CargoScheduleView: React.FC<Props> = ({
             Programe coletas futuras e converta em frete quando o caminhão sair.
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 w-full sm:w-auto">
           <select
             aria-label="Filtro da agenda"
             value={filter}
             onChange={(e) => setFilter(e.target.value as 'ATIVAS' | 'TODAS')}
-            className="text-xs font-semibold p-2.5 bg-slate-50 border border-slate-300 rounded-xl"
+            className="min-h-11 sm:min-h-10 text-xs font-semibold px-2.5 bg-slate-50 border border-slate-300 rounded-xl"
           >
             <option value="ATIVAS">Somente ativas</option>
             <option value="TODAS">Todas</option>
           </select>
-          <button type="button" onClick={openModal} className={primaryBtn}>
+          <button type="button" onClick={openModal} className={`${primaryBtn} flex-1 sm:flex-none`}>
             <Plus className="w-5 h-5" />
             Agendar Carga
           </button>
@@ -198,7 +264,7 @@ export const CargoScheduleView: React.FC<Props> = ({
                   </span>
                 </div>
               </div>
-              <div className="text-right">
+              <div className="sm:text-right">
                 <span className="text-xs text-slate-500 block">Frete</span>
                 <span className="text-xl font-bold text-sky-700">{formatBRL(s.freightValue)}</span>
               </div>
@@ -249,91 +315,162 @@ export const CargoScheduleView: React.FC<Props> = ({
 
       {open && (
         <Modal title="Agendar Carga" subtitle="Reserve caminhão e motorista para uma coleta futura." onClose={() => setOpen(false)}>
-          {customers.length === 0 ? (
-            <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 p-3 rounded-xl">
-              Cadastre um cliente na aba &quot;Cadastros&quot; antes de agendar uma carga.
-            </p>
-          ) : (
-            <form onSubmit={submit} className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <Field label="Cliente">
-                  <select required className={inputCls} value={form.customerId} onChange={set('customerId')}>
-                    {customers.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
-                <Field label="Caminhão (opcional)">
-                  <select className={inputCls} value={form.truckId} onChange={set('truckId')}>
-                    <option value="">A definir</option>
-                    {trucks.map((t) => (
-                      <option key={t.id} value={t.id}>
-                        {t.plate} - {t.model}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
-                <Field label="Motorista (opcional)">
-                  <select className={inputCls} value={form.driverId} onChange={set('driverId')}>
-                    <option value="">A definir</option>
-                    {drivers.map((d) => (
-                      <option key={d.id} value={d.id}>
-                        {d.name}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
-                <Field label="Origem">
-                  <input required className={inputCls} value={form.origin} onChange={set('origin')} />
-                </Field>
-                <Field label="Destino">
-                  <input required className={inputCls} value={form.destination} onChange={set('destination')} />
-                </Field>
-                <Field label="Distância (km)">
-                  <input required type="number" min="1" className={inputCls} value={form.distanceKm} onChange={set('distanceKm')} />
-                </Field>
-                <Field label="Carga" className="sm:col-span-2">
-                  <input required className={inputCls} value={form.cargoDescription} onChange={set('cargoDescription')} placeholder="O que será transportado" />
-                </Field>
-                <Field label="Peso (kg)">
-                  <input required type="number" min="1" className={inputCls} value={form.cargoWeightKg} onChange={set('cargoWeightKg')} />
-                </Field>
-                <Field label="Data da coleta">
-                  <input required type="date" className={inputCls} value={form.pickupDate} onChange={set('pickupDate')} />
-                </Field>
-                <Field label="Hora da coleta">
-                  <input required type="time" className={inputCls} value={form.pickupTime} onChange={set('pickupTime')} />
-                </Field>
-                <Field label="Previsão de entrega">
-                  <input type="date" className={inputCls} value={form.deliveryDate} onChange={set('deliveryDate')} />
-                </Field>
-                <Field label="Valor do frete (R$)">
-                  <input required type="number" min="1" step="0.01" className={inputCls} value={form.freightValue} onChange={set('freightValue')} />
-                </Field>
-                <Field label="Observações" className="sm:col-span-2">
-                  <input className={inputCls} value={form.notes} onChange={set('notes')} />
-                </Field>
-              </div>
+          <form onSubmit={submit} className="space-y-4">
+            {/* Cliente: escolhe um existente pela lista ou digita um novo nome */}
+            <div className="space-y-3">
+              <Field
+                label="Cliente"
+                hint={customers.length > 0 ? 'Comece a digitar para escolher um cliente já cadastrado.' : undefined}
+              >
+                <input
+                  required
+                  minLength={2}
+                  list="schedule-customers"
+                  autoComplete="off"
+                  className={inputCls}
+                  value={form.customerName}
+                  onChange={set('customerName')}
+                  placeholder="Nome / razão social do cliente"
+                />
+                <datalist id="schedule-customers">
+                  {customers.map((c) => (
+                    <option key={c.id} value={c.name} />
+                  ))}
+                </datalist>
+              </Field>
 
-              {conflict && (
-                <p className="flex items-start gap-2 text-xs text-amber-900 bg-amber-50 border border-amber-200 p-3 rounded-xl">
-                  <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
-                  Este caminhão já tem uma carga agendada nesse dia ({conflict.origin} → {conflict.destination}).
+              {matchedCustomer && (
+                <p className="flex items-center gap-2 text-xs text-sky-900 bg-sky-50 ring-1 ring-sky-200 p-2.5 rounded-xl">
+                  <UserCheck className="w-4 h-4 shrink-0" />
+                  Cliente cadastrado{matchedCustomer.phone ? ` • ${matchedCustomer.phone}` : ''}
+                  {matchedCustomer.city ? ` • ${matchedCustomer.city}/${matchedCustomer.state}` : ''}
                 </p>
               )}
 
-              <div className="flex justify-end gap-2">
-                <button type="button" className={secondaryBtn} onClick={() => setOpen(false)}>
-                  Cancelar
-                </button>
-                <button type="submit" className={primaryBtn}>
-                  Salvar agendamento
-                </button>
-              </div>
-            </form>
-          )}
+              {isNewCustomer && (
+                <fieldset className="rounded-xl ring-1 ring-amber-200 bg-amber-50/60 p-3 space-y-3">
+                  <legend className="sr-only">Cadastro básico do novo cliente</legend>
+                  <p className="flex items-center gap-2 text-xs font-semibold text-amber-900">
+                    <UserPlus className="w-4 h-4 shrink-0" />
+                    Cliente novo — será cadastrado junto com o agendamento.
+                  </p>
+                  <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                    <Field label="Telefone / WhatsApp" className="sm:col-span-2">
+                      <input
+                        required
+                        type="tel"
+                        inputMode="tel"
+                        autoComplete="tel"
+                        className={inputCls}
+                        value={form.customerPhone}
+                        onChange={set('customerPhone')}
+                        placeholder="(00) 00000-0000"
+                      />
+                    </Field>
+                    <Field label="CNPJ (opcional)" className="sm:col-span-2">
+                      <input
+                        inputMode="numeric"
+                        className={inputCls}
+                        value={form.customerCnpj}
+                        onChange={set('customerCnpj')}
+                        placeholder="00.000.000/0000-00"
+                      />
+                    </Field>
+                    <Field label="Cidade (opcional)" className="sm:col-span-3">
+                      <input className={inputCls} value={form.customerCity} onChange={set('customerCity')} />
+                    </Field>
+                    <Field label="UF">
+                      <input
+                        maxLength={2}
+                        autoCapitalize="characters"
+                        className={`${inputCls} uppercase`}
+                        value={form.customerState}
+                        onChange={set('customerState')}
+                        placeholder="SP"
+                      />
+                    </Field>
+                  </div>
+                </fieldset>
+              )}
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <Field label="Caminhão (opcional)">
+                <select className={inputCls} value={form.truckId} onChange={set('truckId')}>
+                  <option value="">A definir</option>
+                  {trucks.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.plate} - {t.model}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <Field label="Motorista (opcional)">
+                <select className={inputCls} value={form.driverId} onChange={set('driverId')}>
+                  <option value="">A definir</option>
+                  {drivers.map((d) => (
+                    <option key={d.id} value={d.id}>
+                      {d.name}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <Field label="Distância (km)">
+                <input required type="number" inputMode="numeric" min="1" className={inputCls} value={form.distanceKm} onChange={set('distanceKm')} />
+              </Field>
+              <Field label="Origem">
+                <input required className={inputCls} value={form.origin} onChange={set('origin')} />
+              </Field>
+              <Field label="Destino">
+                <input required className={inputCls} value={form.destination} onChange={set('destination')} />
+              </Field>
+              <Field label="Peso (kg)">
+                <input required type="number" inputMode="numeric" min="1" className={inputCls} value={form.cargoWeightKg} onChange={set('cargoWeightKg')} />
+              </Field>
+              <Field label="Carga" className="sm:col-span-3">
+                <input required className={inputCls} value={form.cargoDescription} onChange={set('cargoDescription')} placeholder="O que será transportado" />
+              </Field>
+              <Field label="Data da coleta">
+                <input required type="date" className={inputCls} value={form.pickupDate} onChange={set('pickupDate')} />
+              </Field>
+              <Field label="Hora da coleta">
+                <input required type="time" className={inputCls} value={form.pickupTime} onChange={set('pickupTime')} />
+              </Field>
+              <Field label="Previsão de entrega">
+                <input type="date" className={inputCls} value={form.deliveryDate} onChange={set('deliveryDate')} />
+              </Field>
+              <Field label="Valor do frete (R$)">
+                <input required type="number" inputMode="decimal" min="1" step="0.01" className={inputCls} value={form.freightValue} onChange={set('freightValue')} />
+              </Field>
+              <Field label="Observações" className="sm:col-span-2">
+                <input className={inputCls} value={form.notes} onChange={set('notes')} />
+              </Field>
+            </div>
+
+            {conflict && (
+              <p className="flex items-start gap-2 text-xs text-amber-900 bg-amber-50 border border-amber-200 p-3 rounded-xl">
+                <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+                Este caminhão já tem uma carga agendada nesse dia ({conflict.origin} → {conflict.destination}).
+              </p>
+            )}
+
+            {saveError && (
+              <p role="alert" className="flex items-start gap-2 text-xs text-rose-900 bg-rose-50 border border-rose-200 p-3 rounded-xl">
+                <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+                {saveError}
+              </p>
+            )}
+
+            <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
+              <button type="button" className={secondaryBtn} onClick={() => setOpen(false)}>
+                Cancelar
+              </button>
+              <button type="submit" disabled={saving} className={primaryBtn}>
+                {saving && <Loader2 className="w-4 h-4 animate-spin" />}
+                {saving ? 'Salvando…' : isNewCustomer ? 'Cadastrar cliente e agendar' : 'Salvar agendamento'}
+              </button>
+            </div>
+          </form>
         </Modal>
       )}
     </div>

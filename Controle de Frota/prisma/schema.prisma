@@ -237,6 +237,7 @@ model Driver {
   rpas           Rpa[]
   contracts      FreightContract[]
   driverTables   DriverFreightTable[]
+  problemReports ProblemReport[]
   infractions    Infraction[]
   payables       Payable[]
   profiles       UserProfile[]
@@ -993,9 +994,34 @@ model UserProfile {
 enum ExpenseCategory {
   ALIMENTACAO
   ESTACIONAMENTO
+  BORRACHARIA
   CHAPA
+  PEDAGIO
   HOSPEDAGEM
   OUTROS
+}
+
+enum ProblemStatus {
+  ABERTO
+  EM_ANALISE
+  RESOLVIDO
+}
+
+/// Problema relatado pelo motorista na estrada (pane, pneu, documentação etc.)
+model ProblemReport {
+  id          String        @id @default(uuid()) @db.Uuid
+  driverId    String        @map("driver_id") @db.Uuid
+  truckId     String?       @map("truck_id") @db.Uuid
+  title       String
+  description String        @default("")
+  urgent      Boolean       @default(false)
+  status      ProblemStatus @default(ABERTO)
+  createdAt   DateTime      @default(now()) @map("created_at")
+
+  driver Driver @relation(fields: [driverId], references: [id])
+
+  @@index([driverId])
+  @@map("problem_reports")
 }
 
 model TravelExpense {

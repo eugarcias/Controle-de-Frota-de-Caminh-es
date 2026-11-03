@@ -7,7 +7,7 @@ import { requireDriver } from '@/lib/auth';
 const Body = z.object({
   tripId: z.string().uuid(),
   date: z.string().min(8),
-  category: z.enum(['ALIMENTACAO', 'ESTACIONAMENTO', 'CHAPA', 'HOSPEDAGEM', 'OUTROS']),
+  category: z.enum(['ALIMENTACAO', 'ESTACIONAMENTO', 'BORRACHARIA', 'CHAPA', 'PEDAGIO', 'HOSPEDAGEM', 'OUTROS']),
   amount: z.number().positive().max(100000),
   description: z.string().trim().max(300).default(''),
   /** Caminho devolvido por /api/driver/upload */

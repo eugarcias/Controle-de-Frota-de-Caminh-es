@@ -14,7 +14,7 @@ export async function GET() {
   const truckIds = await allowedTruckIds(profile);
 
   const [driver, trucks, trips, expenses] = await Promise.all([
-    prisma.driver.findUnique({ where: { id: profile.driverId }, select: { id: true, name: true } }),
+    prisma.driver.findUnique({ where: { id: profile.driverId }, select: { id: true, name: true, cnhExpiry: true } }),
     prisma.truck.findMany({
       where: { id: { in: truckIds } },
       select: { id: true, plate: true, model: true, currentOdometer: true },

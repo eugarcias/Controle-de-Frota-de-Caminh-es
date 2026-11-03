@@ -45,9 +45,10 @@ interface FreightTripsViewProps {
   estDieselPrice: number;
   onAdd: (trip: FreightTrip) => void;
   onUpdate: (id: string, patch: Partial<FreightTrip>) => void;
-  onAddCustomer?: (customer: Customer) => Promise<any> | void;
-  onAddDriver?: (driver: Driver) => Promise<any> | void;
-  onAddTruck?: (truck: Truck) => Promise<any> | void;
+  // Devolvem o registro salvo (com o id gerado pelo banco) ou null em caso de erro
+  onAddCustomer?: (customer: Customer) => Promise<Customer | null>;
+  onAddDriver?: (driver: Driver) => Promise<Driver | null>;
+  onAddTruck?: (truck: Truck) => Promise<Truck | null>;
 }
 
 const statusLabel: Record<TripStatus, string> = {
@@ -177,10 +178,10 @@ export const FreightTripsView: React.FC<FreightTripsViewProps> = ({
       paymentTermsDays: 30,
     };
 
-    if (onAddCustomer) {
-      await onAddCustomer(newCust);
-    }
-    setForm((f) => ({ ...f, customerId: newCust.id }));
+    // O banco gera o id definitivo: usa o registro devolvido pela API, não o id local.
+    const created = onAddCustomer ? await onAddCustomer(newCust) : null;
+    if (!created?.id) return;
+    setForm((f) => ({ ...f, customerId: created.id }));
     setQuickCustomerName('');
     setQuickCustomerPhone('');
     setQuickCustomerOpen(false);
@@ -204,10 +205,9 @@ export const FreightTripsView: React.FC<FreightTripsViewProps> = ({
       createdAt: new Date().toISOString(),
     };
 
-    if (onAddTruck) {
-      await onAddTruck(newTrk);
-    }
-    setForm((f) => ({ ...f, truckId: newTrk.id }));
+    const created = onAddTruck ? await onAddTruck(newTrk) : null;
+    if (!created?.id) return;
+    setForm((f) => ({ ...f, truckId: created.id }));
     setQuickTruckPlate('');
     setQuickTruckOpen(false);
   };
@@ -225,10 +225,9 @@ export const FreightTripsView: React.FC<FreightTripsViewProps> = ({
       status: 'ATIVO',
     };
 
-    if (onAddDriver) {
-      await onAddDriver(newDrv);
-    }
-    setForm((f) => ({ ...f, driverId: newDrv.id }));
+    const created = onAddDriver ? await onAddDriver(newDrv) : null;
+    if (!created?.id) return;
+    setForm((f) => ({ ...f, driverId: created.id }));
     setQuickDriverName('');
     setQuickDriverPhone('');
     setQuickDriverOpen(false);

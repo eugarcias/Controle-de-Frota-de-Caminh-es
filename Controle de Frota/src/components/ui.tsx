@@ -70,8 +70,8 @@ export function Modal({
       aria-modal="true"
       aria-label={title}
     >
-      <div className="bg-white w-full sm:max-w-3xl max-h-[92vh] overflow-y-auto rounded-t-2xl sm:rounded-2xl shadow-2xl border-t-4 border-sky-500">
-        <div className="sticky top-0 bg-white flex items-start justify-between gap-3 p-5 border-b border-slate-100 z-10">
+      <div className="bg-white w-full sm:max-w-3xl max-h-[92vh] max-h-[92dvh] overflow-y-auto overscroll-contain rounded-t-2xl sm:rounded-2xl shadow-2xl border-t-4 border-sky-500">
+        <div className="sticky top-0 bg-white flex items-start justify-between gap-3 p-4 sm:p-5 border-b border-slate-100 z-10">
           <div>
             <h2 className="text-lg font-bold text-slate-900">{title}</h2>
             {subtitle && <p className="text-xs text-slate-500 mt-0.5">{subtitle}</p>}
@@ -85,7 +85,7 @@ export function Modal({
             <X className="w-5 h-5" />
           </button>
         </div>
-        <div className="p-5">{children}</div>
+        <div className="p-4 sm:p-5 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:pb-5">{children}</div>
       </div>
     </div>
   );

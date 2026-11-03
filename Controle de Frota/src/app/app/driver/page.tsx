@@ -2,13 +2,14 @@
 
 import React, { useCallback, useEffect, useState } from 'react';
 import Image from 'next/image';
-import { Fuel, Receipt, Gauge, LogOut, Loader2, CheckCircle2, AlertTriangle, Camera, X } from 'lucide-react';
+import { Fuel, Receipt, Gauge, LogOut, Loader2, CheckCircle2, AlertTriangle, Camera, X, WifiOff, Siren } from 'lucide-react';
 import { createSupabaseBrowser } from '@/lib/supabase/browser';
 import { formatBRL, formatDate } from '@/components/ui';
+import { enqueue, flushQueue, isNetworkError, queueSize } from '@/lib/offlineQueue';
 
 interface Ctx {
   userName: string;
-  driver: { id: string; name: string } | null;
+  driver: { id: string; name: string; cnhExpiry: string | null } | null;
   trucks: { id: string; plate: string; model: string; currentOdometer: number }[];
   trips: { id: string; truckId: string; origin: string; destination: string; customerName: string; status: string }[];
   expenses: { id: string; date: string; category: string; amount: number; description: string; receiptPhotoUrl: string | null }[];
@@ -17,7 +18,9 @@ interface Ctx {
 const CATEGORIES = [
   { value: 'ALIMENTACAO', label: 'Alimentação' },
   { value: 'ESTACIONAMENTO', label: 'Estacionamento' },
-  { value: 'CHAPA', label: 'Chapa' },
+  { value: 'BORRACHARIA', label: 'Borracharia' },
+  { value: 'CHAPA', label: 'Chapa / Ajudante' },
+  { value: 'PEDAGIO', label: 'Pedágio' },
   { value: 'HOSPEDAGEM', label: 'Hospedagem' },
   { value: 'OUTROS', label: 'Outros' },
 ];
@@ -31,19 +34,35 @@ const submitBtn =
   'w-full min-h-12 inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold shadow-md active:scale-[0.98] transition disabled:opacity-50';
 
 async function post<T>(url: string, body: unknown): Promise<T> {
-  const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  // Sem internet: guarda no aparelho e sincroniza depois (fila offline).
+  if (!navigator.onLine) {
+    enqueue(url, body);
+    return { queued: true } as T;
+  }
+  let res: Response;
+  try {
+    res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  } catch (e) {
+    if (isNetworkError(e)) {
+      enqueue(url, body);
+      return { queued: true } as T;
+    }
+    throw e;
+  }
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data?.error || 'Não foi possível concluir. Tente novamente.');
   return data as T;
 }
 
-type Tab = 'fuel' | 'expense' | 'odometer';
+type Tab = 'fuel' | 'expense' | 'odometer' | 'problem';
 
 export default function DriverPage() {
   const [ctx, setCtx] = useState<Ctx | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>('fuel');
   const [toast, setToast] = useState<{ ok: boolean; text: string } | null>(null);
+  const [online, setOnline] = useState(true);
+  const [pending, setPending] = useState(0);
 
   const load = useCallback(async () => {
     try {
@@ -66,6 +85,41 @@ export default function DriverPage() {
     setTimeout(() => setToast(null), 4500);
   };
 
+  // PWA: acompanha a conexão e sincroniza a fila offline (o service worker é registrado no layout raiz).
+  useEffect(() => {
+    setOnline(navigator.onLine);
+    setPending(queueSize());
+
+    const sync = async () => {
+      const { synced } = await flushQueue();
+      if (synced > 0) {
+        notify(true, `${synced} lançamento(s) sincronizado(s) com sucesso!`);
+        load();
+      }
+    };
+    const goOnline = () => { setOnline(true); sync(); };
+    const goOffline = () => setOnline(false);
+    const onQueue = () => setPending(queueSize());
+
+    window.addEventListener('online', goOnline);
+    window.addEventListener('offline', goOffline);
+    window.addEventListener('vsm-queue-change', onQueue);
+    sync();
+    return () => {
+      window.removeEventListener('online', goOnline);
+      window.removeEventListener('offline', goOffline);
+      window.removeEventListener('vsm-queue-change', onQueue);
+    };
+  }, [load]);
+
+  // Alerta de vencimento da CNH (60 dias antes ou já vencida)
+  const cnhAlert = (() => {
+    const exp = ctx?.driver?.cnhExpiry;
+    if (!exp) return null;
+    const days = Math.floor((new Date(exp).getTime() - Date.now()) / 86400000);
+    return days <= 60 ? { days, expired: days < 0 } : null;
+  })();
+
   const logout = async () => {
     await createSupabaseBrowser().auth.signOut();
     window.location.assign('/login');
@@ -75,6 +129,7 @@ export default function DriverPage() {
     { id: 'fuel', label: 'Abastecer', icon: Fuel },
     { id: 'expense', label: 'Despesa', icon: Receipt },
     { id: 'odometer', label: 'Hodômetro', icon: Gauge },
+    { id: 'problem', label: 'Problema', icon: Siren },
   ];
 
   return (
@@ -107,6 +162,21 @@ export default function DriverPage() {
       )}
 
       <main className="max-w-md mx-auto p-4 space-y-4">
+        {(!online || pending > 0) && (
+          <div role="status" className="flex items-center gap-2 rounded-xl bg-amber-50 text-amber-900 ring-1 ring-amber-200 p-3 text-sm">
+            <WifiOff className="w-5 h-5 shrink-0" />
+            <span>
+              {!online ? 'Sem internet. ' : ''}
+              {pending > 0 ? `${pending} lançamento(s) aguardando sincronização — enviaremos assim que a conexão voltar.` : 'Seus lançamentos serão salvos no aparelho.'}
+            </span>
+          </div>
+        )}
+        {cnhAlert && (
+          <div role="alert" className={`flex items-start gap-2 rounded-xl p-3 text-sm ring-1 ${cnhAlert.expired ? 'bg-rose-50 text-rose-900 ring-rose-200' : 'bg-amber-50 text-amber-900 ring-amber-200'}`}>
+            <AlertTriangle className="w-5 h-5 shrink-0" />
+            <span>{cnhAlert.expired ? `Sua CNH venceu há ${-cnhAlert.days} dia(s). Regularize antes de dirigir.` : `Sua CNH vence em ${cnhAlert.days} dia(s). Providencie a renovação.`}</span>
+          </div>
+        )}
         {loadError && (
           <div role="alert" className="rounded-xl bg-rose-50 text-rose-900 ring-1 ring-rose-200 p-4 text-sm">
             {loadError}
@@ -133,6 +203,7 @@ export default function DriverPage() {
             {tab === 'fuel' && <FuelForm ctx={ctx} onDone={(m) => { notify(true, m); load(); }} onError={(m) => notify(false, m)} />}
             {tab === 'expense' && <ExpenseForm ctx={ctx} onDone={(m) => { notify(true, m); load(); }} onError={(m) => notify(false, m)} />}
             {tab === 'odometer' && <OdometerForm ctx={ctx} onDone={(m) => { notify(true, m); load(); }} onError={(m) => notify(false, m)} />}
+            {tab === 'problem' && <ProblemForm ctx={ctx} onDone={(m) => notify(true, m)} onError={(m) => notify(false, m)} />}
 
             {tab === 'expense' && ctx.expenses.length > 0 && (
               <section className="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200 p-4 space-y-2">
@@ -157,7 +228,7 @@ export default function DriverPage() {
       </main>
 
       {/* Navegação inferior (polegar) */}
-      <nav className="fixed bottom-0 inset-x-0 z-30 bg-white border-t border-slate-200 grid grid-cols-3 pb-[env(safe-area-inset-bottom)]" aria-label="Seções">
+      <nav className="fixed bottom-0 inset-x-0 z-30 bg-white border-t border-slate-200 grid grid-cols-4 pb-[env(safe-area-inset-bottom)]" aria-label="Seções">
         {tabs.map(({ id, label: l, icon: Icon }) => (
           <button
             key={id}
@@ -296,7 +367,7 @@ function ExpenseForm({ ctx, onDone, onError }: FormProps) {
     setBusy(true);
     try {
       let receiptPhotoUrl: string | null = null;
-      if (file) {
+      if (file && navigator.onLine) {
         const fd = new FormData();
         fd.append('file', file);
         const up = await fetch('/api/driver/upload', { method: 'POST', body: fd });
@@ -309,7 +380,7 @@ function ExpenseForm({ ctx, onDone, onError }: FormProps) {
         date: `${date}T12:00:00.000Z`,
         category,
         amount: Number(amount),
-        description,
+        description: file && !receiptPhotoUrl ? `${description} [recibo pendente - sem internet]`.trim() : description,
         receiptPhotoUrl,
       });
       setAmount(''); setDescription(''); pick(null);
@@ -419,6 +490,51 @@ function OdometerForm({ ctx, onDone, onError }: FormProps) {
       <button type="submit" disabled={busy} className={submitBtn}>
         {busy ? <Loader2 className="w-5 h-5 animate-spin" /> : <Gauge className="w-5 h-5" />}
         Atualizar hodômetro
+      </button>
+    </form>
+  );
+}
+
+function ProblemForm({ ctx, onDone, onError }: FormProps) {
+  const [truckId, setTruckId] = useState(ctx.trucks[0].id);
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [urgent, setUrgent] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setBusy(true);
+    try {
+      await post('/api/driver/problem', { truckId, title, description, urgent });
+      setTitle(''); setDescription(''); setUrgent(false);
+      onDone('Problema enviado ao administrador!');
+    } catch (err) {
+      onError(err instanceof Error ? err.message : 'Erro ao enviar.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <form onSubmit={submit} className="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200 p-4 space-y-4">
+      <h2 className="text-lg font-bold text-slate-900">Relatar problema</h2>
+      <TruckSelect ctx={ctx} value={truckId} onChange={setTruckId} />
+      <div>
+        <label className={label}>O que aconteceu?</label>
+        <input required minLength={3} className={field} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Ex: pneu furado, luz do painel acesa" />
+      </div>
+      <div>
+        <label className={label}>Detalhes (opcional)</label>
+        <textarea rows={3} className={field} value={description} onChange={(e) => setDescription(e.target.value)} />
+      </div>
+      <label className="flex items-center justify-between rounded-xl bg-rose-50 p-3.5 ring-1 ring-rose-200">
+        <span className="text-sm font-semibold text-rose-900">Urgente (caminhão parado)</span>
+        <input type="checkbox" checked={urgent} onChange={(e) => setUrgent(e.target.checked)} className="w-6 h-6 accent-rose-600" />
+      </label>
+      <button type="submit" disabled={busy} className={submitBtn}>
+        {busy ? <Loader2 className="w-5 h-5 animate-spin" /> : <Siren className="w-5 h-5" />}
+        Enviar relato
       </button>
     </form>
   );

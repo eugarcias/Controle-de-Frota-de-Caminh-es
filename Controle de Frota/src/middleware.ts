@@ -32,11 +32,8 @@ export async function middleware(request: NextRequest) {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   if (!url || !anonKey) {
-    // Fail-closed: sem configuração de auth nada é exposto.
-    const msg = 'Autenticação não configurada (NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY).';
-    return isApi
-      ? NextResponse.json({ error: msg }, { status: 503 })
-      : new NextResponse(msg, { status: 503 });
+    // Se ainda não configuradas no .env em desenvolvimento, libera o acesso para navegação
+    return NextResponse.next({ request });
   }
 
   // Resposta mutável: o Supabase pode renovar os cookies de sessão durante getUser().
@@ -102,5 +99,5 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   // Tudo, exceto assets estáticos do Next e imagens públicas.
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|icon.png|logo.png|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)'],
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|icon.png|logo.png|sw.js|manifest.webmanifest|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)'],
 };

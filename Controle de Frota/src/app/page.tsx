@@ -108,7 +108,8 @@ export default function Home() {
         </div>
       )}
 
-      <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:auto">
+      {/* pb extra no celular: espaço para o menu inferior fixo + área segura do iPhone */}
+      <main className="flex-1 max-w-7xl w-full mx-auto px-3 pt-4 pb-[calc(6rem+env(safe-area-inset-bottom))] sm:px-6 sm:pt-6 lg:pb-6">
         {activeTab === 'dashboard' && (
           <DashboardView
             trucks={data.trucks}
@@ -153,6 +154,7 @@ export default function Home() {
             trucks={data.trucks}
             drivers={data.drivers}
             onAdd={(s) => addItem('schedules', s)}
+            onAddCustomer={(c) => addItem('customers', c)}
             onUpdate={(id, patch) => updateItem('schedules', id, patch)}
             onRemove={(id) => removeItem('schedules', id)}
             onConvert={convertScheduleToTrip}
@@ -178,7 +180,7 @@ export default function Home() {
         )}
       </main>
 
-      <footer className="bg-slate-950 text-slate-400 border-t-2 border-emerald-500 py-4 text-center text-xs">
+      <footer className="hidden lg:block bg-slate-950 text-slate-400 border-t-2 border-emerald-500 py-4 text-center text-xs">
         <span className="text-emerald-400 font-bold">VSM Garcia</span> • Gestão de Frota • &copy; 2026
       </footer>
     </div>
