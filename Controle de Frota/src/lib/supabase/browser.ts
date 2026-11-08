@@ -1,10 +1,11 @@
 import { createBrowserClient } from '@supabase/ssr';
 
-const INTERNAL_DOMAIN = '@acesso.vsmfrota.com';
+export const INTERNAL_DOMAIN = '@frota.com';
 
 /**
- * Permite que motoristas e administradores entrem tanto com um usuário simples
- * (ex: "carlos", "vinicius") quanto com um e-mail completo (ex: "teste@frota.com").
+ * Normaliza o nome de usuário digitado (ex: "admin", "motorista", "carlos")
+ * para o formato interno exigido pelo Supabase Auth.
+ * NUNCA é exibido para o usuário final — todo o sistema opera apenas como usuário.
  */
 export function normalizeLoginIdentifier(raw: string): string {
   const trimmed = raw.trim().toLowerCase();
@@ -17,18 +18,26 @@ export function normalizeLoginIdentifier(raw: string): string {
   return `${cleanUser}${INTERNAL_DOMAIN}`;
 }
 
-/** Exibe o usuário de forma amigável (oculta o domínio interno se foi criado apenas com nome de usuário). */
-export function formatLoginDisplay(email?: string | null): string {
-  if (!email) return '';
-  if (email.endsWith(INTERNAL_DOMAIN)) {
-    return email.slice(0, -INTERNAL_DOMAIN.length);
+/**
+ * Remove qualquer sufixo interno para exibir SEMPRE apenas o nome do usuário limpo.
+ */
+export function formatLoginDisplay(emailOrLogin?: string | null): string {
+  if (!emailOrLogin) return '';
+  if (emailOrLogin.endsWith(INTERNAL_DOMAIN)) {
+    return emailOrLogin.slice(0, -INTERNAL_DOMAIN.length);
   }
-  return email;
+  if (emailOrLogin.endsWith('@acesso.vsmfrota.com')) {
+    return emailOrLogin.slice(0, -'@acesso.vsmfrota.com'.length);
+  }
+  if (emailOrLogin.endsWith('@empresa.com')) {
+    return emailOrLogin.slice(0, -'@empresa.com'.length);
+  }
+  return emailOrLogin;
 }
 
 /**
  * Cliente Supabase para navegador com sessão persistente de longa duração (1 ano),
- * garantindo que o motorista não precise digitar a senha toda vez que abrir o app.
+ * garantindo que o motorista ou administrador não precise redigitar a senha toda vez.
  */
 export function createSupabaseBrowser() {
   return createBrowserClient(
@@ -36,7 +45,7 @@ export function createSupabaseBrowser() {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY as string,
     {
       cookieOptions: {
-        maxAge: 60 * 60 * 24 * 365, // 365 dias salvo no celular/navegador
+        maxAge: 60 * 60 * 24 * 365, // 365 dias
         path: '/',
         sameSite: 'lax',
       },

@@ -2,7 +2,6 @@ import { NextResponse } from 'next/server';
 import { z, ZodError } from 'zod';
 import { prisma } from '@/lib/prisma';
 import { requireAdmin } from '@/lib/auth';
-import { createSupabaseAdmin } from '@/lib/supabase/admin';
 import { normalizeLoginIdentifier, formatLoginDisplay } from '@/lib/supabase/browser';
 import { serialize } from '@/lib/serialize';
 
@@ -33,20 +32,39 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     const role = body.role ?? existing.role;
     const name = body.name ?? existing.name;
 
-    const supabaseAdmin = createSupabaseAdmin();
-    const authUpdate: Record<string, unknown> = {
-      email,
-      email_confirm: true,
-      app_metadata: { role },
-      user_metadata: { name, role },
-    };
+    // Atualiza auth.users
     if (body.password && body.password.trim().length >= 4) {
-      authUpdate.password = body.password.trim();
-    }
-
-    const { error: authErr } = await supabaseAdmin.auth.admin.updateUserById(params.id, authUpdate);
-    if (authErr) {
-      return NextResponse.json({ error: `Erro ao atualizar no Auth: ${authErr.message}` }, { status: 400 });
+      await prisma.$executeRawUnsafe(
+        `
+        UPDATE auth.users
+        SET email = $1,
+            encrypted_password = crypt($2, gen_salt('bf')),
+            updated_at = now(),
+            raw_app_meta_data = jsonb_build_object('provider', 'email', 'providers', jsonb_build_array('email'), 'role', $3::text),
+            raw_user_meta_data = jsonb_build_object('role', $3::text, 'name', $4::text)
+        WHERE id = $5::uuid
+      `,
+        email,
+        body.password.trim(),
+        role,
+        name,
+        params.id
+      );
+    } else {
+      await prisma.$executeRawUnsafe(
+        `
+        UPDATE auth.users
+        SET email = $1,
+            updated_at = now(),
+            raw_app_meta_data = jsonb_build_object('provider', 'email', 'providers', jsonb_build_array('email'), 'role', $2::text),
+            raw_user_meta_data = jsonb_build_object('role', $2::text, 'name', $3::text)
+        WHERE id = $4::uuid
+      `,
+        email,
+        role,
+        name,
+        params.id
+      );
     }
 
     const updated = await prisma.userProfile.update({
@@ -86,8 +104,8 @@ export async function DELETE(_req: Request, { params }: { params: { id: string }
 
   try {
     await prisma.userProfile.delete({ where: { id: params.id } });
-    const supabaseAdmin = createSupabaseAdmin();
-    await supabaseAdmin.auth.admin.deleteUser(params.id).catch(() => {});
+    await prisma.$executeRawUnsafe('DELETE FROM auth.identities WHERE user_id = $1::uuid', params.id);
+    await prisma.$executeRawUnsafe('DELETE FROM auth.users WHERE id = $1::uuid', params.id);
     return NextResponse.json({ ok: true });
   } catch (e) {
     console.error(e);

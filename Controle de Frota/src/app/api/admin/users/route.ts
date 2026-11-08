@@ -1,17 +1,17 @@
 import { NextResponse } from 'next/server';
 import { z, ZodError } from 'zod';
+import { randomUUID } from 'crypto';
 import { prisma } from '@/lib/prisma';
 import { requireAdmin } from '@/lib/auth';
-import { createSupabaseAdmin } from '@/lib/supabase/admin';
 import { normalizeLoginIdentifier, formatLoginDisplay } from '@/lib/supabase/browser';
 import { serialize } from '@/lib/serialize';
 
 export const dynamic = 'force-dynamic';
 
 const CreateUserSchema = z.object({
-  login: z.string().trim().min(2, 'Informe o usuário ou e-mail (mínimo 2 caracteres).'),
+  login: z.string().trim().min(2, 'Informe o nome de usuário (mínimo 2 caracteres).'),
   password: z.string().min(4, 'A senha deve ter pelo menos 4 caracteres.'),
-  name: z.string().trim().min(2, 'Informe o nome do usuário.'),
+  name: z.string().trim().min(2, 'Informe o nome da pessoa.'),
   role: z.enum(['ADMIN', 'DRIVER']).default('DRIVER'),
   driverId: z.string().uuid().optional().nullable(),
   truckId: z.string().uuid().optional().nullable(),
@@ -41,66 +41,79 @@ export async function POST(req: Request) {
     const body = CreateUserSchema.parse(await req.json());
     const email = normalizeLoginIdentifier(body.login);
     if (!email) {
-      return NextResponse.json({ error: 'Usuário ou e-mail inválido.' }, { status: 400 });
+      return NextResponse.json({ error: 'Usuário inválido.' }, { status: 400 });
     }
 
-    const supabaseAdmin = createSupabaseAdmin();
+    // 1. Verifica se já existe em auth.users
+    const existing = await prisma.$queryRawUnsafe<any[]>(
+      'SELECT id FROM auth.users WHERE lower(email) = lower($1)',
+      email
+    );
 
-    // Verifica se já existe perfil com esse email ou para esse motorista
-    const existingByEmail = await prisma.userProfile.findUnique({ where: { email } });
+    let userId: string;
 
-    let authUserId = existingByEmail?.id ?? null;
-
-    if (authUserId) {
-      // Atualiza senha e metadados no Supabase Auth
-      const { error: updateErr } = await supabaseAdmin.auth.admin.updateUserById(authUserId, {
-        email,
-        password: body.password,
-        email_confirm: true,
-        app_metadata: { role: body.role },
-        user_metadata: { name: body.name, role: body.role },
-      });
-      if (updateErr) {
-        return NextResponse.json({ error: `Erro ao atualizar credenciais: ${updateErr.message}` }, { status: 400 });
-      }
+    if (existing.length > 0) {
+      userId = existing[0].id;
+      await prisma.$executeRawUnsafe(
+        `
+        UPDATE auth.users
+        SET encrypted_password = crypt($1, gen_salt('bf')),
+            email_confirmed_at = now(),
+            updated_at = now(),
+            raw_app_meta_data = jsonb_build_object('provider', 'email', 'providers', jsonb_build_array('email'), 'role', $2::text),
+            raw_user_meta_data = jsonb_build_object('role', $2::text, 'name', $3::text)
+        WHERE id = $4::uuid
+      `,
+        body.password,
+        body.role,
+        body.name,
+        userId
+      );
     } else {
-      // Tenta criar no Supabase Auth
-      const { data: createdAuth, error: createErr } = await supabaseAdmin.auth.admin.createUser({
+      userId = randomUUID();
+      await prisma.$executeRawUnsafe(
+        `
+        INSERT INTO auth.users (
+          id, instance_id, email, encrypted_password, email_confirmed_at,
+          created_at, updated_at, raw_app_meta_data, raw_user_meta_data,
+          is_super_admin, role, aud
+        ) VALUES (
+          $1::uuid, '00000000-0000-0000-0000-000000000000'::uuid, $2,
+          crypt($3, gen_salt('bf')), now(), now(), now(),
+          jsonb_build_object('provider', 'email', 'providers', jsonb_build_array('email'), 'role', $4::text),
+          jsonb_build_object('role', $4::text, 'name', $5::text),
+          false, 'authenticated', 'authenticated'
+        )
+      `,
+        userId,
         email,
-        password: body.password,
-        email_confirm: true,
-        app_metadata: { role: body.role },
-        user_metadata: { name: body.name, role: body.role },
-      });
+        body.password,
+        body.role,
+        body.name
+      );
 
-      if (createErr || !createdAuth?.user) {
-        // Caso o usuário já exista em auth.users mas não em user_profiles
-        const rows = await prisma.$queryRaw<{ id: string }[]>`
-          SELECT id FROM auth.users WHERE lower(email) = lower(${email}) LIMIT 1
-        `;
-        if (rows.length > 0) {
-          authUserId = rows[0].id;
-          await supabaseAdmin.auth.admin.updateUserById(authUserId, {
-            password: body.password,
-            email_confirm: true,
-            app_metadata: { role: body.role },
-            user_metadata: { name: body.name, role: body.role },
-          });
-        } else {
-          return NextResponse.json(
-            { error: createErr?.message || 'Não foi possível criar o login no servidor de autenticação.' },
-            { status: 400 }
-          );
-        }
-      } else {
-        authUserId = createdAuth.user.id;
-      }
+      await prisma.$executeRawUnsafe(
+        `
+        INSERT INTO auth.identities (
+          id, user_id, identity_data, provider, provider_id, last_sign_in_at, created_at, updated_at
+        ) VALUES (
+          $1::uuid, $1::uuid, jsonb_build_object('sub', $1::text, 'email', $2::text),
+          'email', $1::text, now(), now(), now()
+        )
+        ON CONFLICT (provider_id, provider) DO UPDATE
+        SET identity_data = jsonb_build_object('sub', $1::text, 'email', $2::text),
+            updated_at = now()
+      `,
+        userId,
+        email
+      );
     }
 
+    // 2. Atualiza ou cria na tabela userProfile
     const profile = await prisma.userProfile.upsert({
-      where: { id: authUserId! },
+      where: { id: userId },
       create: {
-        id: authUserId!,
+        id: userId,
         email,
         name: body.name,
         role: body.role,
@@ -130,6 +143,6 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: e.issues.map((i) => i.message).join(' ') }, { status: 400 });
     }
     console.error(e);
-    return NextResponse.json({ error: 'Erro ao salvar acesso do usuário.' }, { status: 500 });
+    return NextResponse.json({ error: 'Erro ao salvar usuário e senha.' }, { status: 500 });
   }
 }

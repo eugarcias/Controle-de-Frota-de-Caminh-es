@@ -15,7 +15,6 @@ import {
   X,
   WifiOff,
   LayoutDashboard,
-  Star,
   Truck as TruckIcon,
   RefreshCw,
 } from 'lucide-react';
@@ -35,9 +34,6 @@ interface DriverTruck {
   model: string;
   brand?: string;
   currentOdometer: number;
-  isPreferred?: boolean;
-  isLastUsed?: boolean;
-  usageCount?: number;
 }
 
 interface Ctx {
@@ -64,26 +60,26 @@ interface Ctx {
   }[];
 }
 
-const CTX_CACHE_KEY = 'vsm.driver.ctx.v2';
-const PREF_TRUCK_KEY = 'vsm.driver.preferredTruckId.v1';
+const CTX_CACHE_KEY = 'vsm.driver.ctx.v3';
+const PREF_TRUCK_KEY = 'vsm.driver.preferredTruckId.v2';
 
 const CATEGORIES = [
   { value: 'ALIMENTACAO', label: 'Alimentação / Refeição' },
   { value: 'PEDAGIO', label: 'Pedágio' },
   { value: 'CHAPA', label: 'Chapa / Ajudante' },
   { value: 'BORRACHARIA', label: 'Borracharia / Pneu' },
-  { value: 'ESTACIONAMENTO', label: 'Estacionamento / Pátio' },
-  { value: 'HOSPEDAGEM', label: 'Hospedagem / Pernoite' },
-  { value: 'OUTROS', label: 'Outros gastos' },
+  { value: 'ESTACIONAMENTO', label: 'Estacionamento' },
+  { value: 'HOSPEDAGEM', label: 'Hospedagem' },
+  { value: 'OUTROS', label: 'Outros' },
 ];
 const catLabel = (v: string) => CATEGORIES.find((c) => c.value === v)?.label ?? v;
 
 const today = () => new Date().toISOString().slice(0, 10);
-const field =
-  'w-full min-h-14 text-lg font-medium px-4 py-2.5 rounded-2xl bg-white text-slate-900 shadow-sm ring-1 ring-slate-300 focus:ring-2 focus:ring-sky-500 focus:outline-none';
-const label = 'block text-xs font-extrabold text-slate-700 uppercase tracking-wide mb-1.5';
-const submitBtn =
-  'w-full min-h-14 inline-flex items-center justify-center gap-2.5 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white text-base font-extrabold shadow-lg shadow-emerald-600/20 active:scale-[0.98] transition disabled:opacity-50';
+const fieldCls =
+  'w-full h-12 sm:h-14 text-base font-semibold px-4 rounded-xl bg-white text-black border-2 border-zinc-300 placeholder:text-zinc-400 focus:border-black focus:outline-none transition-colors';
+const labelCls = 'block text-xs font-bold text-zinc-700 uppercase tracking-wider mb-1.5';
+const submitBtnCls =
+  'w-full h-12 sm:h-14 inline-flex items-center justify-center gap-2 rounded-xl bg-black hover:bg-zinc-800 text-white text-sm sm:text-base font-bold shadow-md active:scale-[0.99] transition disabled:opacity-40';
 
 async function postDriverAction(
   url: string,
@@ -123,21 +119,23 @@ export default function DriverPage() {
   const [online, setOnline] = useState(true);
   const [pending, setPending] = useState(0);
 
-  // Escolhe o caminhão inicial de forma inteligente (localStorage -> preferido do banco -> 1º da lista)
   const applySmartTruckSelection = useCallback((data: Ctx) => {
     if (!data.trucks || data.trucks.length === 0) return;
-    const savedLocal = localStorage.getItem(PREF_TRUCK_KEY);
-    const validSaved = savedLocal && data.trucks.some((t) => t.id === savedLocal) ? savedLocal : null;
-    const bestId =
-      validSaved ||
-      (data.preferredTruckId && data.trucks.some((t) => t.id === data.preferredTruckId)
-        ? data.preferredTruckId
-        : data.trucks[0].id);
-    setSelectedTruckId((curr) => (curr && data.trucks.some((t) => t.id === curr) ? curr : bestId));
+    try {
+      const savedLocal = localStorage.getItem(PREF_TRUCK_KEY);
+      const validSaved = savedLocal && data.trucks.some((t) => t.id === savedLocal) ? savedLocal : null;
+      const bestId =
+        validSaved ||
+        (data.preferredTruckId && data.trucks.some((t) => t.id === data.preferredTruckId)
+          ? data.preferredTruckId
+          : data.trucks[0].id);
+      setSelectedTruckId((curr) => (curr && data.trucks.some((t) => t.id === curr) ? curr : bestId));
+    } catch {
+      setSelectedTruckId(data.trucks[0].id);
+    }
   }, []);
 
   const load = useCallback(async () => {
-    // 1. Carrega cache local imediatamente para abrir sem internet em 0ms
     try {
       const cachedRaw = localStorage.getItem(CTX_CACHE_KEY);
       if (cachedRaw) {
@@ -159,10 +157,13 @@ export default function DriverPage() {
       if (!res.ok) throw new Error(data?.error || 'Falha ao carregar dados.');
       setCtx(data);
       setLoadError(null);
-      localStorage.setItem(CTX_CACHE_KEY, JSON.stringify(data));
+      try {
+        localStorage.setItem(CTX_CACHE_KEY, JSON.stringify(data));
+      } catch {
+        /* ignore */
+      }
       applySmartTruckSelection(data);
     } catch (e) {
-      // Se já temos cache local salvo, não trava a tela do motorista
       setCtx((current) => {
         if (!current) {
           setLoadError(e instanceof Error ? e.message : 'Sem conexão no momento.');
@@ -179,10 +180,9 @@ export default function DriverPage() {
   const notify = (ok: boolean, text: string) => {
     setToast({ ok, text });
     window.scrollTo({ top: 0, behavior: 'smooth' });
-    setTimeout(() => setToast(null), 5000);
+    setTimeout(() => setToast(null), 4500);
   };
 
-  // Atualiza odômetro localmente mesmo quando offline para que a tela reflita na hora
   const updateLocalOdometer = (truckId: string, newOdometer: number) => {
     setCtx((prev) => {
       if (!prev) return prev;
@@ -203,10 +203,13 @@ export default function DriverPage() {
     });
   };
 
-  // Quando o motorista seleciona um caminhão, salva como preferido no celular e no banco
   const handleSelectTruck = (truckId: string) => {
     setSelectedTruckId(truckId);
-    localStorage.setItem(PREF_TRUCK_KEY, truckId);
+    try {
+      localStorage.setItem(PREF_TRUCK_KEY, truckId);
+    } catch {
+      /* ignore */
+    }
     if (navigator.onLine) {
       fetch('/api/driver/context', {
         method: 'PATCH',
@@ -224,7 +227,7 @@ export default function DriverPage() {
       const { synced } = await flushQueue();
       setPending(queueSize());
       if (synced > 0) {
-        notify(true, `${synced} lançamento(s) enviado(s) automaticamente!`);
+        notify(true, `${synced} lançamento(s) sincronizado(s) com sucesso.`);
         load();
       }
     };
@@ -247,23 +250,15 @@ export default function DriverPage() {
     };
   }, [load]);
 
-  const cnhAlert = (() => {
-    const exp = ctx?.driver?.cnhExpiry;
-    if (!exp) return null;
-    const days = Math.floor((new Date(exp).getTime() - Date.now()) / 86400000);
-    return days <= 60 ? { days, expired: days < 0 } : null;
-  })();
-
   const logout = async () => {
-    if (!confirm('Deseja realmente sair do aplicativo?')) return;
+    if (!confirm('Deseja sair da sua conta?')) return;
     await createSupabaseBrowser().auth.signOut();
     window.location.assign('/login');
   };
 
-  // Apenas as 3 abas essenciais (removida a aba "Problema")
   const tabs: { id: Tab; label: string; icon: React.ElementType }[] = [
     { id: 'fuel', label: 'Abastecer', icon: Fuel },
-    { id: 'expense', label: 'Despesa', icon: Receipt },
+    { id: 'expense', label: 'Despesas', icon: Receipt },
     { id: 'odometer', label: 'Hodômetro', icon: Gauge },
   ];
 
@@ -271,90 +266,81 @@ export default function DriverPage() {
     ctx?.trucks.find((t) => t.id === selectedTruckId) ?? ctx?.trucks[0] ?? null;
 
   return (
-    <div className="min-h-screen bg-slate-100 pb-28">
-      <header className="sticky top-0 z-30 bg-slate-950 text-white px-4 py-3 flex items-center justify-between shadow-md border-b-2 border-sky-500">
+    <div className="min-h-[100dvh] bg-zinc-100 text-zinc-900 pb-[calc(5rem+env(safe-area-inset-bottom))]">
+      {/* Header com contraste máximo (preto e branco) */}
+      <header className="sticky top-0 z-30 bg-black text-white px-4 py-3 flex items-center justify-between border-b border-zinc-800 pt-[env(safe-area-inset-top)]">
         <div className="flex items-center gap-3 min-w-0">
-          <div className="bg-white rounded-lg px-1.5 py-0.5 shrink-0">
-            <Image src="/logo.png" alt="VSM Garcia" width={950} height={440} className="h-8 w-auto" />
+          <div className="bg-white rounded-lg px-2 py-0.5 shrink-0">
+            <Image
+              src="/logo.png"
+              alt="VSM Garcia"
+              width={950}
+              height={440}
+              className="h-7 w-auto object-contain"
+            />
           </div>
           <div className="min-w-0">
-            <p className="text-[11px] text-emerald-400 font-bold uppercase tracking-wider leading-none">
-              Motorista Conectado
+            <p className="text-[10px] text-zinc-400 uppercase tracking-wider leading-none">
+              Motorista
             </p>
-            <p className="text-sm font-bold truncate mt-0.5">
+            <p className="text-sm font-bold truncate mt-0.5 text-white">
               {ctx?.driver?.name ?? ctx?.userName ?? 'Carregando…'}
             </p>
           </div>
         </div>
+
         <div className="flex items-center gap-1.5 shrink-0">
           {ctx?.role === 'ADMIN' && (
             <Link
               href="/"
-              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-sky-300 text-xs font-bold"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-white text-xs font-bold"
             >
-              <LayoutDashboard className="w-4 h-4" />
-              <span>Painel Admin</span>
+              <LayoutDashboard className="w-3.5 h-3.5" />
+              <span>Painel</span>
             </Link>
           )}
           <button
             onClick={logout}
-            aria-label="Sair da conta"
-            title="Sair da conta"
-            className="p-2.5 rounded-xl text-slate-300 hover:bg-slate-800"
+            aria-label="Sair"
+            title="Sair"
+            className="p-2 rounded-lg text-zinc-300 hover:text-white hover:bg-zinc-900"
           >
             <LogOut className="w-5 h-5" />
           </button>
         </div>
       </header>
 
+      {/* Alerta de confirmação */}
       {toast && (
         <div
           role="status"
-          className={`fixed top-16 inset-x-4 z-40 mx-auto max-w-md flex items-center gap-2.5 rounded-2xl p-4 text-sm font-bold shadow-xl ring-2 ${
+          className={`fixed top-16 inset-x-4 z-40 mx-auto max-w-md flex items-center gap-2.5 rounded-xl p-3.5 text-sm font-bold shadow-lg border ${
             toast.ok
-              ? 'bg-emerald-600 text-white ring-emerald-400'
-              : 'bg-rose-600 text-white ring-rose-400'
+              ? 'bg-black text-white border-zinc-800'
+              : 'bg-zinc-900 text-white border-zinc-700'
           }`}
         >
           {toast.ok ? (
-            <CheckCircle2 className="w-6 h-6 shrink-0" />
+            <CheckCircle2 className="w-5 h-5 shrink-0 text-white" />
           ) : (
-            <AlertTriangle className="w-6 h-6 shrink-0" />
+            <AlertTriangle className="w-5 h-5 shrink-0 text-zinc-300" />
           )}
           <span>{toast.text}</span>
         </div>
       )}
 
-      <main className="max-w-md mx-auto p-4 space-y-4">
+      <main className="w-full max-w-md mx-auto p-3.5 sm:p-4 space-y-3.5">
         {(!online || pending > 0) && (
           <div
             role="status"
-            className="flex items-center gap-3 rounded-2xl bg-amber-50 text-amber-950 ring-1 ring-amber-300 p-3.5 text-xs font-semibold"
+            className="flex items-center gap-2.5 rounded-xl bg-zinc-200 border border-zinc-300 p-3 text-xs font-semibold text-zinc-900"
           >
-            <WifiOff className="w-5 h-5 shrink-0 text-amber-600" />
+            <WifiOff className="w-4 h-4 shrink-0 text-black" />
             <span>
-              {!online ? 'Você está sem internet no momento. ' : ''}
+              {!online ? 'Sem internet no momento. ' : ''}
               {pending > 0
-                ? `${pending} lançamento(s) guardado(s) no celular — serão enviados sozinhos assim que o sinal voltar.`
-                : 'Pode lançar normalmente! Tudo fica salvo no celular e sincroniza depois.'}
-            </span>
-          </div>
-        )}
-
-        {cnhAlert && (
-          <div
-            role="alert"
-            className={`flex items-start gap-2.5 rounded-2xl p-3.5 text-xs font-semibold ring-1 ${
-              cnhAlert.expired
-                ? 'bg-rose-50 text-rose-900 ring-rose-200'
-                : 'bg-amber-50 text-amber-900 ring-amber-200'
-            }`}
-          >
-            <AlertTriangle className="w-5 h-5 shrink-0" />
-            <span>
-              {cnhAlert.expired
-                ? `Sua CNH venceu há ${-cnhAlert.days} dia(s). Avise o escritório.`
-                : `Sua CNH vence em ${cnhAlert.days} dia(s).`}
+                ? `${pending} lançamento(s) aguardando sincronização.`
+                : 'Seus lançamentos ficam salvos no celular e são enviados quando o sinal voltar.'}
             </span>
           </div>
         )}
@@ -362,35 +348,35 @@ export default function DriverPage() {
         {loadError && !ctx && (
           <div
             role="alert"
-            className="rounded-2xl bg-rose-50 text-rose-900 ring-1 ring-rose-200 p-4 text-sm space-y-2"
+            className="rounded-xl bg-white border border-zinc-300 p-4 text-xs font-semibold text-zinc-900 space-y-2"
           >
-            <p className="font-semibold">{loadError}</p>
+            <p>{loadError}</p>
             <button
               onClick={load}
-              className="inline-flex items-center gap-1.5 font-bold text-rose-800 underline"
+              className="inline-flex items-center gap-1 font-bold underline"
             >
-              <RefreshCw className="w-4 h-4" /> Tentar novamente
+              <RefreshCw className="w-3.5 h-3.5" /> Tentar novamente
             </button>
           </div>
         )}
 
         {!ctx && !loadError && (
-          <div className="flex flex-col items-center justify-center py-16 gap-2 text-sky-700">
-            <Loader2 className="w-8 h-8 animate-spin" />
-            <span className="text-sm font-semibold">Carregando seu caminhão…</span>
+          <div className="flex flex-col items-center justify-center py-16 gap-2 text-zinc-700">
+            <Loader2 className="w-7 h-7 animate-spin" />
+            <span className="text-xs font-semibold">Carregando…</span>
           </div>
         )}
 
         {ctx && ctx.trucks.length === 0 && (
-          <div className="rounded-2xl bg-amber-50 text-amber-900 ring-1 ring-amber-200 p-4 text-sm font-medium">
-            Nenhum caminhão ativo cadastrado no sistema. Peça ao administrador para cadastrar.
+          <div className="rounded-xl bg-white border border-zinc-300 p-4 text-xs font-medium text-zinc-800">
+            Nenhum caminhão ativo liberado. Fale com a administração da frota.
           </div>
         )}
 
         {ctx && currentTruck && (
           <>
-            {/* Card Inteligente do Caminhão Selecionado (evita que o motorista precise escolher toda vez) */}
-            <SmartTruckBar
+            {/* Seletor direto do Caminhão (alto contraste) */}
+            <TruckSelectorBar
               trucks={ctx.trucks}
               selectedTruck={currentTruck}
               onSelectTruck={handleSelectTruck}
@@ -432,37 +418,39 @@ export default function DriverPage() {
               />
             )}
 
+            {/* Lista compacta de despesas */}
             {tab === 'expense' && ctx.expenses.length > 0 && (
-              <section className="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200 p-4 space-y-2.5">
-                <h3 className="text-sm font-extrabold text-slate-800 uppercase tracking-wide">
-                  Minhas últimas despesas lançadas
+              <section className="bg-white rounded-xl border border-zinc-200 p-4 space-y-2">
+                <h3 className="text-xs font-bold text-zinc-700 uppercase tracking-wider">
+                  Últimas despesas lançadas
                 </h3>
-                {ctx.expenses.map((e) => (
-                  <div
-                    key={e.id}
-                    className="flex items-center justify-between text-sm border-b border-slate-100 last:border-0 pb-2.5 last:pb-0"
-                  >
-                    <div>
-                      <span className="font-bold text-slate-900">{catLabel(e.category)}</span>
-                      <span className="block text-xs text-slate-500">
-                        {formatDate(e.date)}
-                        {e.description ? ` • ${e.description}` : ''}
-                        {e.receiptPhotoUrl ? ' • 📎 Com foto' : ''}
-                      </span>
+                <div className="divide-y divide-zinc-100">
+                  {ctx.expenses.slice(0, 8).map((e) => (
+                    <div
+                      key={e.id}
+                      className="py-2 flex items-center justify-between text-xs"
+                    >
+                      <div>
+                        <span className="font-bold text-black">{catLabel(e.category)}</span>
+                        <span className="block text-[11px] text-zinc-500">
+                          {formatDate(e.date)}
+                          {e.description ? ` • ${e.description}` : ''}
+                        </span>
+                      </div>
+                      <strong className="text-sm font-bold text-black">{formatBRL(e.amount)}</strong>
                     </div>
-                    <strong className="text-rose-600 text-base">{formatBRL(e.amount)}</strong>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </section>
             )}
           </>
         )}
       </main>
 
-      {/* Navegação inferior com 3 botões grandes e fáceis de tocar */}
+      {/* Navegação inferior (3 botões grandes, contraste máximo) */}
       <nav
-        className="fixed bottom-0 inset-x-0 z-30 bg-white border-t-2 border-slate-200 grid grid-cols-3 pb-[env(safe-area-inset-bottom)] shadow-lg"
-        aria-label="Menu do motorista"
+        className="fixed bottom-0 inset-x-0 z-30 bg-white border-t border-zinc-200 grid grid-cols-3 pb-[env(safe-area-inset-bottom)]"
+        aria-label="Ações do motorista"
       >
         {tabs.map(({ id, label: l, icon: Icon }) => {
           const active = tab === id;
@@ -471,11 +459,13 @@ export default function DriverPage() {
               key={id}
               onClick={() => setTab(id)}
               aria-current={active ? 'page' : undefined}
-              className={`flex flex-col items-center justify-center gap-1 py-3.5 text-xs font-extrabold transition ${
-                active ? 'text-emerald-600 bg-emerald-50/60' : 'text-slate-500 active:bg-slate-100'
+              className={`flex flex-col items-center justify-center gap-1 min-h-[56px] py-2 text-xs font-bold transition ${
+                active
+                  ? 'text-black bg-zinc-100 border-t-2 border-black'
+                  : 'text-zinc-500 active:bg-zinc-50'
               }`}
             >
-              <Icon className="w-6 h-6" />
+              <Icon className="w-5 h-5 shrink-0" />
               <span>{l}</span>
             </button>
           );
@@ -485,9 +475,9 @@ export default function DriverPage() {
   );
 }
 
-/* ------------------------------------------------------------------ */
+/* ---------------- Componentes e Formulários ---------------- */
 
-function SmartTruckBar({
+function TruckSelectorBar({
   trucks,
   selectedTruck,
   onSelectTruck,
@@ -496,73 +486,65 @@ function SmartTruckBar({
   selectedTruck: DriverTruck;
   onSelectTruck: (id: string) => void;
 }) {
-  const [changing, setChanging] = useState(false);
+  const [open, setOpen] = useState(false);
 
   return (
-    <div className="bg-slate-900 text-white rounded-2xl p-4 shadow-md ring-1 ring-slate-800 space-y-3">
+    <div className="bg-white rounded-xl p-4 border border-zinc-200 shadow-sm space-y-2">
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-3 min-w-0">
-          <div className="p-2.5 rounded-xl bg-emerald-500/20 text-emerald-400 shrink-0">
-            <TruckIcon className="w-6 h-6" />
+          <div className="p-2.5 rounded-xl bg-zinc-100 text-black shrink-0">
+            <TruckIcon className="w-5 h-5" />
           </div>
           <div className="min-w-0">
-            <div className="flex items-center gap-1.5">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-amber-400 flex items-center gap-1">
-                <Star className="w-3.5 h-3.5 fill-amber-400" />
-                Seu Caminhão Atual
-              </span>
-            </div>
-            <div className="text-lg font-extrabold tracking-tight truncate">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">
+              Caminhão Selecionado
+            </p>
+            <p className="text-base font-extrabold text-black truncate">
               {selectedTruck.plate} — {selectedTruck.model}
-            </div>
-            <div className="text-xs text-slate-400">
-              Hodômetro atual: <strong className="text-slate-200">{selectedTruck.currentOdometer.toLocaleString('pt-BR')} km</strong>
-            </div>
+            </p>
+            <p className="text-xs text-zinc-600 font-semibold">
+              Hodômetro: {selectedTruck.currentOdometer.toLocaleString('pt-BR')} km
+            </p>
           </div>
         </div>
 
         {trucks.length > 1 && (
           <button
             type="button"
-            onClick={() => setChanging((v) => !v)}
-            className="shrink-0 px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-sky-300 text-xs font-bold border border-slate-700"
+            onClick={() => setOpen((o) => !o)}
+            className="px-3 py-2 rounded-lg bg-zinc-100 hover:bg-zinc-200 text-xs font-bold text-black border border-zinc-300"
           >
-            {changing ? 'Fechar' : 'Trocar'}
+            {open ? 'Fechar' : 'Trocar'}
           </button>
         )}
       </div>
 
-      {changing && trucks.length > 1 && (
-        <div className="pt-2 border-t border-slate-800 space-y-2">
-          <p className="text-xs text-slate-300 font-semibold">
-            Toque no caminhão que você está dirigindo hoje (ele ficará salvo como seu preferido):
-          </p>
-          <div className="grid grid-cols-1 gap-2">
+      {open && trucks.length > 1 && (
+        <div className="pt-2 border-t border-zinc-100 space-y-1.5">
+          <p className="text-xs text-zinc-600 font-medium">Selecione o caminhão que está com você:</p>
+          <div className="grid grid-cols-1 gap-1.5">
             {trucks.map((t) => {
-              const isSelected = t.id === selectedTruck.id;
+              const active = t.id === selectedTruck.id;
               return (
                 <button
                   key={t.id}
                   type="button"
                   onClick={() => {
                     onSelectTruck(t.id);
-                    setChanging(false);
+                    setOpen(false);
                   }}
-                  className={`w-full flex items-center justify-between p-3 rounded-xl text-left text-sm font-bold transition ${
-                    isSelected
-                      ? 'bg-emerald-600 text-white ring-2 ring-emerald-300'
-                      : 'bg-slate-800 text-slate-200 hover:bg-slate-700'
+                  className={`w-full flex items-center justify-between p-3 rounded-lg text-left text-xs font-bold border transition ${
+                    active
+                      ? 'bg-black text-white border-black'
+                      : 'bg-zinc-50 text-black border-zinc-200 hover:bg-zinc-100'
                   }`}
                 >
-                  <div>
-                    <span className="text-base">{t.plate}</span> — {t.model}
-                    <span className="block text-xs font-normal opacity-80">
-                      {t.currentOdometer.toLocaleString('pt-BR')} km
-                    </span>
-                  </div>
-                  {isSelected && (
-                    <span className="text-xs bg-white/20 px-2.5 py-1 rounded-lg">Selecionado</span>
-                  )}
+                  <span>
+                    {t.plate} — {t.model}
+                  </span>
+                  <span className={active ? 'text-zinc-300' : 'text-zinc-600'}>
+                    {t.currentOdometer.toLocaleString('pt-BR')} km
+                  </span>
                 </button>
               );
             })}
@@ -615,11 +597,11 @@ function FuelForm({
 
     const numOdo = Number(odometer);
     if (!numOdo || numOdo <= 0) {
-      onError('Digite o KM (odômetro) que está no painel do caminhão.');
+      onError('Digite o KM do painel do caminhão.');
       return;
     }
     if (numLiters <= 0 || numTotal <= 0) {
-      onError('Informe os litros e o valor total do abastecimento.');
+      onError('Informe a quantidade de litros e o valor total.');
       return;
     }
 
@@ -668,9 +650,9 @@ function FuelForm({
       pick(null);
 
       if (res.queued) {
-        onDone('Abastecimento salvo no celular! Será enviado quando a internet voltar.', numOdo);
+        onDone('Abastecimento salvo no aparelho.', numOdo);
       } else {
-        onDone('Abastecimento registrado com sucesso!', numOdo);
+        onDone('Abastecimento registrado com sucesso.', numOdo);
       }
     } catch (err) {
       onError(err instanceof Error ? err.message : 'Erro ao registrar abastecimento.');
@@ -682,88 +664,84 @@ function FuelForm({
   return (
     <form
       onSubmit={submit}
-      className="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200 p-4 space-y-4"
+      className="bg-white rounded-xl border border-zinc-200 p-4 space-y-3.5 shadow-sm"
     >
-      <div>
-        <h2 className="text-lg font-extrabold text-slate-900">Lançar Abastecimento</h2>
-        <p className="text-xs text-slate-500">
-          Preencha os números da bomba e do painel do caminhão.
-        </p>
+      <div className="border-b border-zinc-100 pb-2">
+        <h2 className="text-base font-extrabold text-black">Abastecimento</h2>
+        <p className="text-xs text-zinc-500">Dados do cupom fiscal e painel</p>
       </div>
 
       <div>
-        <label className={label}>
-          KM no Painel (Odômetro) — último: {truck.currentOdometer.toLocaleString('pt-BR')} km
+        <label className={labelCls}>
+          KM Atual no Painel (último: {truck.currentOdometer.toLocaleString('pt-BR')} km)
         </label>
         <input
           required
           type="number"
           inputMode="numeric"
           min={truck.currentOdometer > 0 ? truck.currentOdometer : 1}
-          className={field}
+          className={fieldCls}
           value={odometer}
           onChange={(e) => setOdometer(e.target.value)}
-          placeholder={truck.currentOdometer > 0 ? `Ex: ${truck.currentOdometer + 450}` : 'Ex: 228500'}
+          placeholder={truck.currentOdometer > 0 ? `Ex: ${truck.currentOdometer + 400}` : 'Ex: 220000'}
         />
       </div>
 
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className={label}>Litros</label>
+          <label className={labelCls}>Litros</label>
           <input
             required
             type="number"
             inputMode="decimal"
             step="0.01"
             min="1"
-            className={field}
+            className={fieldCls}
             value={liters}
             onChange={(e) => setLiters(e.target.value)}
-            placeholder="Ex: 550"
+            placeholder="Ex: 500"
           />
         </div>
         <div>
-          <label className={label}>Valor Total (R$)</label>
+          <label className={labelCls}>Valor Total (R$)</label>
           <input
             required
             type="number"
             inputMode="decimal"
             step="0.01"
             min="0.01"
-            className={field}
+            className={fieldCls}
             value={totalAmount}
             onChange={(e) => setTotalAmount(e.target.value)}
-            placeholder="Ex: 3250,00"
+            placeholder="Ex: 3000,00"
           />
         </div>
       </div>
 
       <div>
-        <label className={label}>Foto da Nota / Cupom (Opcional)</label>
+        <label className={labelCls}>Foto do Cupom (Opcional)</label>
         {preview ? (
-          <div className="flex items-center gap-3 rounded-2xl bg-slate-50 p-3 ring-1 ring-slate-200">
+          <div className="flex items-center gap-3 rounded-xl bg-zinc-50 p-2.5 border border-zinc-200">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={preview}
-              alt="Recibo de abastecimento"
-              className="w-16 h-16 object-cover rounded-xl"
+              alt="Recibo"
+              className="w-14 h-14 object-cover rounded-lg border border-zinc-300"
             />
-            <span className="flex-1 text-xs font-semibold text-emerald-700">
-              Foto anexada com sucesso
-            </span>
+            <span className="flex-1 text-xs font-semibold text-zinc-800">Foto anexada</span>
             <button
               type="button"
               onClick={() => pick(null)}
               aria-label="Remover foto"
-              className="p-2 text-slate-500 hover:text-rose-600"
+              className="p-2 text-zinc-500 hover:text-black"
             >
               <X className="w-5 h-5" />
             </button>
           </div>
         ) : (
-          <label className="flex min-h-14 cursor-pointer items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-sky-400 bg-sky-50/50 text-sm font-bold text-sky-900 active:bg-sky-100">
-            <Camera className="w-5 h-5 text-sky-600" />
-            Tirar Foto do Cupom
+          <label className="flex h-12 sm:h-14 cursor-pointer items-center justify-center gap-2 rounded-xl border-2 border-dashed border-zinc-300 bg-zinc-50 text-xs sm:text-sm font-bold text-zinc-700 hover:border-black active:bg-zinc-100 transition">
+            <Camera className="w-4 h-4 text-black" />
+            <span>Tirar Foto do Cupom</span>
             <input
               type="file"
               accept="image/*"
@@ -776,31 +754,26 @@ function FuelForm({
       </div>
 
       <div>
-        <label className={label}>Data e Hora</label>
+        <label className={labelCls}>Data e Hora</label>
         <input
           required
           type="datetime-local"
-          className={field}
+          className={fieldCls}
           value={dateTime}
           onChange={(e) => setDateTime(e.target.value)}
         />
       </div>
 
-      <div className="flex items-center justify-between rounded-2xl bg-slate-900 text-white p-4">
-        <div>
-          <span className="text-xs text-slate-400 block">Total do Abastecimento</span>
-          {unitPrice > 0 && (
-            <span className="text-xs text-emerald-400 font-semibold">
-              Preço por litro: R$ {unitPrice.toFixed(2).replace('.', ',')}
-            </span>
-          )}
+      {unitPrice > 0 && (
+        <div className="p-3 bg-zinc-100 rounded-xl text-xs font-bold text-zinc-800 flex justify-between items-center">
+          <span>Preço calculado:</span>
+          <span>R$ {unitPrice.toFixed(2).replace('.', ',')} / Litro</span>
         </div>
-        <strong className="text-2xl text-emerald-400">{formatBRL(numTotal)}</strong>
-      </div>
+      )}
 
-      <button type="submit" disabled={busy} className={submitBtn}>
-        {busy ? <Loader2 className="w-6 h-6 animate-spin" /> : <Fuel className="w-6 h-6" />}
-        {busy ? 'SALVANDO…' : 'CONFIRMAR ABASTECIMENTO'}
+      <button type="submit" disabled={busy} className={submitBtnCls}>
+        {busy ? <Loader2 className="w-5 h-5 animate-spin" /> : <Fuel className="w-5 h-5" />}
+        <span>{busy ? 'Gravando…' : 'CONFIRMAR ABASTECIMENTO'}</span>
       </button>
     </form>
   );
@@ -885,9 +858,9 @@ function ExpenseForm({
       pick(null);
 
       if (res.queued) {
-        onDone('Despesa salva no celular! Será enviada quando a internet voltar.');
+        onDone('Despesa salva no aparelho.');
       } else {
-        onDone('Despesa registrada com sucesso!');
+        onDone('Despesa registrada com sucesso.');
       }
     } catch (err) {
       onError(err instanceof Error ? err.message : 'Erro ao registrar despesa.');
@@ -899,19 +872,17 @@ function ExpenseForm({
   return (
     <form
       onSubmit={submit}
-      className="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200 p-4 space-y-4"
+      className="bg-white rounded-xl border border-zinc-200 p-4 space-y-3.5 shadow-sm"
     >
-      <div>
-        <h2 className="text-lg font-extrabold text-slate-900">Lançar Despesa de Viagem</h2>
-        <p className="text-xs text-slate-500">
-          Registre gastos com pedágio, refeição, chapa ou borracharia.
-        </p>
+      <div className="border-b border-zinc-100 pb-2">
+        <h2 className="text-base font-extrabold text-black">Despesa de Viagem</h2>
+        <p className="text-xs text-zinc-500">Pedágio, refeição, chapa ou borracharia</p>
       </div>
 
       {ctx.trips.length > 0 && (
         <div>
-          <label className={label}>Viagem / Frete</label>
-          <select className={field} value={tripId} onChange={(e) => setTripId(e.target.value)}>
+          <label className={labelCls}>Frete em Andamento</label>
+          <select className={fieldCls} value={tripId} onChange={(e) => setTripId(e.target.value)}>
             {ctx.trips.map((t) => (
               <option key={t.id} value={t.id}>
                 {t.origin} → {t.destination} ({t.customerName})
@@ -922,8 +893,8 @@ function ExpenseForm({
       )}
 
       <div>
-        <label className={label}>Tipo de Gasto</label>
-        <select className={field} value={category} onChange={(e) => setCategory(e.target.value)}>
+        <label className={labelCls}>Tipo de Despesa</label>
+        <select className={fieldCls} value={category} onChange={(e) => setCategory(e.target.value)}>
           {CATEGORIES.map((c) => (
             <option key={c.value} value={c.value}>
               {c.label}
@@ -934,26 +905,26 @@ function ExpenseForm({
 
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className={label}>Valor (R$)</label>
+          <label className={labelCls}>Valor (R$)</label>
           <input
             required
             type="number"
             inputMode="decimal"
             step="0.01"
             min="0.01"
-            className={field}
+            className={fieldCls}
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
-            placeholder="Ex: 45,00"
+            placeholder="Ex: 50,00"
           />
         </div>
         <div>
-          <label className={label}>Data</label>
+          <label className={labelCls}>Data</label>
           <input
             required
             type="date"
             max={today()}
-            className={field}
+            className={fieldCls}
             value={date}
             onChange={(e) => setDate(e.target.value)}
           />
@@ -961,37 +932,39 @@ function ExpenseForm({
       </div>
 
       <div>
-        <label className={label}>Observação (Opcional)</label>
+        <label className={labelCls}>Descrição (Opcional)</label>
         <input
-          className={field}
+          className={fieldCls}
           value={description}
           onChange={(e) => setDescription(e.target.value)}
-          placeholder="Ex: Almoço no posto"
+          placeholder="Ex: Almoço posto"
         />
       </div>
 
       <div>
-        <label className={label}>Foto do Comprovante (Opcional)</label>
+        <label className={labelCls}>Foto do Comprovante (Opcional)</label>
         {preview ? (
-          <div className="flex items-center gap-3 rounded-2xl bg-slate-50 p-3 ring-1 ring-slate-200">
+          <div className="flex items-center gap-3 rounded-xl bg-zinc-50 p-2.5 border border-zinc-200">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={preview} alt="Recibo" className="w-16 h-16 object-cover rounded-xl" />
-            <span className="flex-1 text-xs font-semibold text-emerald-700">
-              Foto anexada com sucesso
-            </span>
+            <img
+              src={preview}
+              alt="Comprovante"
+              className="w-14 h-14 object-cover rounded-lg border border-zinc-300"
+            />
+            <span className="flex-1 text-xs font-semibold text-zinc-800">Foto anexada</span>
             <button
               type="button"
               onClick={() => pick(null)}
               aria-label="Remover foto"
-              className="p-2 text-slate-500 hover:text-rose-600"
+              className="p-2 text-zinc-500 hover:text-black"
             >
               <X className="w-5 h-5" />
             </button>
           </div>
         ) : (
-          <label className="flex min-h-14 cursor-pointer items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-sky-400 bg-sky-50/50 text-sm font-bold text-sky-900 active:bg-sky-100">
-            <Camera className="w-5 h-5 text-sky-600" />
-            Tirar Foto do Comprovante
+          <label className="flex h-12 sm:h-14 cursor-pointer items-center justify-center gap-2 rounded-xl border-2 border-dashed border-zinc-300 bg-zinc-50 text-xs sm:text-sm font-bold text-zinc-700 hover:border-black active:bg-zinc-100 transition">
+            <Camera className="w-4 h-4 text-black" />
+            <span>Tirar Foto do Recibo</span>
             <input
               type="file"
               accept="image/*"
@@ -1003,9 +976,9 @@ function ExpenseForm({
         )}
       </div>
 
-      <button type="submit" disabled={busy} className={submitBtn}>
-        {busy ? <Loader2 className="w-6 h-6 animate-spin" /> : <Receipt className="w-6 h-6" />}
-        {busy ? 'SALVANDO…' : 'CONFIRMAR DESPESA'}
+      <button type="submit" disabled={busy} className={submitBtnCls}>
+        {busy ? <Loader2 className="w-5 h-5 animate-spin" /> : <Receipt className="w-5 h-5" />}
+        <span>{busy ? 'Gravando…' : 'CONFIRMAR DESPESA'}</span>
       </button>
     </form>
   );
@@ -1040,9 +1013,9 @@ function OdometerForm({
       });
       setOdometer('');
       if (res.queued) {
-        onDone('Hodômetro salvo no celular! Será sincronizado assim que a internet voltar.', numOdo);
+        onDone('Hodômetro salvo no aparelho.', numOdo);
       } else {
-        onDone('Hodômetro atualizado com sucesso!', numOdo);
+        onDone('Hodômetro atualizado com sucesso.', numOdo);
       }
     } catch (err) {
       onError(err instanceof Error ? err.message : 'Erro ao atualizar hodômetro.');
@@ -1054,39 +1027,37 @@ function OdometerForm({
   return (
     <form
       onSubmit={submit}
-      className="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200 p-4 space-y-4"
+      className="bg-white rounded-xl border border-zinc-200 p-4 space-y-3.5 shadow-sm"
     >
-      <div>
-        <h2 className="text-lg font-extrabold text-slate-900">Atualizar Hodômetro (KM)</h2>
-        <p className="text-xs text-slate-500">
-          Informe o KM que aparece agora no painel do caminhão.
-        </p>
+      <div className="border-b border-zinc-100 pb-2">
+        <h2 className="text-base font-extrabold text-black">Atualizar Hodômetro</h2>
+        <p className="text-xs text-zinc-500">Quilometragem atual no painel</p>
       </div>
 
-      <div className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200 text-sm text-slate-600 flex items-center justify-between">
-        <span>Último KM registrado:</span>
-        <strong className="text-base text-slate-900">
+      <div className="p-3 bg-zinc-100 rounded-xl text-xs font-bold text-zinc-800 flex justify-between items-center">
+        <span>Último registrado:</span>
+        <span className="text-sm font-extrabold text-black">
           {truck.currentOdometer.toLocaleString('pt-BR')} km
-        </strong>
+        </span>
       </div>
 
       <div>
-        <label className={label}>Novo KM no Painel</label>
+        <label className={labelCls}>Novo KM no Painel</label>
         <input
           required
           type="number"
           inputMode="numeric"
           min={truck.currentOdometer > 0 ? truck.currentOdometer : 1}
-          className={field}
+          className={fieldCls}
           value={odometer}
           onChange={(e) => setOdometer(e.target.value)}
-          placeholder={truck.currentOdometer > 0 ? `Ex: ${truck.currentOdometer + 300}` : 'Ex: 150000'}
+          placeholder={truck.currentOdometer > 0 ? `Ex: ${truck.currentOdometer + 200}` : 'Ex: 220000'}
         />
       </div>
 
-      <button type="submit" disabled={busy} className={submitBtn}>
-        {busy ? <Loader2 className="w-6 h-6 animate-spin" /> : <Gauge className="w-6 h-6" />}
-        {busy ? 'SALVANDO…' : 'CONFIRMAR KM'}
+      <button type="submit" disabled={busy} className={submitBtnCls}>
+        {busy ? <Loader2 className="w-5 h-5 animate-spin" /> : <Gauge className="w-5 h-5" />}
+        <span>{busy ? 'Gravando…' : 'CONFIRMAR KM'}</span>
       </button>
     </form>
   );
