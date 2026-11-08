@@ -2,7 +2,8 @@
 
 import React, { useState } from 'react';
 import Image from 'next/image';
-import { LayoutDashboard, Fuel, Wrench, Navigation, CalendarClock, Users, LogOut, Loader2 } from 'lucide-react';
+import Link from 'next/link';
+import { LayoutDashboard, Fuel, Wrench, Navigation, CalendarClock, Users, LogOut, Loader2, Smartphone } from 'lucide-react';
 import { createSupabaseBrowser } from '@/lib/supabase/browser';
 
 interface NavbarProps {
@@ -88,17 +89,27 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab }) => {
               })}
             </nav>
 
-            <button
-              type="button"
-              onClick={logout}
-              disabled={leaving}
-              aria-label="Sair"
-              title="Sair"
-              className="shrink-0 inline-flex items-center gap-2 p-2.5 rounded-xl text-slate-300 hover:text-white hover:bg-zinc-900 disabled:opacity-50"
-            >
-              {leaving ? <Loader2 className="w-5 h-5 animate-spin" /> : <LogOut className="w-5 h-5" />}
-              <span className="hidden xl:inline text-sm font-semibold">Sair</span>
-            </button>
+            <div className="flex items-center gap-1.5 shrink-0">
+              <Link
+                href="/app/driver"
+                title="Abrir App do Motorista"
+                className="inline-flex items-center gap-1.5 px-2.5 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-sky-300 text-xs font-semibold transition"
+              >
+                <Smartphone className="w-4 h-4 shrink-0" />
+                <span className="hidden sm:inline">Modo Motorista</span>
+              </Link>
+              <button
+                type="button"
+                onClick={logout}
+                disabled={leaving}
+                aria-label="Sair"
+                title="Sair"
+                className="shrink-0 inline-flex items-center gap-2 p-2.5 rounded-xl text-slate-300 hover:text-white hover:bg-zinc-900 disabled:opacity-50"
+              >
+                {leaving ? <Loader2 className="w-5 h-5 animate-spin" /> : <LogOut className="w-5 h-5" />}
+                <span className="hidden xl:inline text-sm font-semibold">Sair</span>
+              </button>
+            </div>
           </div>
         </div>
       </header>

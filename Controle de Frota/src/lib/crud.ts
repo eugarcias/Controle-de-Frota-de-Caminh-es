@@ -43,6 +43,12 @@ export const resources: Record<string, ResourceConfig> = {
     schema: FuelLogSchema,
     dateFields: ['date'],
     orderBy: { date: 'desc' },
+    beforeSave: (d) => {
+      if (d.pricePerLiter === undefined && d.totalAmount !== undefined && d.liters > 0) {
+        d.pricePerLiter = Number((d.totalAmount / d.liters).toFixed(3));
+      }
+      return d;
+    },
     // Mantém o hodômetro do caminhão sempre no maior valor lançado
     afterCreate: async (row) => {
       await prisma.truck.updateMany({

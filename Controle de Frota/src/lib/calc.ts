@@ -1,107 +1,221 @@
-import { FuelLog, MaintenanceAlert, Truck, MaintenanceLog } from '../types';
+import { FuelLog, MaintenanceAlert, MonthlyFuelPerformance, Truck, MaintenanceLog } from '../types';
+
+const MONTH_NAMES = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+
+export function formatPeriodLabel(month: number, year: number): string {
+  const m = MONTH_NAMES[Math.max(0, Math.min(11, month - 1))] ?? String(month).padStart(2, '0');
+  return `${m}/${year}`;
+}
 
 /**
- * 1. CÁLCULO DE CONSUMO MÉDIO (km/L) PELO MÉTODO DE TANQUE CHEIO
- * - Para cada abastecimento com isFullTank = true:
- *   localiza o abastecimento com tanque cheio anterior.
- *   Fórmula: km/L = (Odometer Atual - Odometer Anterior) / Soma(Litros desde o anterior até este)
- * - Detecta distorções (< 1.8 km/L ou > 4.5 km/L para caminhões pesados).
+ * 1. MOTOR DE CÁLCULO PELO MÉTODO DE MÉDIA MENSAL ACUMULADA
+ *
+ * Fórmulas padronizadas:
+ *  1. total_liters      = SUM(liters) para o período selecionado
+ *  2. start_odometer    = MIN(odometer) do primeiro registro do período
+ *  3. end_odometer      = MAX(odometer) do último registro do período
+ *  4. distance_traveled = end_odometer - start_odometer
+ *  5. monthly_avg_km_l  = distance_traveled / total_liters (0 se total_liters == 0)
+ *  6. total_fuel_cost   = SUM(total_amount)
+ *  7. fuel_cpk          = total_fuel_cost / distance_traveled (0 se distance_traveled <= 0)
+ *
+ * Alerta de anomalia:
+ *  Se distance_traveled > 1.000 km e (monthly_avg_km_l < 2,0 ou monthly_avg_km_l > 4,5),
+ *  sinaliza alerta sugerindo conferência de notas ou revisão do veículo.
+ */
+export function evaluateMonthlyAnomaly(
+  distanceTraveled: number,
+  monthlyAvgKmL: number,
+  periodLabel?: string
+): {
+  isAnomalous: boolean;
+  anomalyType: 'LOW' | 'HIGH' | null;
+  anomalyMessage: string | null;
+} {
+  if (distanceTraveled <= 1000 || monthlyAvgKmL <= 0) {
+    return { isAnomalous: false, anomalyType: null, anomalyMessage: null };
+  }
+  const ref = periodLabel ? ` (${periodLabel})` : '';
+  const fmtKmL = monthlyAvgKmL.toFixed(1).replace('.', ',');
+  if (monthlyAvgKmL < 2.0) {
+    return {
+      isAnomalous: true,
+      anomalyType: 'LOW',
+      anomalyMessage: `Média baixa de ${fmtKmL} km/L${ref} (> 1.000 km rodados) — sugerida conferência de notas ou revisão do veículo.`,
+    };
+  }
+  if (monthlyAvgKmL > 4.5) {
+    return {
+      isAnomalous: true,
+      anomalyType: 'HIGH',
+      anomalyMessage: `Média atípica de ${fmtKmL} km/L${ref} (> 1.000 km rodados) — sugerida conferência de notas ou revisão do veículo.`,
+    };
+  }
+  return { isAnomalous: false, anomalyType: null, anomalyMessage: null };
+}
+
+export function calculateCumulativeFuelStats(
+  logs: Pick<FuelLog, 'odometer' | 'liters' | 'totalAmount'>[],
+  periodLabel?: string
+) {
+  if (logs.length === 0) {
+    return {
+      logsCount: 0,
+      totalLiters: 0,
+      startOdometer: 0,
+      endOdometer: 0,
+      distanceTraveled: 0,
+      monthlyAvgKmL: 0,
+      totalFuelCost: 0,
+      fuelCpk: 0,
+      isAnomalous: false,
+      anomalyType: null as 'LOW' | 'HIGH' | null,
+      anomalyMessage: null as string | null,
+    };
+  }
+
+  let totalLiters = 0;
+  let totalFuelCost = 0;
+  let startOdometer = Infinity;
+  let endOdometer = -Infinity;
+
+  for (const log of logs) {
+    const l = Number(log.liters) || 0;
+    const c = Number(log.totalAmount) || 0;
+    const odo = Number(log.odometer) || 0;
+    totalLiters += l;
+    totalFuelCost += c;
+    if (odo < startOdometer) startOdometer = odo;
+    if (odo > endOdometer) endOdometer = odo;
+  }
+
+  if (!Number.isFinite(startOdometer)) startOdometer = 0;
+  if (!Number.isFinite(endOdometer)) endOdometer = 0;
+
+  const distanceTraveled = Math.max(0, endOdometer - startOdometer);
+  const rawKmL = totalLiters > 0 && distanceTraveled > 0 ? distanceTraveled / totalLiters : 0;
+  const rawFuelCpk = distanceTraveled > 0 ? totalFuelCost / distanceTraveled : 0;
+
+  const monthlyAvgKmL = Number(rawKmL.toFixed(2));
+  const fuelCpk = Number(rawFuelCpk.toFixed(2));
+  const anomaly = evaluateMonthlyAnomaly(distanceTraveled, monthlyAvgKmL, periodLabel);
+
+  return {
+    logsCount: logs.length,
+    totalLiters: Number(totalLiters.toFixed(2)),
+    startOdometer,
+    endOdometer,
+    distanceTraveled,
+    monthlyAvgKmL,
+    totalFuelCost: Number(totalFuelCost.toFixed(2)),
+    fuelCpk,
+    ...anomaly,
+  };
+}
+
+/**
+ * Calcula o desempenho acumulado de um caminhão em um mês/ano específico (1..12).
+ */
+export function calculateMonthlyFuelPerformance(
+  logs: FuelLog[],
+  truckId: string,
+  month: number,
+  year: number
+): MonthlyFuelPerformance {
+  const periodKey = `${year}-${String(month).padStart(2, '0')}`;
+  const periodLabel = formatPeriodLabel(month, year);
+
+  const monthLogs = logs.filter((l) => {
+    if (l.truckId !== truckId) return false;
+    const d = new Date(l.date);
+    return d.getUTCFullYear() === year && d.getUTCMonth() + 1 === month;
+  });
+
+  const stats = calculateCumulativeFuelStats(monthLogs, periodLabel);
+
+  return {
+    truckId,
+    month,
+    year,
+    periodKey,
+    periodLabel,
+    ...stats,
+  };
+}
+
+/**
+ * Agrupa todos os abastecimentos de um caminhão por mês (YYYY-MM) e calcula a Média Mensal Acumulada.
+ */
+export function calculateTruckMonthlyHistory(logs: FuelLog[], truckId: string): MonthlyFuelPerformance[] {
+  const truckLogs = logs.filter((l) => l.truckId === truckId);
+  const buckets = new Map<string, { month: number; year: number; items: FuelLog[] }>();
+
+  for (const log of truckLogs) {
+    const d = new Date(log.date);
+    if (Number.isNaN(d.getTime())) continue;
+    const year = d.getUTCFullYear();
+    const month = d.getUTCMonth() + 1;
+    const key = `${year}-${String(month).padStart(2, '0')}`;
+    const existing = buckets.get(key);
+    if (existing) {
+      existing.items.push(log);
+    } else {
+      buckets.set(key, { month, year, items: [log] });
+    }
+  }
+
+  return Array.from(buckets.entries())
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([periodKey, { month, year, items }]) => {
+      const periodLabel = formatPeriodLabel(month, year);
+      const stats = calculateCumulativeFuelStats(items, periodLabel);
+      return {
+        truckId,
+        month,
+        year,
+        periodKey,
+        periodLabel,
+        ...stats,
+      };
+    });
+}
+
+/**
+ * Compatibilidade para análise rápida por lançamento usando a Média Mensal Acumulada do respectivo mês.
  */
 export function calculateFuelConsumption(logs: FuelLog[]): {
   logId: string;
   kmTraveled: number;
   litersUsed: number;
   averageKmL: number | null;
+  fuelCpk: number;
   isDistorted: boolean;
   message?: string;
 }[] {
-  // Ordena por odômetro crescente
-  const sorted = [...logs].sort((a, b) => a.odometer - b.odometer);
-  const results: {
-    logId: string;
-    kmTraveled: number;
-    litersUsed: number;
-    averageKmL: number | null;
-    isDistorted: boolean;
-    message?: string;
-  }[] = [];
-
-  let lastFullTankIndex = -1;
-
-  for (let i = 0; i < sorted.length; i++) {
-    const current = sorted[i];
-
-    if (!current.isFullTank) {
-      results.push({
-        logId: current.id,
-        kmTraveled: 0,
-        litersUsed: current.liters,
-        averageKmL: null,
-        isDistorted: false,
-        message: 'Abastecimento parcial (não calcula média isolada)',
-      });
-      continue;
-    }
-
-    if (lastFullTankIndex === -1) {
-      // Primeiro tanque cheio registrado - ponto de partida
-      lastFullTankIndex = i;
-      results.push({
-        logId: current.id,
-        kmTraveled: 0,
-        litersUsed: current.liters,
-        averageKmL: null,
-        isDistorted: false,
-        message: 'Primeiro tanque cheio (base inicial de odômetro)',
-      });
-      continue;
-    }
-
-    const previousFull = sorted[lastFullTankIndex];
-    const kmTraveled = current.odometer - previousFull.odometer;
-
-    // Soma os litros de todos os abastecimentos intermediários + o tanque cheio atual
-    let litersUsed = 0;
-    for (let j = lastFullTankIndex + 1; j <= i; j++) {
-      litersUsed += sorted[j].liters;
-    }
-
-    if (litersUsed <= 0 || kmTraveled <= 0) {
-      results.push({
-        logId: current.id,
-        kmTraveled,
-        litersUsed,
-        averageKmL: null,
-        isDistorted: true,
-        message: 'Hodômetro ou litros inconsistentes',
-      });
-      lastFullTankIndex = i;
-      continue;
-    }
-
-    const rawKmL = kmTraveled / litersUsed;
-    const averageKmL = Number(rawKmL.toFixed(2));
-    const isDistorted = averageKmL < 1.8 || averageKmL > 4.5;
-
-    results.push({
+  const sorted = [...logs].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  return sorted.map((current) => {
+    const d = new Date(current.date);
+    const month = d.getUTCMonth() + 1;
+    const year = d.getUTCFullYear();
+    const perf = calculateMonthlyFuelPerformance(logs, current.truckId, month, year);
+    return {
       logId: current.id,
-      kmTraveled,
-      litersUsed: Number(litersUsed.toFixed(2)),
-      averageKmL,
-      isDistorted,
-      message: isDistorted
-        ? `Atenção: Consumo fora da faixa esperada para pesados (1.8 a 4.5 km/L)`
-        : 'Consumo normal',
-    });
-
-    lastFullTankIndex = i;
-  }
-
-  return results;
+      kmTraveled: perf.distanceTraveled,
+      litersUsed: perf.totalLiters,
+      averageKmL: perf.monthlyAvgKmL > 0 ? perf.monthlyAvgKmL : null,
+      fuelCpk: perf.fuelCpk,
+      isDistorted: perf.isAnomalous,
+      message:
+        perf.anomalyMessage ??
+        (perf.monthlyAvgKmL > 0
+          ? `Média Mensal (${perf.periodLabel}): ${perf.monthlyAvgKmL.toFixed(1).replace('.', ',')} km/L • Custo de Diesel por KM: R$ ${perf.fuelCpk.toFixed(2).replace('.', ',')}`
+          : 'Primeiro registro do mês (aguardando próximo abastecimento para fechar distância mensal)'),
+    };
+  });
 }
 
 /**
- * 2. CUSTO POR KM (CPK)
+ * 2. CUSTO POR KM (CPK OPERACIONAL TOTAL)
  * CPK = (Custos Combustível + Manutenção/Óleo + Pedágios/Viagem) / Total KM Rodados
  */
 export function calculateCPK(
@@ -151,7 +265,6 @@ export function checkMaintenanceAlerts(
     const triggerThreshold = 1000;
 
     if (kmRemaining <= 0) {
-      // Vencida!
       alerts.push({
         truckId: truck.id,
         truckPlate: truck.plate,
@@ -164,7 +277,6 @@ export function checkMaintenanceAlerts(
         message: `ATENÇÃO CRÍTICA: Revisão de ${formatCategory(m.category)} vencida há ${Math.abs(kmRemaining)} km!`,
       });
     } else if (kmRemaining <= triggerThreshold) {
-      // Próxima da revisão
       alerts.push({
         truckId: truck.id,
         truckPlate: truck.plate,
@@ -196,12 +308,9 @@ export function formatCategory(cat: string): string {
 }
 
 /**
- * 5. EFICIÊNCIA HISTÓRICA REAL DE UM CAMINHÃO (base do simulador de viagem)
+ * 5. EFICIÊNCIA HISTÓRICA ACUMULADA DE UM CAMINHÃO (base do simulador de viagem)
  *
- * Usa apenas intervalos válidos de tanque cheio (calculateFuelConsumption) e faz a
- * média PONDERADA: Σ km / Σ litros. Isso é mais fiel que a média simples dos km/L,
- * pois um intervalo de 2.000 km pesa mais que um de 200 km.
- * Intervalos distorcidos (< 1.8 ou > 4.5 km/L) são descartados como ruído de lançamento.
+ * Usa o método de Média Mensal Acumulada: (MAX(odometer) - MIN(odometer)) / SUM(liters).
  */
 export function calculateTruckEfficiency(logs: FuelLog[]): {
   kmPerLiter: number | null;
@@ -209,16 +318,12 @@ export function calculateTruckEfficiency(logs: FuelLog[]): {
   sampleLiters: number;
   intervals: number;
 } {
-  const valid = calculateFuelConsumption(logs).filter(
-    (r) => r.averageKmL !== null && !r.isDistorted && r.kmTraveled > 0 && r.litersUsed > 0
-  );
-  const sampleKm = valid.reduce((a, r) => a + r.kmTraveled, 0);
-  const sampleLiters = valid.reduce((a, r) => a + r.litersUsed, 0);
+  const stats = calculateCumulativeFuelStats(logs);
   return {
-    kmPerLiter: sampleLiters > 0 ? Number((sampleKm / sampleLiters).toFixed(2)) : null,
-    sampleKm,
-    sampleLiters: Number(sampleLiters.toFixed(2)),
-    intervals: valid.length,
+    kmPerLiter: stats.monthlyAvgKmL > 0 ? stats.monthlyAvgKmL : null,
+    sampleKm: stats.distanceTraveled,
+    sampleLiters: stats.totalLiters,
+    intervals: stats.logsCount,
   };
 }
 
@@ -248,7 +353,6 @@ export function projectTripProfit(input: {
     totalCost,
     netProfit,
     marginPercent: grossFreight > 0 ? (netProfit / grossFreight) * 100 : 0,
-    // frete mínimo para não ter prejuízo
     breakEvenFreight: totalCost,
     freightPerKm: distanceKm > 0 ? grossFreight / distanceKm : 0,
     costPerKm: distanceKm > 0 ? totalCost / distanceKm : 0,

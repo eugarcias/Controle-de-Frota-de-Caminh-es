@@ -12,10 +12,9 @@ import {
   Sparkles,
   FileText,
   X,
-  Info,
 } from 'lucide-react';
-import { Truck, Driver, FuelLog } from '@/types';
-import { calculateFuelConsumption } from '@/lib/calc';
+import { Truck, Driver, FuelLog, MonthlyFuelPerformance } from '@/types';
+import { calculateMonthlyFuelPerformance } from '@/lib/calc';
 import { formatBRL } from '@/components/ui';
 
 interface QuickEntryViewProps {
@@ -23,6 +22,12 @@ interface QuickEntryViewProps {
   drivers: Driver[];
   fuelLogs: FuelLog[];
   onSubmitLog: (newLog: FuelLog) => Promise<unknown>;
+}
+
+function nowLocalDateTime(): string {
+  const d = new Date();
+  const off = d.getTimezoneOffset() * 60000;
+  return new Date(d.getTime() - off).toISOString().slice(0, 16);
 }
 
 export const QuickEntryView: React.FC<QuickEntryViewProps> = ({
@@ -35,12 +40,9 @@ export const QuickEntryView: React.FC<QuickEntryViewProps> = ({
   const [driverId, setDriverId] = useState(drivers[0]?.id || '');
   const [odometer, setOdometer] = useState<number>(trucks[0]?.currentOdometer || 0);
   const [liters, setLiters] = useState<number>(550);
-  const [pricePerLiter, setPricePerLiter] = useState<number>(5.95);
-  const [arlaLiters, setArlaLiters] = useState<number>(40);
-  const [arlaPricePerLiter, setArlaPricePerLiter] = useState<number>(4.5);
-  const [isFullTank, setIsFullTank] = useState<boolean>(true);
-  const [gasStationName, setGasStationName] = useState<string>('Posto Graal Rodovia');
-  const [logDate, setLogDate] = useState<string>(new Date().toISOString().slice(0, 10));
+  const [totalAmount, setTotalAmount] = useState<number>(3272.5);
+  const [gasStationName, setGasStationName] = useState<string>('Posto Rodovia');
+  const [logDateTime, setLogDateTime] = useState<string>(nowLocalDateTime);
   const [submitting, setSubmitting] = useState<boolean>(false);
 
   // Estados do OCR com IA
@@ -52,7 +54,7 @@ export const QuickEntryView: React.FC<QuickEntryViewProps> = ({
   const [feedback, setFeedback] = useState<{
     type: 'success' | 'error';
     message: string;
-    analysis?: any;
+    monthlyPerf?: MonthlyFuelPerformance;
   } | null>(null);
 
   // Seleciona caminhão e atualiza hodômetro de referência
@@ -60,13 +62,11 @@ export const QuickEntryView: React.FC<QuickEntryViewProps> = ({
     setTruckId(id);
     const selected = trucks.find((t) => t.id === id);
     if (selected) {
-      setOdometer(selected.currentOdometer + 1500); // Sugestão inteligente
+      setOdometer(selected.currentOdometer + 1500);
     }
   };
 
-  const totalFuelAmount = Number((liters * pricePerLiter).toFixed(2));
-  const totalArlaAmount = Number((arlaLiters * arlaPricePerLiter).toFixed(2));
-  const totalGeral = Number((totalFuelAmount + totalArlaAmount).toFixed(2));
+  const pricePerLiter = liters > 0 ? Number((totalAmount / liters).toFixed(3)) : 0;
 
   // Handler de upload e leitura de Nota Fiscal por IA
   const handleFileUpload = async (file: File) => {
@@ -77,14 +77,12 @@ export const QuickEntryView: React.FC<QuickEntryViewProps> = ({
     setFeedback(null);
 
     try {
-      // Cria preview da imagem
       const reader = new FileReader();
       reader.onload = (e) => {
         setReceiptImage(e.target?.result as string);
       };
       reader.readAsDataURL(file);
 
-      // Envia para o backend /api/ocr-fuel
       const formData = new FormData();
       formData.append('file', file);
 
@@ -99,15 +97,20 @@ export const QuickEntryView: React.FC<QuickEntryViewProps> = ({
 
       const data = await res.json();
 
-      // Preenchimento automático dos inputs com os dados retornados pela IA
       if (data.gasStationName) setGasStationName(data.gasStationName);
-      if (data.liters && Number(data.liters) > 0) setLiters(Number(data.liters));
-      if (data.pricePerLiter && Number(data.pricePerLiter) > 0)
-        setPricePerLiter(Number(data.pricePerLiter));
-      if (data.arlaLiters !== undefined) setArlaLiters(Number(data.arlaLiters));
-      if (data.arlaPricePerLiter !== undefined)
-        setArlaPricePerLiter(Number(data.arlaPricePerLiter));
-      if (data.date) setLogDate(data.date.slice(0, 10));
+      const parsedLiters = data.liters && Number(data.liters) > 0 ? Number(data.liters) : liters;
+      if (data.liters && Number(data.liters) > 0) setLiters(parsedLiters);
+
+      if (data.totalAmount && Number(data.totalAmount) > 0) {
+        setTotalAmount(Number(data.totalAmount));
+      } else if (data.pricePerLiter && Number(data.pricePerLiter) > 0) {
+        setTotalAmount(Number((parsedLiters * Number(data.pricePerLiter)).toFixed(2)));
+      }
+
+      if (data.date) {
+        const dStr = String(data.date);
+        setLogDateTime(dStr.length >= 16 ? dStr.slice(0, 16) : `${dStr.slice(0, 10)}T12:00`);
+      }
       if (data.odometer && Number(data.odometer) > 0) setOdometer(Number(data.odometer));
 
       setOcrSuccessMsg(
@@ -130,19 +133,22 @@ export const QuickEntryView: React.FC<QuickEntryViewProps> = ({
     setFeedback(null);
 
     try {
+      const isoDate = logDateTime
+        ? new Date(logDateTime).toISOString()
+        : new Date().toISOString();
+
       const payload = {
         truckId,
         driverId,
-        date: `${logDate}T12:00:00.000Z`,
+        date: isoDate,
         odometer: Number(odometer),
         fuelType: 'DIESEL_S10' as const,
         liters: Number(liters),
-        pricePerLiter: Number(pricePerLiter),
-        totalAmount: totalFuelAmount,
-        arlaLiters: Number(arlaLiters),
-        arlaAmount: totalArlaAmount,
-        isFullTank: Boolean(isFullTank),
-        gasStationName,
+        pricePerLiter: pricePerLiter > 0 ? pricePerLiter : 1,
+        totalAmount: Number(totalAmount),
+        arlaLiters: 0,
+        arlaAmount: 0,
+        gasStationName: gasStationName.trim() || 'Posto Rodovia',
         receiptPhotoUrl: receiptImage || null,
       };
 
@@ -152,9 +158,14 @@ export const QuickEntryView: React.FC<QuickEntryViewProps> = ({
         createdAt: new Date().toISOString(),
       };
 
-      // Análise de consumo (tanque cheio) considerando o histórico do caminhão
+      const d = new Date(isoDate);
       const history = [...fuelLogs.filter((l) => l.truckId === truckId), newLog];
-      const analysis = calculateFuelConsumption(history).find((c) => c.logId === newLog.id);
+      const monthlyPerf = calculateMonthlyFuelPerformance(
+        history,
+        truckId,
+        d.getUTCMonth() + 1,
+        d.getUTCFullYear()
+      );
 
       const saved = await onSubmitLog(newLog);
       if (!saved) {
@@ -166,7 +177,7 @@ export const QuickEntryView: React.FC<QuickEntryViewProps> = ({
       setFeedback({
         type: 'success',
         message: 'Abastecimento registrado com sucesso!',
-        analysis,
+        monthlyPerf,
       });
       setReceiptImage(null);
       setOcrSuccessMsg(null);
@@ -192,23 +203,23 @@ export const QuickEntryView: React.FC<QuickEntryViewProps> = ({
             <div>
               <h2 className="text-xl font-bold">Lançamento de Abastecimento</h2>
               <p className="text-xs text-slate-400 mt-0.5">
-                Fotografe o cupom para preenchimento automático com Inteligência Artificial.
+                Cálculo padronizado por Média Mensal Acumulada • Fotografe o recibo para leitura automática.
               </p>
             </div>
           </div>
           <span className="self-start sm:self-auto text-[11px] font-bold uppercase tracking-wider text-emerald-400 bg-emerald-950/60 px-2.5 py-1 rounded-full border border-emerald-800">
-            IA Multimodal
+            Média Mensal
           </span>
         </div>
       </div>
 
-      {/* Componente de Upload de Nota Fiscal com IA (OCR) */}
+      {/* Foto do Recibo + Leitura Inteligente (OCR) */}
       <div className="bg-white p-5 rounded-2xl shadow-sm ring-1 ring-slate-200 space-y-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Sparkles className="w-5 h-5 text-sky-600" />
             <h3 className="text-sm font-bold text-slate-900">
-              Leitura Inteligente de Nota Fiscal (OCR)
+              Foto do Recibo (Leitura Inteligente IA)
             </h3>
           </div>
           <span className="text-[11px] text-slate-500">Gemini / GPT-4o</span>
@@ -218,6 +229,7 @@ export const QuickEntryView: React.FC<QuickEntryViewProps> = ({
           ref={fileInputRef}
           type="file"
           accept="image/*"
+          capture="environment"
           className="hidden"
           onChange={(e) => {
             const f = e.target.files?.[0];
@@ -234,10 +246,10 @@ export const QuickEntryView: React.FC<QuickEntryViewProps> = ({
               <div className="py-4 flex flex-col items-center gap-2 text-sky-700">
                 <Loader2 className="w-8 h-8 animate-spin" />
                 <span className="text-sm font-semibold">
-                  Analisando nota fiscal com Inteligência Artificial...
+                  Analisando recibo com Inteligência Artificial...
                 </span>
                 <span className="text-xs text-slate-500">
-                  Extraindo valor, litros, data e posto
+                  Extraindo valor total, litros e data/hora
                 </span>
               </div>
             ) : (
@@ -246,11 +258,10 @@ export const QuickEntryView: React.FC<QuickEntryViewProps> = ({
                   <UploadCloud className="w-6 h-6" />
                 </div>
                 <div className="text-sm font-semibold text-slate-800">
-                  Clique para tirar foto ou selecionar imagem do cupom
+                  Clique para tirar foto ou anexar o recibo
                 </div>
                 <p className="text-xs text-slate-500 max-w-sm">
-                  A IA lerá os dados da bomba (Posto, Litros, Preço por Litro e Total) e preencherá
-                  o formulário automaticamente.
+                  Anexe a foto do cupom fiscal para comprovação e preenchimento automático de Litros e Valor Total.
                 </p>
               </>
             )}
@@ -261,15 +272,15 @@ export const QuickEntryView: React.FC<QuickEntryViewProps> = ({
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={receiptImage}
-                alt="Nota Fiscal"
+                alt="Recibo"
                 className="w-16 h-16 object-cover rounded-lg ring-1 ring-slate-300"
               />
               <div className="text-xs space-y-0.5">
-                <span className="font-bold text-slate-900 block flex items-center gap-1">
+                <span className="font-bold text-slate-900 flex items-center gap-1">
                   <FileText className="w-3.5 h-3.5 text-emerald-600" />
-                  Cupom Fiscal Carregado
+                  Foto do Recibo Anexada
                 </span>
-                <span className="text-slate-500 block">Dados extraídos para os campos</span>
+                <span className="text-slate-500 block">Dados sincronizados com o formulário</span>
               </div>
             </div>
 
@@ -322,34 +333,43 @@ export const QuickEntryView: React.FC<QuickEntryViewProps> = ({
             )}
             <span>{feedback.message}</span>
           </div>
-          {feedback.analysis && (
-            <div className="mt-2 text-xs bg-white/80 p-3 rounded-xl border border-emerald-100">
-              <span className="font-semibold block text-slate-700">Resultado do Tanque Cheio:</span>
-              <p className="mt-0.5">
-                Média calculada:{' '}
+          {feedback.monthlyPerf && (
+            <div className="mt-2 text-xs bg-white/80 p-3 rounded-xl border border-emerald-100 space-y-1">
+              <span className="font-semibold block text-slate-700">
+                Desempenho Acumulado ({feedback.monthlyPerf.periodLabel}):
+              </span>
+              <p>
+                Média Mensal:{' '}
                 <strong className="text-emerald-700 text-sm">
-                  {feedback.analysis.averageKmL
-                    ? `${feedback.analysis.averageKmL} km/L`
-                    : 'Base inicial definida'}
+                  {feedback.monthlyPerf.monthlyAvgKmL > 0
+                    ? `${feedback.monthlyPerf.monthlyAvgKmL.toFixed(1).replace('.', ',')} km/L`
+                    : '0,0 km/L (primeiro registro do mês)'}
+                </strong>
+                {' • '}
+                Custo de Diesel por KM:{' '}
+                <strong className="text-slate-900 text-sm">
+                  R$ {feedback.monthlyPerf.fuelCpk.toFixed(2).replace('.', ',')}
                 </strong>
               </p>
-              {feedback.analysis.isDistorted && (
-                <p className="text-amber-700 font-bold mt-1">⚠️ {feedback.analysis.message}</p>
+              {feedback.monthlyPerf.isAnomalous && feedback.monthlyPerf.anomalyMessage && (
+                <p className="text-amber-800 bg-amber-50 border border-amber-200 p-2 rounded-lg font-semibold mt-1">
+                  ⚠️ {feedback.monthlyPerf.anomalyMessage}
+                </p>
               )}
             </div>
           )}
         </div>
       )}
 
-      {/* Formulário com Alvos de Toque Mobile */}
+      {/* Formulário Simplificado (Sem is_full_tank) */}
       <form
         onSubmit={handleSubmit}
         className="bg-white p-6 rounded-2xl shadow-sm ring-1 ring-slate-200 space-y-4"
       >
-        {/* Escolha do Caminhão */}
+        {/* 1. Caminhão (Placa) */}
         <div>
           <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
-            Caminhão (Placa / Modelo)
+            Caminhão (Placa)
           </label>
           <select
             value={truckId}
@@ -358,17 +378,17 @@ export const QuickEntryView: React.FC<QuickEntryViewProps> = ({
           >
             {trucks.map((t) => (
               <option key={t.id} value={t.id}>
-                {t.plate} - {t.model} ({t.currentOdometer.toLocaleString()} km)
+                {t.plate} - {t.model} ({t.currentOdometer.toLocaleString('pt-BR')} km)
               </option>
             ))}
           </select>
         </div>
 
-        {/* Escolha do Motorista e Data */}
+        {/* Motorista e 2. Data/Hora */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
-              Motorista Responsável
+              Motorista
             </label>
             <select
               value={driverId}
@@ -377,32 +397,33 @@ export const QuickEntryView: React.FC<QuickEntryViewProps> = ({
             >
               {drivers.map((d) => (
                 <option key={d.id} value={d.id}>
-                  {d.name} {d.cnhCategory ? `(CNH ${d.cnhCategory})` : ''}
+                  {d.name}
                 </option>
               ))}
             </select>
           </div>
           <div>
             <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
-              Data do Abastecimento
+              Data / Hora
             </label>
             <input
-              type="date"
+              type="datetime-local"
               required
-              value={logDate}
-              onChange={(e) => setLogDate(e.target.value)}
+              value={logDateTime}
+              onChange={(e) => setLogDateTime(e.target.value)}
               className="w-full text-sm p-3 bg-slate-50 rounded-xl ring-1 ring-slate-200 focus:ring-2 focus:ring-sky-500 focus:outline-none"
             />
           </div>
         </div>
 
-        {/* KM no Painel (Hodômetro Atual) */}
+        {/* 3. Odômetro Atual (km) */}
         <div>
           <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
-            KM no Painel (Hodômetro)
+            Odômetro Atual (km)
           </label>
           <input
             type="number"
+            inputMode="numeric"
             required
             value={odometer}
             onChange={(e) => setOdometer(Number(e.target.value))}
@@ -411,35 +432,17 @@ export const QuickEntryView: React.FC<QuickEntryViewProps> = ({
           />
         </div>
 
-        {/* Chave: Tanque Cheio? */}
-        <div className="bg-slate-50 p-4 rounded-xl ring-1 ring-slate-200">
-          <label className="flex items-center justify-between cursor-pointer">
-            <div>
-              <span className="font-bold text-sm text-slate-900 block">
-                Completou até a boca (Tanque Cheio)?
-              </span>
-              <span className="text-xs text-slate-500">
-                Obrigatório para cálculo exato de consumo médio (km/L)
-              </span>
-            </div>
-            <input
-              type="checkbox"
-              checked={isFullTank}
-              onChange={(e) => setIsFullTank(e.target.checked)}
-              className="w-6 h-6 text-sky-600 rounded focus:ring-sky-500 accent-sky-600 cursor-pointer"
-            />
-          </label>
-        </div>
-
-        {/* Litros Diesel & Preço por Litro */}
+        {/* 4. Litros Abastecidos & 5. Valor Total (R$) */}
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
-              Litros Diesel
+              Litros Abastecidos
             </label>
             <input
               type="number"
+              inputMode="decimal"
               step="0.01"
+              min="0.1"
               required
               value={liters}
               onChange={(e) => setLiters(Number(e.target.value))}
@@ -449,73 +452,33 @@ export const QuickEntryView: React.FC<QuickEntryViewProps> = ({
           </div>
           <div>
             <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
-              Preço / Litro (R$)
+              Valor Total (R$)
             </label>
             <input
               type="number"
-              step="0.001"
+              inputMode="decimal"
+              step="0.01"
+              min="0.01"
               required
-              value={pricePerLiter}
-              onChange={(e) => setPricePerLiter(Number(e.target.value))}
+              value={totalAmount}
+              onChange={(e) => setTotalAmount(Number(e.target.value))}
               className="w-full text-base font-bold p-3 bg-slate-50 rounded-xl ring-1 ring-slate-200 focus:ring-2 focus:ring-sky-500 focus:outline-none"
-              placeholder="Ex: 5.95"
+              placeholder="Ex: 3272.50"
             />
           </div>
         </div>
 
-        {/* Arla 32 */}
-        <div className="grid grid-cols-2 gap-3 pt-1">
-          <div>
-            <label className="block text-xs font-semibold text-slate-600 mb-1">
-              Litros Arla 32
-            </label>
-            <input
-              type="number"
-              step="0.01"
-              value={arlaLiters}
-              onChange={(e) => setArlaLiters(Number(e.target.value))}
-              className="w-full text-sm p-2.5 bg-slate-50 rounded-xl ring-1 ring-slate-200 focus:ring-2 focus:ring-sky-500 focus:outline-none"
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-semibold text-slate-600 mb-1">
-              Preço Arla / Litro (R$)
-            </label>
-            <input
-              type="number"
-              step="0.01"
-              value={arlaPricePerLiter}
-              onChange={(e) => setArlaPricePerLiter(Number(e.target.value))}
-              className="w-full text-sm p-2.5 bg-slate-50 rounded-xl ring-1 ring-slate-200 focus:ring-2 focus:ring-sky-500 focus:outline-none"
-            />
-          </div>
-        </div>
-
-        {/* Nome do Posto */}
-        <div>
-          <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
-            Nome do Posto / Rodovia
-          </label>
-          <input
-            type="text"
-            required
-            value={gasStationName}
-            onChange={(e) => setGasStationName(e.target.value)}
-            className="w-full text-sm p-3 bg-slate-50 rounded-xl ring-1 ring-slate-200 focus:ring-2 focus:ring-sky-500 focus:outline-none"
-            placeholder="Ex: Posto Graal Roseira Dutra"
-          />
-        </div>
-
-        {/* Card de Total Calculado */}
+        {/* Card de Total e Preço Médio por Litro Derivado */}
         <div className="bg-slate-900 text-white p-4 rounded-xl flex items-center justify-between">
           <div>
-            <span className="text-xs text-slate-400 block">Total do Cupom Fiscal</span>
-            <span className="text-xs text-slate-400">Diesel + Arla 32</span>
+            <span className="text-xs text-slate-400 block">Valor Total do Abastecimento</span>
+            <span className="text-xs text-slate-400">
+              Preço derivado: R$ {pricePerLiter.toFixed(3).replace('.', ',')} / L
+            </span>
           </div>
-          <span className="text-2xl font-bold text-emerald-400">{formatBRL(totalGeral)}</span>
+          <span className="text-2xl font-bold text-emerald-400">{formatBRL(totalAmount)}</span>
         </div>
 
-        {/* Botão de Envio Grande Mobile */}
         <button
           type="submit"
           disabled={submitting || ocrLoading}

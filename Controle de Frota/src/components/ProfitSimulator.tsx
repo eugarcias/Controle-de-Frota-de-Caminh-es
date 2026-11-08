@@ -122,7 +122,7 @@ export const ProfitSimulator: React.FC<Props> = ({ trucks, fuelLogs, fleetKmL, f
         </span>
         <span>
           {efficiency.source === 'truck'
-            ? `média real deste caminhão (${efficiency.intervals} tanques cheios, ${efficiency.sampleKm.toLocaleString('pt-BR')} km)`
+            ? `média mensal acumulada deste caminhão (${efficiency.intervals} abastecimentos, ${efficiency.sampleKm.toLocaleString('pt-BR')} km)`
             : 'média da frota (este caminhão ainda não tem histórico suficiente)'}
         </span>
         <span>Diesel: {formatBRL(efficiency.dieselPrice)}/L (último abastecimento)</span>

@@ -69,7 +69,6 @@ async function main() {
       totalAmount: f.totalAmount,
       arlaLiters: f.arlaLiters,
       arlaAmount: f.arlaAmount,
-      isFullTank: f.isFullTank,
       gasStationName: f.gasStationName,
       createdAt: new Date(f.createdAt),
     })),

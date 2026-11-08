@@ -9,15 +9,10 @@ import {
   Gauge,
   AlertTriangle,
   AlertCircle,
-  Truck as TruckIcon,
-  Filter,
-  Calendar,
-  Users,
   MapPin,
-  RefreshCw,
   Sparkles,
   ArrowUpRight,
-  ArrowDownRight,
+  Calendar,
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -34,7 +29,7 @@ import {
   Line,
   CartesianGrid,
 } from 'recharts';
-import { DashboardMetrics, Truck, Driver, FuelLog, MaintenanceLog, FreightTrip } from '@/types';
+import { Truck, Driver, FuelLog, MaintenanceLog, FreightTrip } from '@/types';
 import { computeDashboardMetrics } from '@/mock-data';
 import { DashboardFilterBar } from '@/components/DashboardFilterBar';
 import { DashboardFilters, defaultDashboardFilters, isDateInFilter } from '@/lib/dashboardFilters';
@@ -50,6 +45,9 @@ interface DashboardViewProps {
   onOpenQuickEntry: () => void;
 }
 
+const fmtKmL = (val: number) => val.toFixed(1).replace('.', ',');
+const fmtCpk = (val: number) => val.toFixed(2).replace('.', ',');
+
 export const DashboardView: React.FC<DashboardViewProps> = ({
   trucks,
   drivers,
@@ -60,11 +58,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 }) => {
   // Filtros Globais Dinâmicos
   const [filters, setFilters] = useState<DashboardFilters>(defaultDashboardFilters);
+  // Filtro opcional de mês específico para inspeção da Média Mensal Acumulada por caminhão
+  const [selectedPeriodKey, setSelectedPeriodKey] = useState<string>('ALL');
   const { truckIds: selectedTruckIds, driverIds: selectedDriverIds } = filters;
 
-  // Aplicação dos Filtros Dinâmicos
   const filteredData = useMemo(() => {
-    // 1. Filtra Fretes
     const filteredTrips = trips.filter((t) => {
       if (t.status === 'CANCELADO') return false;
       if (!isDateInFilter(t.startDate, filters)) return false;
@@ -73,7 +71,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       return true;
     });
 
-    // 2. Filtra Abastecimentos
     const filteredFuelLogs = fuelLogs.filter((f) => {
       if (!isDateInFilter(f.date, filters)) return false;
       if (selectedTruckIds.length > 0 && !selectedTruckIds.includes(f.truckId)) return false;
@@ -81,20 +78,17 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       return true;
     });
 
-    // 3. Filtra Manutenções
     const filteredMaintenanceLogs = maintenanceLogs.filter((m) => {
       if (!isDateInFilter(m.date, filters)) return false;
       if (selectedTruckIds.length > 0 && !selectedTruckIds.includes(m.truckId)) return false;
       return true;
     });
 
-    // 4. Caminhões relevantes para o escopo
     const targetTrucks =
       selectedTruckIds.length > 0
         ? trucks.filter((t) => selectedTruckIds.includes(t.id))
         : trucks;
 
-    // 5. Recálculo das Métricas em Tempo Real
     const metrics = computeDashboardMetrics({
       trucks: targetTrucks,
       fuelLogs: filteredFuelLogs,
@@ -102,7 +96,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       trips: filteredTrips,
     });
 
-    // 6. Análise de Lucro por Rota (Descoberta de Gargalos / Dinheiro na mesa)
     const routePerformance: Record<
       string,
       { route: string; tripsCount: number; gross: number; net: number; margin: number }
@@ -124,10 +117,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       routePerformance[label].net += trip.netFreightValue;
     });
 
-    const routeList = Object.values(routePerformance).map((r) => ({
-      ...r,
-      margin: r.gross > 0 ? (r.net / r.gross) * 100 : 0,
-    })).sort((a, b) => b.net - a.net);
+    const routeList = Object.values(routePerformance)
+      .map((r) => ({
+        ...r,
+        margin: r.gross > 0 ? (r.net / r.gross) * 100 : 0,
+      }))
+      .sort((a, b) => b.net - a.net);
 
     return {
       metrics,
@@ -137,9 +132,49 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       targetTrucks,
       routeList,
     };
-  }, [trucks, drivers, fuelLogs, maintenanceLogs, trips, filters]);
+  }, [trucks, drivers, fuelLogs, maintenanceLogs, trips, filters, selectedTruckIds, selectedDriverIds]);
 
   const { metrics, routeList } = filteredData;
+
+  // Quando o administrador escolhe um mês específico no seletor de mês, exibe os dados daquele mês no card do caminhão
+  const truckCardsData = useMemo(() => {
+    return metrics.truckMetrics.map((t) => {
+      if (selectedPeriodKey !== 'ALL') {
+        const monthEntry = t.monthlyHistory.find((m) => m.periodKey === selectedPeriodKey);
+        if (monthEntry) {
+          return {
+            ...t,
+            kmTraveled: monthEntry.distanceTraveled,
+            totalLiters: monthEntry.totalLiters,
+            startOdometer: monthEntry.startOdometer,
+            endOdometer: monthEntry.endOdometer,
+            fuelCost: monthEntry.totalFuelCost,
+            monthlyAvgKmL: monthEntry.monthlyAvgKmL,
+            fuelCpk: monthEntry.fuelCpk,
+            isAnomalous: monthEntry.isAnomalous,
+            anomalyType: monthEntry.anomalyType,
+            anomalyMessage: monthEntry.anomalyMessage,
+            anomalyPeriodLabel: monthEntry.periodLabel,
+          };
+        }
+        return {
+          ...t,
+          kmTraveled: 0,
+          totalLiters: 0,
+          startOdometer: 0,
+          endOdometer: 0,
+          fuelCost: 0,
+          monthlyAvgKmL: 0,
+          fuelCpk: 0,
+          isAnomalous: false,
+          anomalyType: null,
+          anomalyMessage: null,
+          anomalyPeriodLabel: null,
+        };
+      }
+      return t;
+    });
+  }, [metrics.truckMetrics, selectedPeriodKey]);
 
   return (
     <div className="space-y-6">
@@ -151,12 +186,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <Sparkles className="w-4 h-4" />
             </span>
             <span className="text-xs font-semibold text-emerald-400 uppercase tracking-wider">
-              Inteligência Financeira
+              Inteligência Financeira • Média Mensal Acumulada
             </span>
           </div>
           <h1 className="text-2xl font-bold tracking-tight mt-1">Painel Executivo da Frota</h1>
           <p className="text-xs text-slate-300 mt-1">
-            Análise de CPK, margens reais de frete, consumo e detecção de gargalos financeiros.
+            Análise de CPK, Média Mensal (km/L), Custo de Diesel por KM e detecção de anomalias.
           </p>
         </div>
         <button
@@ -174,10 +209,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         drivers={drivers}
         value={filters}
         onChange={setFilters}
-        resultCount={filteredData.filteredTrips.length + filteredData.filteredFuelLogs.length + filteredData.filteredMaintenanceLogs.length}
+        resultCount={
+          filteredData.filteredTrips.length +
+          filteredData.filteredFuelLogs.length +
+          filteredData.filteredMaintenanceLogs.length
+        }
       />
 
-      {/* Cards de KPIs Principais (Refatorados com Hierarquia Financeira) */}
+      {/* Cards de KPIs Principais */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* 1. Faturamento Fretes */}
         <div className="bg-white p-5 rounded-2xl shadow-sm ring-1 ring-slate-200">
@@ -259,30 +298,32 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
         </div>
 
-        {/* 4. Consumo Médio & CPK */}
+        {/* 4. Média Mensal & Custo de Diesel por KM */}
         <div className="bg-white p-5 rounded-2xl shadow-sm ring-1 ring-slate-200">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-              Consumo & CPK Médio
+              Eficiência de Combustível
             </span>
             <div className="p-2 bg-amber-50 rounded-xl text-amber-600">
               <Gauge className="w-5 h-5" />
             </div>
           </div>
           <div className="mt-3">
-            <div className="text-2xl font-bold text-slate-900">
-              {metrics.fleetAverageKmL}{' '}
-              <span className="text-sm font-normal text-slate-500">km/L</span>
+            <div className="text-lg font-bold text-slate-900">
+              Média Mensal: {fmtKmL(metrics.fleetAverageKmL)} km/L
             </div>
-            <div className="text-xs text-slate-700 font-medium mt-1">
-              CPK:{' '}
-              <span className="font-bold text-slate-900">R$ {metrics.fleetCpk}</span> / km
+            <div className="text-xs text-slate-700 font-semibold mt-1">
+              Custo de Diesel por KM:{' '}
+              <span className="font-bold text-slate-900">R$ {fmtCpk(metrics.fleetFuelCpk)}</span>
+            </div>
+            <div className="text-[11px] text-slate-500 mt-0.5">
+              CPK Total: R$ {fmtCpk(metrics.fleetCpk)} / km
             </div>
           </div>
         </div>
       </div>
 
-      {/* Alertas Ativos da Frota */}
+      {/* Alertas Ativos da Frota (Manutenção) */}
       {metrics.activeAlerts.length > 0 && (
         <div className="bg-amber-50/80 ring-1 ring-amber-200 rounded-2xl p-5 shadow-sm">
           <div className="flex items-center gap-2 mb-3">
@@ -325,7 +366,294 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
       )}
 
-      {/* RANKING DE RENTABILIDADE POR ROTA (Descobrindo Gargalos / Dinheiro na Mesa) */}
+      {/* Desempenho Mensal Acumulado por Caminhão (Cards + Gráficos) */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2 bg-white p-5 rounded-2xl shadow-sm ring-1 ring-slate-200 flex flex-col justify-between space-y-5">
+          <div>
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4">
+              <div>
+                <h3 className="text-base font-bold text-slate-900">
+                  Desempenho por Caminhão (Média Mensal Acumulada)
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Fórmula: (MAX(odômetro) − MIN(odômetro)) ÷ SOMA(litros) • Alerta se &lt; 2,0 ou &gt; 4,5 km/L (&gt; 1.000 km)
+                </p>
+              </div>
+              <div className="flex items-center gap-2 self-stretch sm:self-auto">
+                <Calendar className="w-4 h-4 text-slate-400 shrink-0" />
+                <select
+                  aria-label="Selecionar mês de referência"
+                  value={selectedPeriodKey}
+                  onChange={(e) => setSelectedPeriodKey(e.target.value)}
+                  className="text-xs font-semibold bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 focus:ring-2 focus:ring-sky-500 focus:outline-none"
+                >
+                  <option value="ALL">Acumulado do período ({metrics.truckMetrics.length} veíc.)</option>
+                  {metrics.monthlyFuelSeries.map((m) => (
+                    <option key={m.periodKey} value={m.periodKey}>
+                      Mês: {m.periodLabel}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="h-64 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={truckCardsData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                  <XAxis dataKey="plate" tick={{ fontSize: 12, fill: '#64748b' }} />
+                  <YAxis yAxisId="left" tick={{ fontSize: 11, fill: '#64748b' }} />
+                  <YAxis
+                    yAxisId="right"
+                    orientation="right"
+                    tick={{ fontSize: 11, fill: '#64748b' }}
+                    tickFormatter={(v) => `R$ ${(v / 1000).toFixed(0)}k`}
+                  />
+                  <Tooltip
+                    formatter={(value: any, name: any, item: any) => {
+                      if (name === 'KM Rodados') {
+                        const p = item?.payload;
+                        return [
+                          `${Number(value).toLocaleString('pt-BR')} km (Média Mensal: ${fmtKmL(p?.monthlyAvgKmL ?? 0)} km/L)`,
+                          name,
+                        ];
+                      }
+                      if (name === 'Combustível (R$)') {
+                        const p = item?.payload;
+                        return [
+                          `${formatBRL(Number(value))} (Custo de Diesel por KM: R$ ${fmtCpk(p?.fuelCpk ?? 0)})`,
+                          name,
+                        ];
+                      }
+                      return [formatBRL(Number(value)), name];
+                    }}
+                  />
+                  <Legend wrapperStyle={{ fontSize: 12 }} />
+                  <Bar
+                    yAxisId="left"
+                    dataKey="kmTraveled"
+                    name="KM Rodados"
+                    fill="#10b981"
+                    radius={[4, 4, 0, 0]}
+                  />
+                  <Bar
+                    yAxisId="right"
+                    dataKey="fuelCost"
+                    name="Combustível (R$)"
+                    fill="#0ea5e9"
+                    radius={[4, 4, 0, 0]}
+                  />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          {/* Cards de Desempenho Individual de cada Caminhão */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-4 border-t border-slate-100">
+            {truckCardsData.map((t) => (
+              <div
+                key={t.truckId}
+                className={`p-4 rounded-2xl ring-1 flex flex-col justify-between gap-2.5 ${
+                  t.isAnomalous
+                    ? 'bg-amber-50/70 ring-amber-300'
+                    : 'bg-slate-50 ring-slate-200/80'
+                }`}
+              >
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-sm font-bold text-slate-900">{t.plate}</span>
+                    <span className="text-[11px] font-semibold text-slate-500">
+                      {t.kmTraveled.toLocaleString('pt-BR')} km • {t.totalLiters.toLocaleString('pt-BR')} L
+                    </span>
+                  </div>
+                  <span className="text-xs text-slate-500 block truncate">{t.model}</span>
+                </div>
+
+                {/* Métricas consolidadas exigidas */}
+                <div className="bg-white rounded-xl p-3 ring-1 ring-slate-200/70 space-y-1">
+                  <div
+                    className={`text-sm font-bold ${
+                      t.isAnomalous ? 'text-rose-600' : 'text-emerald-700'
+                    }`}
+                  >
+                    Média Mensal: {fmtKmL(t.monthlyAvgKmL)} km/L
+                  </div>
+                  <div className="text-xs font-semibold text-slate-800">
+                    Custo de Diesel por KM: R$ {fmtCpk(t.fuelCpk)}
+                  </div>
+                </div>
+
+                {/* Badge de alerta quando < 2,0 km/L ou > 4,5 km/L em mês com > 1.000 km rodados */}
+                {t.isAnomalous && (
+                  <div
+                    role="alert"
+                    className="flex items-start gap-2 rounded-xl bg-rose-100/90 text-rose-950 ring-1 ring-rose-300 px-3 py-2 text-[11px]"
+                  >
+                    <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                    <div>
+                      <strong className="block font-bold uppercase tracking-wide text-rose-800">
+                        Alerta de Eficiência {t.anomalyPeriodLabel ? `(${t.anomalyPeriodLabel})` : ''}
+                      </strong>
+                      <span>
+                        {t.anomalyMessage ??
+                          'Consumo fora da faixa (2,0 a 4,5 km/L) com mais de 1.000 km rodados. Sugerida conferência de notas ou revisão do veículo.'}
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Gráfico 2: Composição de Custos Operacionais */}
+        <div className="bg-white p-5 rounded-2xl shadow-sm ring-1 ring-slate-200 flex flex-col justify-between">
+          <div>
+            <h3 className="text-base font-bold text-slate-900">Composição dos Custos</h3>
+            <p className="text-xs text-slate-500 mb-2">
+              Distribuição percentual dos gastos operacionais
+            </p>
+            <div className="h-60 w-full relative">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={metrics.costBreakdown}
+                    innerRadius={55}
+                    outerRadius={85}
+                    paddingAngle={3}
+                    dataKey="value"
+                  >
+                    {metrics.costBreakdown.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip formatter={(value: any) => formatBRL(Number(value))} />
+                </PieChart>
+              </ResponsiveContainer>
+              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                <span className="text-xs text-slate-400">Total</span>
+                <span className="text-sm font-bold text-slate-800">
+                  {formatBRL(metrics.totalExpenses)}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-1.5 mt-2 border-t border-slate-100 pt-3">
+            {metrics.costBreakdown.map((item, idx) => (
+              <div key={idx} className="flex items-center justify-between text-xs">
+                <div className="flex items-center gap-2">
+                  <span
+                    className="w-2.5 h-2.5 rounded-full"
+                    style={{ backgroundColor: item.color }}
+                  />
+                  <span className="text-slate-600">{item.name}</span>
+                </div>
+                <span className="font-semibold text-slate-900">{formatBRL(item.value)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Gráficos Mensais Consolidados: Evolução da Média Mensal (km/L) e Custo de Diesel por KM */}
+      {metrics.monthlyFuelSeries.length > 0 && (
+        <div className="bg-white p-5 rounded-2xl shadow-sm ring-1 ring-slate-200 space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div>
+              <h3 className="text-base font-bold text-slate-900">
+                Evolução Mensal Consolidada (Média Mensal km/L &amp; Custo de Diesel por KM)
+              </h3>
+              <p className="text-xs text-slate-500">
+                Acompanhamento mês a mês pelo método de Média Mensal Acumulada
+              </p>
+            </div>
+            <span className="text-xs font-semibold text-slate-600 bg-slate-100 px-3 py-1.5 rounded-lg">
+              {metrics.monthlyFuelSeries.length} mês(es) apurado(s)
+            </span>
+          </div>
+
+          <div className="h-64 w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart
+                data={metrics.monthlyFuelSeries}
+                margin={{ top: 10, right: 20, left: 0, bottom: 0 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                <XAxis dataKey="periodLabel" tick={{ fontSize: 12, fill: '#64748b' }} />
+                <YAxis
+                  yAxisId="kml"
+                  tick={{ fontSize: 11, fill: '#64748b' }}
+                  tickFormatter={(v) => `${fmtKmL(Number(v))} km/L`}
+                />
+                <YAxis
+                  yAxisId="cpk"
+                  orientation="right"
+                  tick={{ fontSize: 11, fill: '#64748b' }}
+                  tickFormatter={(v) => `R$ ${fmtCpk(Number(v))}`}
+                />
+                <Tooltip
+                  formatter={(val: any, name: any) => {
+                    if (name === 'Média Mensal (km/L)') {
+                      return [`Média Mensal: ${fmtKmL(Number(val))} km/L`, name];
+                    }
+                    return [`Custo de Diesel por KM: R$ ${fmtCpk(Number(val))}`, name];
+                  }}
+                />
+                <Legend wrapperStyle={{ fontSize: 12 }} />
+                <Bar
+                  yAxisId="kml"
+                  dataKey="monthlyAvgKmL"
+                  name="Média Mensal (km/L)"
+                  fill="#10b981"
+                  radius={[4, 4, 0, 0]}
+                />
+                <Bar
+                  yAxisId="cpk"
+                  dataKey="fuelCpk"
+                  name="Custo de Diesel por KM (R$)"
+                  fill="#0284c7"
+                  radius={[4, 4, 0, 0]}
+                />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-2 border-t border-slate-100">
+            {metrics.monthlyFuelSeries.map((m) => (
+              <div
+                key={m.periodKey}
+                className={`p-3.5 rounded-xl ring-1 space-y-1 ${
+                  m.isAnomalous
+                    ? 'bg-amber-50/70 ring-amber-300'
+                    : 'bg-slate-50 ring-slate-200/80'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-900">{m.periodLabel}</span>
+                  <span className="text-[11px] text-slate-500">
+                    {m.distanceTraveled.toLocaleString('pt-BR')} km • {m.totalLiters.toLocaleString('pt-BR')} L
+                  </span>
+                </div>
+                <div className="text-xs font-bold text-emerald-700">
+                  Média Mensal: {fmtKmL(m.monthlyAvgKmL)} km/L
+                </div>
+                <div className="text-xs font-semibold text-slate-800">
+                  Custo de Diesel por KM: R$ {fmtCpk(m.fuelCpk)}
+                </div>
+                {m.isAnomalous && (
+                  <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-rose-100 text-rose-800 px-2 py-0.5 rounded-full">
+                    <AlertTriangle className="w-3 h-3" />
+                    Conferir notas / revisão do veículo
+                  </span>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* RANKING DE RENTABILIDADE POR ROTA */}
       {routeList.length > 0 && (
         <div className="bg-white p-5 rounded-2xl shadow-sm ring-1 ring-slate-200 space-y-3">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
@@ -384,135 +712,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
       )}
 
-      {/* Seção de Gráficos Analíticos com Recharts */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Gráfico 1: Desempenho Individual por Caminhão */}
-        <div className="lg:col-span-2 bg-white p-5 rounded-2xl shadow-sm ring-1 ring-slate-200 flex flex-col justify-between">
-          <div>
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 mb-4">
-              <div>
-                <h3 className="text-base font-bold text-slate-900">
-                  Desempenho por Caminhão (KM vs Gasto Total)
-                </h3>
-                <p className="text-xs text-slate-500">
-                  Comparativo de rodagem e custos gerados no filtro selecionado
-                </p>
-              </div>
-              <span className="text-xs bg-slate-100 text-slate-700 px-2.5 py-1 rounded-lg font-semibold">
-                {metrics.truckMetrics.length} veículo(s)
-              </span>
-            </div>
-
-            <div className="h-72 w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={metrics.truckMetrics} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                  <XAxis dataKey="plate" tick={{ fontSize: 12, fill: '#64748b' }} />
-                  <YAxis yAxisId="left" tick={{ fontSize: 11, fill: '#64748b' }} />
-                  <YAxis
-                    yAxisId="right"
-                    orientation="right"
-                    tick={{ fontSize: 11, fill: '#64748b' }}
-                    tickFormatter={(v) => `R$ ${(v / 1000).toFixed(0)}k`}
-                  />
-                  <Tooltip
-                    formatter={(value: any, name: any) => {
-                      if (name === 'KM Rodados') return [`${value.toLocaleString()} km`, name];
-                      return [formatBRL(Number(value)), name];
-                    }}
-                  />
-                  <Legend wrapperStyle={{ fontSize: 12 }} />
-                  <Bar
-                    yAxisId="left"
-                    dataKey="kmTraveled"
-                    name="KM Rodados"
-                    fill="#10b981"
-                    radius={[4, 4, 0, 0]}
-                  />
-                  <Bar
-                    yAxisId="right"
-                    dataKey="totalExpenses"
-                    name="Gasto Total (R$)"
-                    fill="#f43f5e"
-                    radius={[4, 4, 0, 0]}
-                  />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-
-          {/* Mini Cards Resumo por Veículo */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-4 pt-4 border-t border-slate-100">
-            {metrics.truckMetrics.map((t) => (
-              <div key={t.truckId} className="bg-slate-50 p-3 rounded-xl ring-1 ring-slate-100 text-center">
-                <span className="text-xs font-bold text-slate-900 block">{t.plate}</span>
-                <span className="text-[11px] text-slate-500 block">{t.model}</span>
-                <div className="mt-1.5 flex items-center justify-center gap-2 text-xs">
-                  <span
-                    className={`font-semibold ${
-                      t.averageKmL < 1.8 ? 'text-rose-600' : 'text-emerald-600'
-                    }`}
-                  >
-                    {t.averageKmL} km/L
-                  </span>
-                  <span className="text-slate-300">•</span>
-                  <span className="font-semibold text-slate-700">R$ {t.cpk}/km</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Gráfico 2: Composição de Custos Operacionais */}
-        <div className="bg-white p-5 rounded-2xl shadow-sm ring-1 ring-slate-200 flex flex-col justify-between">
-          <div>
-            <h3 className="text-base font-bold text-slate-900">Composição dos Custos</h3>
-            <p className="text-xs text-slate-500 mb-2">
-              Distribuição percentual dos gastos operacionais
-            </p>
-            <div className="h-60 w-full relative">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={metrics.costBreakdown}
-                    innerRadius={55}
-                    outerRadius={85}
-                    paddingAngle={3}
-                    dataKey="value"
-                  >
-                    {metrics.costBreakdown.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip formatter={(value: any) => formatBRL(Number(value))} />
-                </PieChart>
-              </ResponsiveContainer>
-              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                <span className="text-xs text-slate-400">Total</span>
-                <span className="text-sm font-bold text-slate-800">
-                  {formatBRL(metrics.totalExpenses)}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          <div className="space-y-1.5 mt-2 border-t border-slate-100 pt-3">
-            {metrics.costBreakdown.map((item, idx) => (
-              <div key={idx} className="flex items-center justify-between text-xs">
-                <div className="flex items-center gap-2">
-                  <span
-                    className="w-2.5 h-2.5 rounded-full"
-                    style={{ backgroundColor: item.color }}
-                  />
-                  <span className="text-slate-600">{item.name}</span>
-                </div>
-                <span className="font-semibold text-slate-900">{formatBRL(item.value)}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
       {/* Gráfico 3: Preço do Diesel nos Postos */}
       <div className="bg-white p-5 rounded-2xl shadow-sm ring-1 ring-slate-200">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 gap-2">
@@ -542,7 +741,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 tickFormatter={(v) => `R$ ${Number(v).toFixed(2)}`}
               />
               <Tooltip
-                formatter={(val: any, name: any, item: any) => [
+                formatter={(val: any, _name: any, item: any) => [
                   `R$ ${Number(val).toFixed(2)} / L (${item?.payload?.station || 'Posto'})`,
                   'Diesel S10',
                 ]}

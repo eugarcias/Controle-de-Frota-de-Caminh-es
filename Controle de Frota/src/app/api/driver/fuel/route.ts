@@ -9,13 +9,13 @@ const Body = z.object({
   date: z.string().min(8),
   odometer: z.number().int().positive(),
   liters: z.number().positive(),
-  pricePerLiter: z.number().positive(),
   totalAmount: z.number().positive(),
-  isFullTank: z.boolean().default(true),
-  gasStationName: z.string().trim().min(2),
+  pricePerLiter: z.number().positive().optional(),
+  gasStationName: z.string().trim().min(2).default('Posto Rodovia'),
   fuelType: z.enum(['DIESEL_S10', 'DIESEL_S500']).default('DIESEL_S10'),
   arlaLiters: z.number().nonnegative().default(0),
   arlaAmount: z.number().nonnegative().default(0),
+  receiptPhotoUrl: z.string().optional().nullable(),
 });
 
 export async function POST(req: Request) {
@@ -29,9 +29,17 @@ export async function POST(req: Request) {
     if (!(await allowedTruckIds(profile)).includes(body.truckId))
       return NextResponse.json({ error: 'Este caminhão não está liberado para você.' }, { status: 403 });
 
+    const pricePerLiter = body.pricePerLiter ?? Number((body.totalAmount / body.liters).toFixed(3));
+
     // driverId vem SEMPRE da sessão — nunca do corpo da requisição.
     const row = await prisma.fuelLog.create({
-      data: { ...body, date: new Date(body.date), driverId: profile.driverId },
+      data: {
+        ...body,
+        pricePerLiter,
+        receiptPhotoUrl: body.receiptPhotoUrl ?? null,
+        date: new Date(body.date),
+        driverId: profile.driverId,
+      },
     });
     await prisma.truck.updateMany({
       where: { id: body.truckId, currentOdometer: { lt: body.odometer } },

@@ -41,20 +41,29 @@ export async function requireAdmin(): Promise<Guard<UserProfile>> {
   return { ok: true, profile };
 }
 
-/** Motorista logado e vinculado a um cadastro de motorista (admin também passa, se vinculado). */
+/** Motorista logado e vinculado a um cadastro de motorista (admin também passa, usando o 1º motorista ativo se não tiver um vinculado). */
 export async function requireDriver(): Promise<Guard<UserProfile & { driverId: string }>> {
   const profile = await getAuthProfile();
   if (!profile) return { ok: false, response: NextResponse.json({ error: 'Não autenticado.' }, { status: 401 }) };
-  if (!profile.driverId)
+  let driverId = profile.driverId;
+  if (!driverId && profile.role === 'ADMIN') {
+    const firstDriver = await prisma.driver.findFirst({ orderBy: { name: 'asc' }, select: { id: true } });
+    driverId = firstDriver?.id ?? null;
+  }
+  if (!driverId)
     return {
       ok: false,
       response: NextResponse.json({ error: 'Usuário sem motorista vinculado. Fale com o administrador.' }, { status: 403 }),
     };
-  return { ok: true, profile: profile as UserProfile & { driverId: string } };
+  return { ok: true, profile: { ...profile, driverId } };
 }
 
-/** Caminhões que o motorista pode usar: o padrão do perfil + os de fretes em aberto dele. */
-export async function allowedTruckIds(profile: { driverId: string; truckId: string | null }) {
+/** Caminhões que o motorista pode usar: o padrão do perfil + os de fretes em aberto dele (ou toda a frota se for ADMIN). */
+export async function allowedTruckIds(profile: { role?: string; driverId: string; truckId: string | null }) {
+  if (profile.role === 'ADMIN') {
+    const all = await prisma.truck.findMany({ select: { id: true }, orderBy: { plate: 'asc' } });
+    return all.map((t) => t.id);
+  }
   const trips = await prisma.freightTrip.findMany({
     where: { driverId: profile.driverId, status: { in: ['PLANEJADO', 'EM_VIAGEM'] } },
     select: { truckId: true },

@@ -47,7 +47,6 @@ export interface FuelLog {
   totalAmount: number;
   arlaLiters: number;
   arlaAmount: number;
-  isFullTank: boolean;
   gasStationName: string;
   receiptPhotoUrl?: string | null;
   createdAt: string;
@@ -180,12 +179,32 @@ export interface MaintenanceAlert {
   message: string;
 }
 
+export interface MonthlyFuelPerformance {
+  truckId: string;
+  month: number; // 1..12
+  year: number;
+  periodKey: string; // YYYY-MM
+  periodLabel: string; // ex: Set/2026
+  logsCount: number;
+  totalLiters: number;
+  startOdometer: number;
+  endOdometer: number;
+  distanceTraveled: number;
+  monthlyAvgKmL: number;
+  totalFuelCost: number;
+  fuelCpk: number;
+  isAnomalous: boolean;
+  anomalyType: 'LOW' | 'HIGH' | null;
+  anomalyMessage: string | null;
+}
+
 export interface DashboardMetrics {
   totalRevenue: number;
   totalExpenses: number;
   netProfit: number;
   profitMarginPercent: number;
   fleetAverageKmL: number;
+  fleetFuelCpk: number;
   fleetCpk: number;
   totalKmTraveled: number;
   truckMetrics: {
@@ -193,11 +212,33 @@ export interface DashboardMetrics {
     plate: string;
     model: string;
     kmTraveled: number;
+    totalLiters: number;
+    startOdometer: number;
+    endOdometer: number;
     totalExpenses: number;
     fuelCost: number;
     maintenanceCost: number;
     averageKmL: number;
+    monthlyAvgKmL: number;
+    fuelCpk: number;
     cpk: number;
+    isAnomalous: boolean;
+    anomalyType: 'LOW' | 'HIGH' | null;
+    anomalyMessage: string | null;
+    anomalyPeriodLabel?: string | null;
+    monthlyHistory: MonthlyFuelPerformance[];
+  }[];
+  monthlyFuelSeries: {
+    periodKey: string;
+    periodLabel: string;
+    month: number;
+    year: number;
+    distanceTraveled: number;
+    totalLiters: number;
+    monthlyAvgKmL: number;
+    totalFuelCost: number;
+    fuelCpk: number;
+    isAnomalous: boolean;
   }[];
   costBreakdown: {
     name: string;

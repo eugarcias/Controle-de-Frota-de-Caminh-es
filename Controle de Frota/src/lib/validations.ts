@@ -62,13 +62,12 @@ export const FuelLogSchema = z.object({
   odometer: z.number().int().positive(),
   fuelType: z.enum(['DIESEL_S10', 'DIESEL_S500']).default('DIESEL_S10'),
   liters: z.number().positive(),
-  pricePerLiter: z.number().positive(),
+  pricePerLiter: z.number().positive().optional(),
   totalAmount: z.number().positive(),
   arlaLiters: money.default(0),
   arlaAmount: money.default(0),
-  isFullTank: z.boolean().default(true),
-  gasStationName: z.string().min(2),
-  receiptPhotoUrl: z.string().url().optional().nullable(),
+  gasStationName: z.string().min(2).default('Posto Rodovia'),
+  receiptPhotoUrl: z.string().optional().nullable(),
 });
 
 export const MaintenanceLogSchema = z.object({

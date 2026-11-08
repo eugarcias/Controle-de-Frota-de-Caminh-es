@@ -2,13 +2,15 @@
 
 import React, { useCallback, useEffect, useState } from 'react';
 import Image from 'next/image';
-import { Fuel, Receipt, Gauge, LogOut, Loader2, CheckCircle2, AlertTriangle, Camera, X, WifiOff, Siren } from 'lucide-react';
+import Link from 'next/link';
+import { Fuel, Receipt, Gauge, LogOut, Loader2, CheckCircle2, AlertTriangle, Camera, X, WifiOff, Siren, LayoutDashboard } from 'lucide-react';
 import { createSupabaseBrowser } from '@/lib/supabase/browser';
 import { formatBRL, formatDate } from '@/components/ui';
 import { enqueue, flushQueue, isNetworkError, queueSize } from '@/lib/offlineQueue';
 
 interface Ctx {
   userName: string;
+  role?: 'ADMIN' | 'DRIVER';
   driver: { id: string; name: string; cnhExpiry: string | null } | null;
   trucks: { id: string; plate: string; model: string; currentOdometer: number }[];
   trips: { id: string; truckId: string; origin: string; destination: string; customerName: string; status: string }[];
@@ -144,9 +146,20 @@ export default function DriverPage() {
             <p className="text-sm font-semibold truncate">{ctx?.driver?.name ?? ctx?.userName ?? '…'}</p>
           </div>
         </div>
-        <button onClick={logout} aria-label="Sair" className="p-2.5 rounded-xl text-slate-300 hover:bg-slate-800">
-          <LogOut className="w-5 h-5" />
-        </button>
+        <div className="flex items-center gap-1.5 shrink-0">
+          {ctx?.role === 'ADMIN' && (
+            <Link
+              href="/"
+              className="inline-flex items-center gap-1.5 px-2.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-sky-300 text-xs font-semibold"
+            >
+              <LayoutDashboard className="w-4 h-4" />
+              <span>Painel Admin</span>
+            </Link>
+          )}
+          <button onClick={logout} aria-label="Sair" className="p-2.5 rounded-xl text-slate-300 hover:bg-slate-800">
+            <LogOut className="w-5 h-5" />
+          </button>
+        </div>
       </header>
 
       {toast && (
@@ -264,33 +277,66 @@ function TruckSelect({ ctx, value, onChange }: { ctx: Ctx; value: string; onChan
   );
 }
 
+function nowLocalInput(): string {
+  const d = new Date();
+  const off = d.getTimezoneOffset() * 60000;
+  return new Date(d.getTime() - off).toISOString().slice(0, 16);
+}
+
 function FuelForm({ ctx, onDone, onError }: FormProps) {
   const [truckId, setTruckId] = useState(ctx.trucks[0].id);
   const truck = ctx.trucks.find((t) => t.id === truckId) ?? ctx.trucks[0];
+  const [dateTime, setDateTime] = useState(nowLocalInput);
   const [odometer, setOdometer] = useState('');
   const [liters, setLiters] = useState('');
-  const [price, setPrice] = useState('');
-  const [station, setStation] = useState('');
-  const [full, setFull] = useState(true);
+  const [totalAmount, setTotalAmount] = useState('');
+  const [file, setFile] = useState<File | null>(null);
+  const [preview, setPreview] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const total = (Number(liters) || 0) * (Number(price) || 0);
+  const pick = (f: File | null) => {
+    setFile(f);
+    setPreview((old) => {
+      if (old) URL.revokeObjectURL(old);
+      return f ? URL.createObjectURL(f) : null;
+    });
+  };
+
+  const numLiters = Number(liters) || 0;
+  const numTotal = Number(totalAmount) || 0;
+  const unitPrice = numLiters > 0 && numTotal > 0 ? numTotal / numLiters : 0;
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setBusy(true);
     try {
+      let receiptPhotoUrl: string | null = null;
+      if (file && navigator.onLine) {
+        const fd = new FormData();
+        fd.append('file', file);
+        const up = await fetch('/api/driver/upload', { method: 'POST', body: fd });
+        const upData = await up.json().catch(() => ({}));
+        if (!up.ok) throw new Error(upData?.error || 'Falha ao enviar a foto do recibo.');
+        receiptPhotoUrl = upData.path;
+      }
+
+      const isoDate = dateTime ? new Date(dateTime).toISOString() : new Date().toISOString();
+
       await post('/api/driver/fuel', {
         truckId,
-        date: new Date().toISOString(),
+        date: isoDate,
         odometer: Number(odometer),
-        liters: Number(liters),
-        pricePerLiter: Number(price),
-        totalAmount: Number(total.toFixed(2)),
-        isFullTank: full,
-        gasStationName: station,
+        liters: numLiters,
+        totalAmount: Number(numTotal.toFixed(2)),
+        pricePerLiter: Number((numTotal / numLiters).toFixed(3)),
+        receiptPhotoUrl,
       });
-      setOdometer(''); setLiters(''); setPrice(''); setStation('');
+
+      setDateTime(nowLocalInput());
+      setOdometer('');
+      setLiters('');
+      setTotalAmount('');
+      pick(null);
       onDone('Abastecimento registrado!');
     } catch (err) {
       onError(err instanceof Error ? err.message : 'Erro ao registrar.');
@@ -304,30 +350,87 @@ function FuelForm({ ctx, onDone, onError }: FormProps) {
       <h2 className="text-lg font-bold text-slate-900">Lançar abastecimento</h2>
       <TruckSelect ctx={ctx} value={truckId} onChange={setTruckId} />
       <div>
-        <label className={label}>KM no painel (último: {truck.currentOdometer.toLocaleString('pt-BR')})</label>
-        <input required type="number" inputMode="numeric" min={truck.currentOdometer} className={field} value={odometer} onChange={(e) => setOdometer(e.target.value)} />
+        <label className={label}>Data / Hora</label>
+        <input
+          required
+          type="datetime-local"
+          className={field}
+          value={dateTime}
+          onChange={(e) => setDateTime(e.target.value)}
+        />
+      </div>
+      <div>
+        <label className={label}>Odômetro Atual (km) — último: {truck.currentOdometer.toLocaleString('pt-BR')}</label>
+        <input
+          required
+          type="number"
+          inputMode="numeric"
+          min={truck.currentOdometer}
+          className={field}
+          value={odometer}
+          onChange={(e) => setOdometer(e.target.value)}
+          placeholder={`Ex: ${truck.currentOdometer + 500}`}
+        />
       </div>
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className={label}>Litros</label>
-          <input required type="number" inputMode="decimal" step="0.01" min="1" className={field} value={liters} onChange={(e) => setLiters(e.target.value)} />
+          <label className={label}>Litros Abastecidos</label>
+          <input
+            required
+            type="number"
+            inputMode="decimal"
+            step="0.01"
+            min="1"
+            className={field}
+            value={liters}
+            onChange={(e) => setLiters(e.target.value)}
+            placeholder="Ex: 550"
+          />
         </div>
         <div>
-          <label className={label}>R$ / litro</label>
-          <input required type="number" inputMode="decimal" step="0.001" min="0.1" className={field} value={price} onChange={(e) => setPrice(e.target.value)} />
+          <label className={label}>Valor Total (R$)</label>
+          <input
+            required
+            type="number"
+            inputMode="decimal"
+            step="0.01"
+            min="0.01"
+            className={field}
+            value={totalAmount}
+            onChange={(e) => setTotalAmount(e.target.value)}
+            placeholder="Ex: 3272,50"
+          />
         </div>
       </div>
+
       <div>
-        <label className={label}>Posto</label>
-        <input required className={field} value={station} onChange={(e) => setStation(e.target.value)} placeholder="Nome do posto / cidade" />
+        <label className={label}>Foto do Recibo</label>
+        {preview ? (
+          <div className="flex items-center gap-3 rounded-xl bg-slate-50 p-2.5 ring-1 ring-slate-200">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={preview} alt="Recibo de abastecimento" className="w-16 h-16 object-cover rounded-lg" />
+            <span className="flex-1 text-xs text-slate-600 truncate">{file?.name}</span>
+            <button type="button" onClick={() => pick(null)} aria-label="Remover foto" className="p-2 text-slate-400 hover:text-rose-600">
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+        ) : (
+          <label className="flex min-h-14 cursor-pointer items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 text-sm font-semibold text-slate-600 active:bg-slate-100">
+            <Camera className="w-5 h-5 text-sky-600" />
+            Tirar foto ou escolher recibo
+            <input type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => pick(e.target.files?.[0] ?? null)} />
+          </label>
+        )}
       </div>
-      <label className="flex items-center justify-between rounded-xl bg-slate-50 p-3.5 ring-1 ring-slate-200">
-        <span className="text-sm font-semibold text-slate-800">Completou o tanque?</span>
-        <input type="checkbox" checked={full} onChange={(e) => setFull(e.target.checked)} className="w-6 h-6 accent-emerald-600" />
-      </label>
+
       <div className="flex items-center justify-between rounded-xl bg-slate-900 text-white p-3.5">
-        <span className="text-xs text-slate-400">Total</span>
-        <strong className="text-xl text-emerald-400">{formatBRL(total)}</strong>
+        <div>
+          <span className="text-xs text-slate-400 block">Valor Total</span>
+          {unitPrice > 0 && (
+            <span className="text-[11px] text-slate-400">R$ {unitPrice.toFixed(3).replace('.', ',')} / L</span>
+          )}
+        </div>
+        <strong className="text-xl text-emerald-400">{formatBRL(numTotal)}</strong>
       </div>
       <button type="submit" disabled={busy} className={submitBtn}>
         {busy ? <Loader2 className="w-5 h-5 animate-spin" /> : <Fuel className="w-5 h-5" />}

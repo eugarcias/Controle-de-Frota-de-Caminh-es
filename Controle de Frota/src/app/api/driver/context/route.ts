@@ -32,5 +32,5 @@ export async function GET() {
     }),
   ]);
 
-  return NextResponse.json(serialize({ userName: profile.name, driver, trucks, trips, expenses }));
+  return NextResponse.json(serialize({ userName: profile.name, role: profile.role, driver, trucks, trips, expenses }));
 }
