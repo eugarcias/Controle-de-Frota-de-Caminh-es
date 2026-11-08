@@ -14,8 +14,8 @@ const nullableTrimmed = z
 
 export const TruckSchema = z.object({
   plate: z.string().min(7).max(8).transform((s) => s.toUpperCase()),
-  model: z.string().min(2).default('Não informado'),
-  brand: z.string().min(2).default('Não informada'),
+  model: z.string().min(1).default('Não informado'),
+  brand: z.string().min(1).default('Não informada'),
   year: z.number().int().min(0).max(2035).default(0),
   tankCapacityLiters: z.number().int().nonnegative().default(0),
   initialOdometer: z.number().int().nonnegative().default(0),
@@ -24,9 +24,9 @@ export const TruckSchema = z.object({
 });
 
 export const DriverSchema = z.object({
-  name: z.string().min(3),
+  name: z.string().min(2),
   cnhNumber: nullableTrimmed,
-  cnhCategory: z.string().default(''),
+  cnhCategory: z.string().default('E'),
   phone: z.string().min(8),
   status: z.enum(['ATIVO', 'INATIVO', 'FERIAS']).default('ATIVO'),
 });
@@ -45,13 +45,13 @@ export const CustomerSchema = z.object({
 
 export const TireSupplierSchema = z.object({
   name: z.string().min(2),
-  cnpj: z.string().min(14),
-  contactName: z.string().min(2),
+  cnpj: z.string().min(8),
+  contactName: z.string().default(''),
   phone: z.string().min(8),
-  email: z.string(),
-  city: z.string().min(2),
-  state: z.string().min(2).max(2),
-  brandsSold: z.string().min(2),
+  email: z.string().default(''),
+  city: z.string().default(''),
+  state: z.string().max(2).default(''),
+  brandsSold: z.string().default('Diversas'),
   notes: optionalText,
 });
 
@@ -73,16 +73,16 @@ export const FuelLogSchema = z.object({
 export const MaintenanceLogSchema = z.object({
   truckId: z.string().uuid(),
   date: isoDate,
-  odometerAtService: z.number().int().positive(),
+  odometerAtService: z.number().int().nonnegative(),
   type: z.enum(['PREVENTIVA', 'CORRETIVA']),
   category: z.enum(['OLEO_FILTROS', 'FREIOS', 'SUSPENSAO', 'MOTOR', 'CAIXA', 'ARLA_ELETRICA', 'OUTROS']),
-  description: z.string().min(3),
+  description: z.string().min(2),
   partsCost: money.default(0),
   laborCost: money.default(0),
-  totalCost: z.number().positive(),
-  supplierName: z.string().min(2),
+  totalCost: z.number().nonnegative(),
+  supplierName: z.string().min(2).default('Oficina'),
   nextServiceOdometerAlert: z.number().int().positive().optional().nullable(),
-  receiptPhotoUrl: z.string().url().optional().nullable(),
+  receiptPhotoUrl: z.string().optional().nullable(),
 });
 
 export const FreightTripSchema = z.object({

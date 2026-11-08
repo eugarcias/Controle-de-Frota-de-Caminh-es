@@ -1,33 +1,35 @@
 import { prisma } from '../src/lib/prisma';
+import { normalizeLoginIdentifier, formatLoginDisplay } from '../src/lib/supabase/browser';
 
 /**
  * Script para cadastrar ou atualizar usuários (Administrador ou Motorista)
- * 
+ *
  * Uso:
- *   npx tsx --env-file=.env scripts/create-user.ts <email> <senha> <nome> <role: ADMIN|DRIVER> [driverId] [truckId]
- * 
+ *   npx tsx --env-file=.env scripts/create-user.ts <usuario_ou_email> <senha> <nome> <role: ADMIN|DRIVER> [driverId] [truckId]
+ *
  * Exemplo:
- *   npx tsx --env-file=.env scripts/create-user.ts admin@empresa.com SenhaForte123 "João Admin" ADMIN
+ *   npx tsx --env-file=.env scripts/create-user.ts vinicius 123456 "Vinicius Garcia" ADMIN
  */
 async function main() {
-  const email = process.argv[2];
+  const rawLogin = process.argv[2];
   const password = process.argv[3];
   const name = process.argv[4];
   const role = (process.argv[5] || 'ADMIN').toUpperCase();
   const driverId = process.argv[6] || null;
   const truckId = process.argv[7] || null;
 
-  if (!email || !password || !name) {
+  if (!rawLogin || !password || !name) {
     console.log(`
 Uso:
-  npx tsx --env-file=.env scripts/create-user.ts <email> <senha> <nome> <role: ADMIN|DRIVER> [driverId] [truckId]
+  npx tsx --env-file=.env scripts/create-user.ts <usuario_ou_email> <senha> <nome> <role: ADMIN|DRIVER> [driverId] [truckId]
 
 Exemplo:
-  npx tsx --env-file=.env scripts/create-user.ts gestor@empresa.com 123456 "Gestor da Frota" ADMIN
+  npx tsx --env-file=.env scripts/create-user.ts vinicius 123456 "Vinicius Garcia" ADMIN
     `);
     process.exit(1);
   }
 
+  const email = normalizeLoginIdentifier(rawLogin);
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
@@ -35,9 +37,8 @@ Exemplo:
     throw new Error('NEXT_PUBLIC_SUPABASE_URL ou NEXT_PUBLIC_SUPABASE_ANON_KEY não configurados no .env');
   }
 
-  console.log(`\n⏳ Cadastrando usuário: ${email}...`);
+  console.log(`\n⏳ Cadastrando usuário: ${formatLoginDisplay(email)} (${email})...`);
 
-  // 1. Cadastra no Supabase Auth via API
   const res = await fetch(`${url}/auth/v1/signup`, {
     method: 'POST',
     headers: {
@@ -48,36 +49,40 @@ Exemplo:
   });
 
   const authData = await res.json();
+  let userId = authData.id || authData.user?.id;
 
-  if (!res.ok && !authData.id) {
-    throw new Error(`Erro no Supabase Auth: ${JSON.stringify(authData)}`);
+  if (!userId) {
+    const existing = await prisma.$queryRaw<{ id: string }[]>`
+      SELECT id FROM auth.users WHERE lower(email) = lower(${email}) LIMIT 1
+    `;
+    if (existing.length > 0) {
+      userId = existing[0].id;
+    } else {
+      throw new Error(`Erro no Supabase Auth: ${JSON.stringify(authData)}`);
+    }
   }
 
-  const userId = authData.id || authData.user?.id;
-
-  // 2. Confirma o e-mail e aplica o app_metadata (role) diretamente
   await prisma.$executeRawUnsafe(`
     UPDATE auth.users
     SET email_confirmed_at = now(),
-        raw_app_meta_data = raw_app_meta_data || '{"role": "${role}"}'::jsonb
-    WHERE email = '${email}';
+        raw_app_meta_data = coalesce(raw_app_meta_data, '{}'::jsonb) || '{"role": "${role}"}'::jsonb
+    WHERE lower(email) = lower('${email}');
   `);
 
-  // 3. Atualiza ou cria na tabela user_profiles do sistema
   await prisma.userProfile.upsert({
     where: { email },
     create: {
       id: userId,
       email,
       name,
-      role: role as any,
+      role: role as 'ADMIN' | 'DRIVER',
       active: true,
       driverId,
       truckId,
     },
     update: {
       name,
-      role: role as any,
+      role: role as 'ADMIN' | 'DRIVER',
       active: true,
       driverId,
       truckId,
@@ -85,9 +90,9 @@ Exemplo:
   });
 
   console.log(`\n✅ Usuário ${role} criado e ativado com sucesso!`);
-  console.log(`   E-mail: ${email}`);
-  console.log(`   Nome:   ${name}`);
-  console.log(`   Perfil: ${role}\n`);
+  console.log(`   Usuário: ${formatLoginDisplay(email)}`);
+  console.log(`   Nome:    ${name}`);
+  console.log(`   Perfil:  ${role}\n`);
 }
 
 main()

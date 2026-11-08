@@ -34,6 +34,8 @@ const emptyData: FleetData = {
   schedules: [],
 };
 
+const FLEET_CACHE_KEY = 'vsm.admin.fleetCache.v1';
+
 const PATHS: Record<keyof FleetData, string> = {
   trucks: '/api/trucks',
   drivers: '/api/drivers',
@@ -57,8 +59,8 @@ async function api<T>(url: string, init?: RequestInit): Promise<T> {
 const messageOf = (e: unknown) => (e instanceof Error ? e.message : 'Erro inesperado.');
 
 /**
- * Estado central da aplicação, sincronizado com o PostgreSQL pelas rotas /api.
- * Cada alteração é gravada no banco primeiro; a tela só reflete o que o banco confirmou.
+ * Estado central da aplicação, sincronizado com o PostgreSQL pelas rotas /api
+ * e com cache local para abertura rápida e resiliência offline.
  */
 export function useFleetStore() {
   const [data, setData] = useState<FleetData>(emptyData);
@@ -68,9 +70,25 @@ export function useFleetStore() {
   const reload = useCallback(async () => {
     setLoading(true);
     try {
+      const cachedRaw = localStorage.getItem(FLEET_CACHE_KEY);
+      if (cachedRaw) {
+        const cached = JSON.parse(cachedRaw) as FleetData;
+        setData((prev) => (prev.trucks.length === 0 ? { ...emptyData, ...cached } : prev));
+      }
+    } catch {
+      /* ignore */
+    }
+
+    try {
       const fleet = await api<FleetData>('/api/fleet');
-      setData({ ...emptyData, ...fleet });
+      const next = { ...emptyData, ...fleet };
+      setData(next);
       setError(null);
+      try {
+        localStorage.setItem(FLEET_CACHE_KEY, JSON.stringify(next));
+      } catch {
+        /* ignore */
+      }
     } catch (e) {
       setError(messageOf(e));
     } finally {
@@ -85,7 +103,20 @@ export function useFleetStore() {
   const addItem = useCallback(async <K extends keyof FleetData>(key: K, item: ItemOf<K>) => {
     try {
       const created = await api<ItemOf<K>>(PATHS[key], { method: 'POST', body: JSON.stringify(item) });
-      setData((d) => ({ ...d, [key]: [...(d[key] as unknown[]), created] }));
+      setData((d) => {
+        const existingList = d[key] as { id: string }[];
+        const alreadyExists = existingList.some((x) => x.id === (created as { id: string }).id);
+        const updatedList = alreadyExists
+          ? existingList.map((x) => (x.id === (created as { id: string }).id ? created : x))
+          : [created, ...existingList];
+        const next = { ...d, [key]: updatedList };
+        try {
+          localStorage.setItem(FLEET_CACHE_KEY, JSON.stringify(next));
+        } catch {
+          /* ignore */
+        }
+        return next;
+      });
       setError(null);
       return created;
     } catch (e) {
@@ -101,10 +132,18 @@ export function useFleetStore() {
           method: 'PATCH',
           body: JSON.stringify(patch),
         });
-        setData((d) => ({
-          ...d,
-          [key]: (d[key] as { id: string }[]).map((it) => (it.id === id ? { ...it, ...updated } : it)),
-        }));
+        setData((d) => {
+          const next = {
+            ...d,
+            [key]: (d[key] as { id: string }[]).map((it) => (it.id === id ? { ...it, ...updated } : it)),
+          };
+          try {
+            localStorage.setItem(FLEET_CACHE_KEY, JSON.stringify(next));
+          } catch {
+            /* ignore */
+          }
+          return next;
+        });
         setError(null);
         return updated;
       } catch (e) {
@@ -118,7 +157,15 @@ export function useFleetStore() {
   const removeItem = useCallback(async <K extends keyof FleetData>(key: K, id: string) => {
     try {
       await api(`${PATHS[key]}/${id}`, { method: 'DELETE' });
-      setData((d) => ({ ...d, [key]: (d[key] as { id: string }[]).filter((it) => it.id !== id) }));
+      setData((d) => {
+        const next = { ...d, [key]: (d[key] as { id: string }[]).filter((it) => it.id !== id) };
+        try {
+          localStorage.setItem(FLEET_CACHE_KEY, JSON.stringify(next));
+        } catch {
+          /* ignore */
+        }
+        return next;
+      });
       setError(null);
       return true;
     } catch (e) {

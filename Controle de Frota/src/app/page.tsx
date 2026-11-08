@@ -40,7 +40,7 @@ export default function Home() {
 
     const parsedDest = splitDestination(s.destination);
     const destCity = parsedDest?.city ?? s.destination;
-    const destState = parsedDest?.state ?? 'SP';
+    const destState = parsedDest?.state ?? 'RS';
 
     const fuel = (s.distanceKm / (metrics.fleetAverageKmL || 2.1)) * lastDieselPrice;
     const trip: FreightTrip = {
@@ -127,6 +127,7 @@ export default function Home() {
             drivers={data.drivers}
             fuelLogs={data.fuelLogs}
             onSubmitLog={addFuelLog}
+            onRemoveLog={(id) => removeItem('fuelLogs', id)}
           />
         )}
 
@@ -141,6 +142,7 @@ export default function Home() {
             estDieselPrice={lastDieselPrice}
             onAdd={(t) => addItem('trips', t)}
             onUpdate={(id, patch) => updateItem('trips', id, patch)}
+            onRemove={(id) => removeItem('trips', id)}
             onAddCustomer={(c) => addItem('customers', c)}
             onAddDriver={(d) => addItem('drivers', d)}
             onAddTruck={(t) => addItem('trucks', t)}
@@ -162,7 +164,13 @@ export default function Home() {
         )}
 
         {activeTab === 'maintenance' && (
-          <MaintenanceView maintenances={data.maintenanceLogs} trucks={data.trucks} />
+          <MaintenanceView
+            maintenances={data.maintenanceLogs}
+            trucks={data.trucks}
+            onAdd={(m) => addItem('maintenanceLogs', m)}
+            onUpdate={(id, patch) => updateItem('maintenanceLogs', id, patch)}
+            onRemove={(id) => removeItem('maintenanceLogs', id)}
+          />
         )}
 
         {activeTab === 'registrations' && (
@@ -172,9 +180,13 @@ export default function Home() {
             customers={data.customers}
             tireSuppliers={data.tireSuppliers}
             onAddTruck={(t) => addItem('trucks', t)}
+            onUpdateTruck={(id, patch) => updateItem('trucks', id, patch)}
             onAddDriver={(d) => addItem('drivers', d)}
+            onUpdateDriver={(id, patch) => updateItem('drivers', id, patch)}
             onAddCustomer={(c) => addItem('customers', c)}
+            onUpdateCustomer={(id, patch) => updateItem('customers', id, patch)}
             onAddSupplier={(s) => addItem('tireSuppliers', s)}
+            onUpdateSupplier={(id, patch) => updateItem('tireSuppliers', id, patch)}
             onRemove={(key, id) => removeItem(key, id)}
           />
         )}

@@ -1,11 +1,12 @@
 import { NextResponse } from 'next/server';
+import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
 import { serialize } from '@/lib/serialize';
 import { requireDriver, allowedTruckIds } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 
-/** Tudo o que o app do motorista precisa — e SOMENTE o que pertence a ele. */
+/** Tudo o que o app do motorista precisa — com ordenação inteligente do caminhão preferido/mais usado. */
 export async function GET() {
   const guard = await requireDriver();
   if (!guard.ok) return guard.response;
@@ -13,24 +14,130 @@ export async function GET() {
 
   const truckIds = await allowedTruckIds(profile);
 
-  const [driver, trucks, trips, expenses] = await Promise.all([
-    prisma.driver.findUnique({ where: { id: profile.driverId }, select: { id: true, name: true, cnhExpiry: true } }),
+  const [driver, rawTrucks, trips, expenses, driverFuelLogs, allDriverTrips] = await Promise.all([
+    prisma.driver.findUnique({
+      where: { id: profile.driverId },
+      select: { id: true, name: true, cnhExpiry: true },
+    }),
     prisma.truck.findMany({
       where: { id: { in: truckIds } },
-      select: { id: true, plate: true, model: true, currentOdometer: true },
+      select: { id: true, plate: true, model: true, brand: true, currentOdometer: true, status: true },
+      orderBy: { plate: 'asc' },
     }),
     prisma.freightTrip.findMany({
       where: { driverId: profile.driverId, status: { in: ['PLANEJADO', 'EM_VIAGEM'] } },
       orderBy: { startDate: 'desc' },
-      select: { id: true, truckId: true, origin: true, destination: true, customerName: true, status: true, startDate: true },
+      select: {
+        id: true,
+        truckId: true,
+        origin: true,
+        destination: true,
+        customerName: true,
+        status: true,
+        startDate: true,
+      },
     }),
     prisma.travelExpense.findMany({
       where: { driverId: profile.driverId },
-      orderBy: { date: 'desc' },
+      orderBy: { createdAt: 'desc' },
       take: 15,
-      select: { id: true, tripId: true, date: true, category: true, amount: true, description: true, receiptPhotoUrl: true },
+      select: {
+        id: true,
+        tripId: true,
+        truckId: true,
+        date: true,
+        category: true,
+        amount: true,
+        description: true,
+        receiptPhotoUrl: true,
+      },
+    }),
+    prisma.fuelLog.findMany({
+      where: { driverId: profile.driverId },
+      orderBy: { date: 'desc' },
+      take: 30,
+      select: { id: true, truckId: true, date: true, odometer: true, liters: true, totalAmount: true },
+    }),
+    prisma.freightTrip.findMany({
+      where: { driverId: profile.driverId },
+      orderBy: { startDate: 'desc' },
+      take: 30,
+      select: { truckId: true, startDate: true },
     }),
   ]);
 
-  return NextResponse.json(serialize({ userName: profile.name, role: profile.role, driver, trucks, trips, expenses }));
+  // Contagem de uso de cada caminhão pelo motorista (abastecimentos + viagens)
+  const usageMap = new Map<string, number>();
+  for (const f of driverFuelLogs) {
+    usageMap.set(f.truckId, (usageMap.get(f.truckId) ?? 0) + 1);
+  }
+  for (const t of allDriverTrips) {
+    usageMap.set(t.truckId, (usageMap.get(t.truckId) ?? 0) + 2);
+  }
+
+  const lastFuelTruckId = driverFuelLogs[0]?.truckId ?? null;
+  const activeTripTruckId = trips[0]?.truckId ?? null;
+  const mostUsedTruckId =
+    Array.from(usageMap.entries()).sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
+
+  // Prioridade: 1) Viagem ativa -> 2) Caminhão fixado no perfil -> 3) Último abastecido -> 4) Mais utilizado
+  const preferredTruckId =
+    activeTripTruckId ||
+    profile.truckId ||
+    lastFuelTruckId ||
+    mostUsedTruckId ||
+    rawTrucks[0]?.id ||
+    null;
+
+  const trucks = rawTrucks
+    .map((t) => ({
+      ...t,
+      isPreferred: t.id === preferredTruckId,
+      isProfileDefault: t.id === profile.truckId,
+      isLastUsed: t.id === lastFuelTruckId || t.id === activeTripTruckId,
+      usageCount: usageMap.get(t.id) ?? 0,
+    }))
+    .sort((a, b) => {
+      if (a.id === preferredTruckId) return -1;
+      if (b.id === preferredTruckId) return 1;
+      if (b.usageCount !== a.usageCount) return b.usageCount - a.usageCount;
+      return a.plate.localeCompare(b.plate);
+    });
+
+  return NextResponse.json(
+    serialize({
+      userName: profile.name,
+      role: profile.role,
+      driver,
+      preferredTruckId,
+      trucks,
+      trips,
+      expenses,
+      recentFuelLogs: driverFuelLogs.slice(0, 5),
+    })
+  );
+}
+
+const PatchTruckSchema = z.object({
+  truckId: z.string().uuid(),
+});
+
+/** Salva o caminhão preferido do motorista no perfil para já abrir selecionado nas próximas vezes. */
+export async function PATCH(req: Request) {
+  const guard = await requireDriver();
+  if (!guard.ok) return guard.response;
+
+  const parsed = PatchTruckSchema.safeParse(await req.json().catch(() => null));
+  if (!parsed.success) {
+    return NextResponse.json({ error: 'Caminhão inválido.' }, { status: 400 });
+  }
+
+  await prisma.userProfile
+    .update({
+      where: { id: guard.profile.id },
+      data: { truckId: parsed.data.truckId },
+    })
+    .catch(() => {});
+
+  return NextResponse.json({ ok: true, preferredTruckId: parsed.data.truckId });
 }

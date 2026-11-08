@@ -5,13 +5,14 @@ import { serialize } from '@/lib/serialize';
 import { requireDriver } from '@/lib/auth';
 
 const Body = z.object({
-  tripId: z.string().uuid(),
+  id: z.string().uuid().optional(),
+  tripId: z.string().uuid().optional().nullable(),
+  truckId: z.string().uuid().optional().nullable(),
   date: z.string().min(8),
   category: z.enum(['ALIMENTACAO', 'ESTACIONAMENTO', 'BORRACHARIA', 'CHAPA', 'PEDAGIO', 'HOSPEDAGEM', 'OUTROS']),
   amount: z.number().positive().max(100000),
   description: z.string().trim().max(300).default(''),
-  /** Caminho devolvido por /api/driver/upload */
-  receiptPhotoUrl: z.string().max(300).optional().nullable(),
+  receiptPhotoUrl: z.string().optional().nullable(),
 });
 
 export async function POST(req: Request) {
@@ -22,28 +23,79 @@ export async function POST(req: Request) {
   try {
     const body = Body.parse(await req.json());
 
-    // O frete precisa ser DESTE motorista e estar em aberto.
-    const trip = await prisma.freightTrip.findFirst({
-      where: { id: body.tripId, driverId: profile.driverId, status: { in: ['PLANEJADO', 'EM_VIAGEM'] } },
-      select: { id: true },
-    });
-    if (!trip) return NextResponse.json({ error: 'Frete não encontrado ou já encerrado.' }, { status: 403 });
+    // 1. Proteção contra duplicidade por ID (fila offline / clique duplo)
+    if (body.id) {
+      const existingById = await prisma.travelExpense.findUnique({ where: { id: body.id } });
+      if (existingById) {
+        return NextResponse.json(serialize({ ...existingById, deduplicated: true }), { status: 200 });
+      }
+    }
 
-    // O recibo precisa ter sido enviado por este próprio usuário (pasta = id do usuário).
-    if (body.receiptPhotoUrl && !body.receiptPhotoUrl.startsWith(`${profile.id}/`))
-      return NextResponse.json({ error: 'Recibo inválido.' }, { status: 400 });
+    // 2. Proteção inteligente contra duplicidade de conteúdo nos últimos 15 minutos
+    const parsedDate = new Date(body.date);
+    const fifteenMinAgo = new Date(Date.now() - 15 * 60 * 1000);
+    const existingDuplicate = await prisma.travelExpense.findFirst({
+      where: {
+        driverId: profile.driverId,
+        category: body.category,
+        amount: body.amount,
+        description: body.description,
+        createdAt: { gte: fifteenMinAgo },
+      },
+    });
+    if (existingDuplicate) {
+      return NextResponse.json(serialize({ ...existingDuplicate, deduplicated: true }), { status: 200 });
+    }
+
+    // Se tripId foi informado, valida; se não, tenta achar um frete ativo do motorista/caminhão
+    let resolvedTripId: string | null = null;
+    let resolvedTruckId: string | null = body.truckId ?? profile.truckId ?? null;
+
+    if (body.tripId) {
+      const trip = await prisma.freightTrip.findFirst({
+        where: { id: body.tripId },
+        select: { id: true, truckId: true },
+      });
+      if (trip) {
+        resolvedTripId = trip.id;
+        resolvedTruckId = resolvedTruckId ?? trip.truckId;
+      }
+    } else {
+      const openTrip = await prisma.freightTrip.findFirst({
+        where: {
+          driverId: profile.driverId,
+          ...(resolvedTruckId ? { truckId: resolvedTruckId } : {}),
+          status: { in: ['PLANEJADO', 'EM_VIAGEM'] },
+        },
+        orderBy: { startDate: 'desc' },
+        select: { id: true, truckId: true },
+      });
+      if (openTrip) {
+        resolvedTripId = openTrip.id;
+        resolvedTruckId = resolvedTruckId ?? openTrip.truckId;
+      }
+    }
 
     const row = await prisma.travelExpense.create({
       data: {
-        tripId: body.tripId,
-        driverId: profile.driverId, // sempre da sessão
-        date: new Date(body.date),
+        ...(body.id ? { id: body.id } : {}),
+        tripId: resolvedTripId,
+        truckId: resolvedTruckId,
+        driverId: profile.driverId,
+        date: parsedDate,
         category: body.category,
         amount: body.amount,
         description: body.description,
         receiptPhotoUrl: body.receiptPhotoUrl ?? null,
       },
     });
+
+    if (resolvedTruckId) {
+      await prisma.userProfile
+        .update({ where: { id: profile.id }, data: { truckId: resolvedTruckId } })
+        .catch(() => {});
+    }
+
     return NextResponse.json(serialize(row), { status: 201 });
   } catch (e) {
     if (e instanceof ZodError)

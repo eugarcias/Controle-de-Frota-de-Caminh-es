@@ -49,7 +49,6 @@ export const resources: Record<string, ResourceConfig> = {
       }
       return d;
     },
-    // Mantém o hodômetro do caminhão sempre no maior valor lançado
     afterCreate: async (row) => {
       await prisma.truck.updateMany({
         where: { id: row.truckId, currentOdometer: { lt: row.odometer } },
@@ -63,9 +62,19 @@ export const resources: Record<string, ResourceConfig> = {
     schema: MaintenanceLogSchema,
     dateFields: ['date'],
     orderBy: { date: 'desc' },
+    beforeSave: (d) => {
+      if (d.totalCost === undefined || d.totalCost === 0) {
+        const sum = (Number(d.partsCost) || 0) + (Number(d.laborCost) || 0);
+        if (sum > 0) d.totalCost = sum;
+      }
+      return d;
+    },
     afterCreate: async (row) => {
-      if (row.type === 'CORRETIVA' && row.category === 'MOTOR') {
-        await prisma.truck.update({ where: { id: row.truckId }, data: { status: 'MANUTENCAO' } });
+      if (row.odometerAtService > 0) {
+        await prisma.truck.updateMany({
+          where: { id: row.truckId, currentOdometer: { lt: row.odometerAtService } },
+          data: { currentOdometer: row.odometerAtService },
+        });
       }
     },
   },
@@ -111,7 +120,7 @@ function fail(error: unknown) {
       return NextResponse.json({ error: 'Já existe um registro com esse valor único (placa, CNH ou CNPJ).' }, { status: 409 });
     if (error.code === 'P2003')
       return NextResponse.json(
-        { error: 'Registro vinculado a outros lançamentos (abastecimentos, fretes etc.) ou referência inválida.' },
+        { error: 'Registro vinculado a outros lançamentos. Remova os vínculos primeiro ou desative o cadastro.' },
         { status: 409 }
       );
     if (error.code === 'P2025') return NextResponse.json({ error: 'Registro não encontrado.' }, { status: 404 });
@@ -139,6 +148,21 @@ export async function createResource(slug: string, req: Request) {
   try {
     let data: any = cfg.schema.parse(await req.json());
     if (cfg.beforeSave) data = cfg.beforeSave(data);
+
+    // Evita duplicidade em lançamentos de abastecimento
+    if (slug === 'fuel-logs') {
+      const existing = await prisma.fuelLog.findFirst({
+        where: {
+          truckId: data.truckId,
+          odometer: data.odometer,
+          liters: data.liters,
+        },
+      });
+      if (existing) {
+        return NextResponse.json(serialize(existing), { status: 200 });
+      }
+    }
+
     const row = await delegate(cfg).create({ data: toDates(cfg, data) });
     if (cfg.afterCreate) await cfg.afterCreate(row);
     return NextResponse.json(serialize(row), { status: 201 });
@@ -151,8 +175,10 @@ export async function updateResource(slug: string, id: string, req: Request) {
   const cfg = resources[slug];
   if (!cfg) return notFound();
   try {
-    const data = cfg.schema.partial().parse(await req.json());
+    let data: any = cfg.schema.partial().parse(await req.json());
+    if (cfg.beforeSave) data = cfg.beforeSave(data);
     const row = await delegate(cfg).update({ where: { id }, data: toDates(cfg, data) });
+    if (cfg.afterCreate) await cfg.afterCreate(row);
     return NextResponse.json(serialize(row));
   } catch (e) {
     return fail(e);
@@ -163,6 +189,41 @@ export async function deleteResource(slug: string, id: string) {
   const cfg = resources[slug];
   if (!cfg) return notFound();
   try {
+    // Limpeza segura em cascata para caminhões, motoristas e clientes quando excluídos pelo Admin
+    if (slug === 'trucks') {
+      await prisma.$transaction([
+        prisma.userProfile.updateMany({ where: { truckId: id }, data: { truckId: null } }),
+        prisma.cargoSchedule.updateMany({ where: { truckId: id }, data: { truckId: null } }),
+        prisma.travelExpense.deleteMany({ where: { truckId: id } }),
+        prisma.fuelLog.deleteMany({ where: { truckId: id } }),
+        prisma.maintenanceLog.deleteMany({ where: { truckId: id } }),
+        prisma.maintenancePlan.deleteMany({ where: { truckId: id } }),
+        prisma.freightTrip.deleteMany({ where: { truckId: id } }),
+        prisma.truck.delete({ where: { id } }),
+      ]);
+      return NextResponse.json({ ok: true });
+    }
+    if (slug === 'drivers') {
+      await prisma.$transaction([
+        prisma.userProfile.updateMany({ where: { driverId: id }, data: { driverId: null } }),
+        prisma.cargoSchedule.updateMany({ where: { driverId: id }, data: { driverId: null } }),
+        prisma.travelExpense.deleteMany({ where: { driverId: id } }),
+        prisma.problemReport.deleteMany({ where: { driverId: id } }),
+        prisma.fuelLog.deleteMany({ where: { driverId: id } }),
+        prisma.freightTrip.deleteMany({ where: { driverId: id } }),
+        prisma.driver.delete({ where: { id } }),
+      ]);
+      return NextResponse.json({ ok: true });
+    }
+    if (slug === 'customers') {
+      await prisma.$transaction([
+        prisma.freightTrip.updateMany({ where: { customerId: id }, data: { customerId: null } }),
+        prisma.cargoSchedule.deleteMany({ where: { customerId: id } }),
+        prisma.customer.delete({ where: { id } }),
+      ]);
+      return NextResponse.json({ ok: true });
+    }
+
     await delegate(cfg).delete({ where: { id } });
     return NextResponse.json({ ok: true });
   } catch (e) {

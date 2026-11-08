@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   Fuel,
   CheckCircle,
@@ -12,16 +12,18 @@ import {
   Sparkles,
   FileText,
   X,
+  Trash2,
 } from 'lucide-react';
 import { Truck, Driver, FuelLog, MonthlyFuelPerformance } from '@/types';
 import { calculateMonthlyFuelPerformance } from '@/lib/calc';
-import { formatBRL } from '@/components/ui';
+import { formatBRL, formatDate } from '@/components/ui';
 
 interface QuickEntryViewProps {
   trucks: Truck[];
   drivers: Driver[];
   fuelLogs: FuelLog[];
   onSubmitLog: (newLog: FuelLog) => Promise<unknown>;
+  onRemoveLog?: (id: string) => Promise<boolean>;
 }
 
 function nowLocalDateTime(): string {
@@ -35,6 +37,7 @@ export const QuickEntryView: React.FC<QuickEntryViewProps> = ({
   drivers,
   fuelLogs,
   onSubmitLog,
+  onRemoveLog,
 }) => {
   const [truckId, setTruckId] = useState(trucks[0]?.id || '');
   const [driverId, setDriverId] = useState(drivers[0]?.id || '');
@@ -44,6 +47,19 @@ export const QuickEntryView: React.FC<QuickEntryViewProps> = ({
   const [gasStationName, setGasStationName] = useState<string>('Posto Rodovia');
   const [logDateTime, setLogDateTime] = useState<string>(nowLocalDateTime);
   const [submitting, setSubmitting] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (!truckId && trucks[0]) {
+      setTruckId(trucks[0].id);
+      setOdometer(trucks[0].currentOdometer || 0);
+    }
+  }, [trucks, truckId]);
+
+  useEffect(() => {
+    if (!driverId && drivers[0]) {
+      setDriverId(drivers[0].id);
+    }
+  }, [drivers, driverId]);
 
   // Estados do OCR com IA
   const [ocrLoading, setOcrLoading] = useState<boolean>(false);
@@ -494,6 +510,58 @@ export const QuickEntryView: React.FC<QuickEntryViewProps> = ({
           )}
         </button>
       </form>
+
+      {/* Histórico Recente de Abastecimentos para conferência rápida */}
+      {fuelLogs.length > 0 && (
+        <div className="bg-white p-5 rounded-2xl shadow-sm ring-1 ring-slate-200 space-y-3">
+          <h3 className="text-sm font-bold text-slate-900">
+            Últimos Abastecimentos Registrados ({fuelLogs.length})
+          </h3>
+          <div className="divide-y divide-slate-100">
+            {fuelLogs.slice(0, 15).map((log) => {
+              const t = trucks.find((x) => x.id === log.truckId);
+              const d = drivers.find((x) => x.id === log.driverId);
+              return (
+                <div
+                  key={log.id}
+                  className="py-3 flex flex-wrap items-center justify-between gap-2 text-xs"
+                >
+                  <div className="space-y-0.5">
+                    <div className="flex items-center gap-2 font-bold text-slate-900">
+                      <span className="bg-slate-900 text-white px-2 py-0.5 rounded">
+                        {t?.plate ?? 'Caminhão'}
+                      </span>
+                      <span>{log.liters.toLocaleString('pt-BR')} L</span>
+                      <span>• {log.odometer.toLocaleString('pt-BR')} km</span>
+                    </div>
+                    <div className="text-slate-500">
+                      {formatDate(log.date)} • Motorista: {d?.name ?? '—'} • {log.gasStationName}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <strong className="text-sm text-emerald-700">
+                      {formatBRL(log.totalAmount)}
+                    </strong>
+                    {onRemoveLog && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          confirm('Excluir este lançamento de abastecimento?') &&
+                          onRemoveLog(log.id)
+                        }
+                        className="p-1.5 text-rose-600 hover:bg-rose-50 rounded-lg"
+                        title="Excluir abastecimento"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

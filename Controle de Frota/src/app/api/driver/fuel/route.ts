@@ -5,6 +5,7 @@ import { serialize } from '@/lib/serialize';
 import { requireDriver, allowedTruckIds } from '@/lib/auth';
 
 const Body = z.object({
+  id: z.string().uuid().optional(),
   truckId: z.string().uuid(),
   date: z.string().min(8),
   odometer: z.number().int().positive(),
@@ -29,22 +30,72 @@ export async function POST(req: Request) {
     if (!(await allowedTruckIds(profile)).includes(body.truckId))
       return NextResponse.json({ error: 'Este caminhão não está liberado para você.' }, { status: 403 });
 
-    const pricePerLiter = body.pricePerLiter ?? Number((body.totalAmount / body.liters).toFixed(3));
+    // 1. Proteção contra duplicidade por ID (reenvio de fila offline ou clique duplo)
+    if (body.id) {
+      const existingById = await prisma.fuelLog.findUnique({ where: { id: body.id } });
+      if (existingById) {
+        return NextResponse.json(serialize({ ...existingById, deduplicated: true }), { status: 200 });
+      }
+    }
 
-    // driverId vem SEMPRE da sessão — nunca do corpo da requisição.
-    const row = await prisma.fuelLog.create({
-      data: {
-        ...body,
-        pricePerLiter,
-        receiptPhotoUrl: body.receiptPhotoUrl ?? null,
-        date: new Date(body.date),
-        driverId: profile.driverId,
+    // 2. Proteção inteligente contra duplicidade de conteúdo:
+    // Mesmo caminhão com o mesmo odômetro OU mesmo caminhão, litros e valor nos últimos 30 minutos
+    const parsedDate = new Date(body.date);
+    const windowStart = new Date(parsedDate.getTime() - 30 * 60 * 1000);
+    const windowEnd = new Date(parsedDate.getTime() + 30 * 60 * 1000);
+
+    const existingDuplicate = await prisma.fuelLog.findFirst({
+      where: {
+        truckId: body.truckId,
+        OR: [
+          { odometer: body.odometer },
+          {
+            liters: body.liters,
+            totalAmount: body.totalAmount,
+            date: { gte: windowStart, lte: windowEnd },
+          },
+        ],
       },
     });
-    await prisma.truck.updateMany({
-      where: { id: body.truckId, currentOdometer: { lt: body.odometer } },
-      data: { currentOdometer: body.odometer },
+
+    if (existingDuplicate) {
+      return NextResponse.json(serialize({ ...existingDuplicate, deduplicated: true }), { status: 200 });
+    }
+
+    const pricePerLiter = body.pricePerLiter ?? Number((body.totalAmount / body.liters).toFixed(3));
+
+    const row = await prisma.fuelLog.create({
+      data: {
+        ...(body.id ? { id: body.id } : {}),
+        truckId: body.truckId,
+        driverId: profile.driverId,
+        date: parsedDate,
+        odometer: body.odometer,
+        fuelType: body.fuelType,
+        liters: body.liters,
+        pricePerLiter,
+        totalAmount: body.totalAmount,
+        arlaLiters: body.arlaLiters,
+        arlaAmount: body.arlaAmount,
+        gasStationName: body.gasStationName,
+        receiptPhotoUrl: body.receiptPhotoUrl ?? null,
+      },
     });
+
+    // Atualiza o hodômetro do caminhão e memoriza como último caminhão usado pelo motorista
+    await Promise.all([
+      prisma.truck.updateMany({
+        where: { id: body.truckId, currentOdometer: { lt: body.odometer } },
+        data: { currentOdometer: body.odometer },
+      }),
+      prisma.userProfile
+        .update({
+          where: { id: profile.id },
+          data: { truckId: body.truckId },
+        })
+        .catch(() => {}),
+    ]);
+
     return NextResponse.json(serialize(row), { status: 201 });
   } catch (e) {
     if (e instanceof ZodError)

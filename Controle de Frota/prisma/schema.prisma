@@ -210,6 +210,7 @@ model Truck {
   trips            FreightTrip[]
   infractions      Infraction[]
   profiles         UserProfile[]
+  travelExpenses   TravelExpense[]
 
   @@map("trucks")
 }
@@ -981,8 +982,8 @@ model UserProfile {
   truckId   String?  @map("truck_id") @db.Uuid
   createdAt DateTime @default(now()) @map("created_at")
 
-  driver Driver? @relation(fields: [driverId], references: [id])
-  truck  Truck?  @relation(fields: [truckId], references: [id])
+  driver Driver? @relation(fields: [driverId], references: [id], onDelete: SetNull)
+  truck  Truck?  @relation(fields: [truckId], references: [id], onDelete: SetNull)
 
   @@map("user_profiles")
 }
@@ -1026,7 +1027,8 @@ model ProblemReport {
 
 model TravelExpense {
   id              String          @id @default(uuid()) @db.Uuid
-  tripId          String          @map("trip_id") @db.Uuid
+  tripId          String?         @map("trip_id") @db.Uuid
+  truckId         String?         @map("truck_id") @db.Uuid
   driverId        String          @map("driver_id") @db.Uuid
   date            DateTime
   category        ExpenseCategory
@@ -1036,10 +1038,12 @@ model TravelExpense {
   receiptPhotoUrl String?         @map("receipt_photo_url")
   createdAt       DateTime        @default(now()) @map("created_at")
 
-  trip   FreightTrip @relation(fields: [tripId], references: [id], onDelete: Cascade)
-  driver Driver      @relation(fields: [driverId], references: [id])
+  trip   FreightTrip? @relation(fields: [tripId], references: [id], onDelete: SetNull)
+  truck  Truck?       @relation(fields: [truckId], references: [id], onDelete: SetNull)
+  driver Driver       @relation(fields: [driverId], references: [id], onDelete: Cascade)
 
   @@index([tripId])
+  @@index([truckId])
   @@index([driverId, date])
   @@map("travel_expenses")
 }

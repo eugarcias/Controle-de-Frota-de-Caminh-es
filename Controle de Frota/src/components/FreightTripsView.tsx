@@ -14,6 +14,7 @@ import {
   AlertCircle,
   MapPin,
   TrendingUp,
+  Trash2,
 } from 'lucide-react';
 import { FreightTrip, Truck, Driver, Customer, TripStatus, FuelLog } from '@/types';
 import {
@@ -45,6 +46,7 @@ interface FreightTripsViewProps {
   estDieselPrice: number;
   onAdd: (trip: FreightTrip) => void;
   onUpdate: (id: string, patch: Partial<FreightTrip>) => void;
+  onRemove?: (id: string) => void;
   // Devolvem o registro salvo (com o id gerado pelo banco) ou null em caso de erro
   onAddCustomer?: (customer: Customer) => Promise<Customer | null>;
   onAddDriver?: (driver: Driver) => Promise<Driver | null>;
@@ -95,6 +97,7 @@ export const FreightTripsView: React.FC<FreightTripsViewProps> = ({
   estDieselPrice,
   onAdd,
   onUpdate,
+  onRemove,
   onAddCustomer,
   onAddDriver,
   onAddTruck,
@@ -450,6 +453,16 @@ export const FreightTripsView: React.FC<FreightTripsViewProps> = ({
                       </option>
                     ))}
                   </select>
+                  {onRemove && (
+                    <button
+                      type="button"
+                      onClick={() => confirm('Excluir este frete?') && onRemove(trip.id)}
+                      className="p-1.5 text-rose-600 hover:bg-rose-50 rounded-lg"
+                      title="Excluir frete"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  )}
                 </div>
 
                 <div className="flex items-center justify-between sm:justify-end gap-3">

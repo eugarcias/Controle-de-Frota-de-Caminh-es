@@ -3,80 +3,174 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { Fuel, Receipt, Gauge, LogOut, Loader2, CheckCircle2, AlertTriangle, Camera, X, WifiOff, Siren, LayoutDashboard } from 'lucide-react';
+import {
+  Fuel,
+  Receipt,
+  Gauge,
+  LogOut,
+  Loader2,
+  CheckCircle2,
+  AlertTriangle,
+  Camera,
+  X,
+  WifiOff,
+  LayoutDashboard,
+  Star,
+  Truck as TruckIcon,
+  RefreshCw,
+} from 'lucide-react';
 import { createSupabaseBrowser } from '@/lib/supabase/browser';
 import { formatBRL, formatDate } from '@/components/ui';
-import { enqueue, flushQueue, isNetworkError, queueSize } from '@/lib/offlineQueue';
+import {
+  compressImageToDataUrl,
+  enqueue,
+  flushQueue,
+  isNetworkError,
+  queueSize,
+} from '@/lib/offlineQueue';
+
+interface DriverTruck {
+  id: string;
+  plate: string;
+  model: string;
+  brand?: string;
+  currentOdometer: number;
+  isPreferred?: boolean;
+  isLastUsed?: boolean;
+  usageCount?: number;
+}
 
 interface Ctx {
   userName: string;
   role?: 'ADMIN' | 'DRIVER';
   driver: { id: string; name: string; cnhExpiry: string | null } | null;
-  trucks: { id: string; plate: string; model: string; currentOdometer: number }[];
-  trips: { id: string; truckId: string; origin: string; destination: string; customerName: string; status: string }[];
-  expenses: { id: string; date: string; category: string; amount: number; description: string; receiptPhotoUrl: string | null }[];
+  preferredTruckId?: string | null;
+  trucks: DriverTruck[];
+  trips: {
+    id: string;
+    truckId: string;
+    origin: string;
+    destination: string;
+    customerName: string;
+    status: string;
+  }[];
+  expenses: {
+    id: string;
+    date: string;
+    category: string;
+    amount: number;
+    description: string;
+    receiptPhotoUrl: string | null;
+  }[];
 }
 
+const CTX_CACHE_KEY = 'vsm.driver.ctx.v2';
+const PREF_TRUCK_KEY = 'vsm.driver.preferredTruckId.v1';
+
 const CATEGORIES = [
-  { value: 'ALIMENTACAO', label: 'Alimentação' },
-  { value: 'ESTACIONAMENTO', label: 'Estacionamento' },
-  { value: 'BORRACHARIA', label: 'Borracharia' },
-  { value: 'CHAPA', label: 'Chapa / Ajudante' },
+  { value: 'ALIMENTACAO', label: 'Alimentação / Refeição' },
   { value: 'PEDAGIO', label: 'Pedágio' },
-  { value: 'HOSPEDAGEM', label: 'Hospedagem' },
-  { value: 'OUTROS', label: 'Outros' },
+  { value: 'CHAPA', label: 'Chapa / Ajudante' },
+  { value: 'BORRACHARIA', label: 'Borracharia / Pneu' },
+  { value: 'ESTACIONAMENTO', label: 'Estacionamento / Pátio' },
+  { value: 'HOSPEDAGEM', label: 'Hospedagem / Pernoite' },
+  { value: 'OUTROS', label: 'Outros gastos' },
 ];
 const catLabel = (v: string) => CATEGORIES.find((c) => c.value === v)?.label ?? v;
 
 const today = () => new Date().toISOString().slice(0, 10);
 const field =
-  'w-full min-h-12 text-base px-4 py-2 rounded-xl bg-white shadow-sm ring-1 ring-slate-200 focus:ring-2 focus:ring-sky-500 focus:outline-none';
-const label = 'block text-xs font-bold text-slate-600 uppercase mb-1';
+  'w-full min-h-14 text-lg font-medium px-4 py-2.5 rounded-2xl bg-white text-slate-900 shadow-sm ring-1 ring-slate-300 focus:ring-2 focus:ring-sky-500 focus:outline-none';
+const label = 'block text-xs font-extrabold text-slate-700 uppercase tracking-wide mb-1.5';
 const submitBtn =
-  'w-full min-h-12 inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold shadow-md active:scale-[0.98] transition disabled:opacity-50';
+  'w-full min-h-14 inline-flex items-center justify-center gap-2.5 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white text-base font-extrabold shadow-lg shadow-emerald-600/20 active:scale-[0.98] transition disabled:opacity-50';
 
-async function post<T>(url: string, body: unknown): Promise<T> {
-  // Sem internet: guarda no aparelho e sincroniza depois (fila offline).
-  if (!navigator.onLine) {
-    enqueue(url, body);
-    return { queued: true } as T;
+async function postDriverAction(
+  url: string,
+  body: Record<string, unknown>
+): Promise<{ queued?: boolean; deduplicated?: boolean }> {
+  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    const { deduplicated } = enqueue(url, body);
+    return { queued: true, deduplicated };
   }
   let res: Response;
   try {
-    res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
   } catch (e) {
     if (isNetworkError(e)) {
-      enqueue(url, body);
-      return { queued: true } as T;
+      const { deduplicated } = enqueue(url, body);
+      return { queued: true, deduplicated };
     }
     throw e;
   }
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data?.error || 'Não foi possível concluir. Tente novamente.');
-  return data as T;
+  return data;
 }
 
-type Tab = 'fuel' | 'expense' | 'odometer' | 'problem';
+type Tab = 'fuel' | 'expense' | 'odometer';
 
 export default function DriverPage() {
   const [ctx, setCtx] = useState<Ctx | null>(null);
+  const [selectedTruckId, setSelectedTruckId] = useState<string>('');
   const [loadError, setLoadError] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>('fuel');
   const [toast, setToast] = useState<{ ok: boolean; text: string } | null>(null);
   const [online, setOnline] = useState(true);
   const [pending, setPending] = useState(0);
 
+  // Escolhe o caminhão inicial de forma inteligente (localStorage -> preferido do banco -> 1º da lista)
+  const applySmartTruckSelection = useCallback((data: Ctx) => {
+    if (!data.trucks || data.trucks.length === 0) return;
+    const savedLocal = localStorage.getItem(PREF_TRUCK_KEY);
+    const validSaved = savedLocal && data.trucks.some((t) => t.id === savedLocal) ? savedLocal : null;
+    const bestId =
+      validSaved ||
+      (data.preferredTruckId && data.trucks.some((t) => t.id === data.preferredTruckId)
+        ? data.preferredTruckId
+        : data.trucks[0].id);
+    setSelectedTruckId((curr) => (curr && data.trucks.some((t) => t.id === curr) ? curr : bestId));
+  }, []);
+
   const load = useCallback(async () => {
+    // 1. Carrega cache local imediatamente para abrir sem internet em 0ms
+    try {
+      const cachedRaw = localStorage.getItem(CTX_CACHE_KEY);
+      if (cachedRaw) {
+        const cachedData = JSON.parse(cachedRaw) as Ctx;
+        setCtx((prev) => prev ?? cachedData);
+        applySmartTruckSelection(cachedData);
+      }
+    } catch {
+      /* ignore */
+    }
+
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      return;
+    }
+
     try {
       const res = await fetch('/api/driver/context', { cache: 'no-store' });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || 'Falha ao carregar.');
+      const data = (await res.json()) as Ctx & { error?: string };
+      if (!res.ok) throw new Error(data?.error || 'Falha ao carregar dados.');
       setCtx(data);
       setLoadError(null);
+      localStorage.setItem(CTX_CACHE_KEY, JSON.stringify(data));
+      applySmartTruckSelection(data);
     } catch (e) {
-      setLoadError(e instanceof Error ? e.message : 'Falha ao carregar.');
+      // Se já temos cache local salvo, não trava a tela do motorista
+      setCtx((current) => {
+        if (!current) {
+          setLoadError(e instanceof Error ? e.message : 'Sem conexão no momento.');
+        }
+        return current;
+      });
     }
-  }, []);
+  }, [applySmartTruckSelection]);
 
   useEffect(() => {
     load();
@@ -84,22 +178,61 @@ export default function DriverPage() {
 
   const notify = (ok: boolean, text: string) => {
     setToast({ ok, text });
-    setTimeout(() => setToast(null), 4500);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    setTimeout(() => setToast(null), 5000);
   };
 
-  // PWA: acompanha a conexão e sincroniza a fila offline (o service worker é registrado no layout raiz).
+  // Atualiza odômetro localmente mesmo quando offline para que a tela reflita na hora
+  const updateLocalOdometer = (truckId: string, newOdometer: number) => {
+    setCtx((prev) => {
+      if (!prev) return prev;
+      const updated: Ctx = {
+        ...prev,
+        trucks: prev.trucks.map((t) =>
+          t.id === truckId && newOdometer > t.currentOdometer
+            ? { ...t, currentOdometer: newOdometer }
+            : t
+        ),
+      };
+      try {
+        localStorage.setItem(CTX_CACHE_KEY, JSON.stringify(updated));
+      } catch {
+        /* ignore */
+      }
+      return updated;
+    });
+  };
+
+  // Quando o motorista seleciona um caminhão, salva como preferido no celular e no banco
+  const handleSelectTruck = (truckId: string) => {
+    setSelectedTruckId(truckId);
+    localStorage.setItem(PREF_TRUCK_KEY, truckId);
+    if (navigator.onLine) {
+      fetch('/api/driver/context', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ truckId }),
+      }).catch(() => {});
+    }
+  };
+
   useEffect(() => {
     setOnline(navigator.onLine);
     setPending(queueSize());
 
     const sync = async () => {
       const { synced } = await flushQueue();
+      setPending(queueSize());
       if (synced > 0) {
-        notify(true, `${synced} lançamento(s) sincronizado(s) com sucesso!`);
+        notify(true, `${synced} lançamento(s) enviado(s) automaticamente!`);
         load();
       }
     };
-    const goOnline = () => { setOnline(true); sync(); };
+    const goOnline = () => {
+      setOnline(true);
+      sync();
+      load();
+    };
     const goOffline = () => setOnline(false);
     const onQueue = () => setPending(queueSize());
 
@@ -114,7 +247,6 @@ export default function DriverPage() {
     };
   }, [load]);
 
-  // Alerta de vencimento da CNH (60 dias antes ou já vencida)
   const cnhAlert = (() => {
     const exp = ctx?.driver?.cnhExpiry;
     if (!exp) return null;
@@ -123,40 +255,53 @@ export default function DriverPage() {
   })();
 
   const logout = async () => {
+    if (!confirm('Deseja realmente sair do aplicativo?')) return;
     await createSupabaseBrowser().auth.signOut();
     window.location.assign('/login');
   };
 
+  // Apenas as 3 abas essenciais (removida a aba "Problema")
   const tabs: { id: Tab; label: string; icon: React.ElementType }[] = [
     { id: 'fuel', label: 'Abastecer', icon: Fuel },
     { id: 'expense', label: 'Despesa', icon: Receipt },
     { id: 'odometer', label: 'Hodômetro', icon: Gauge },
-    { id: 'problem', label: 'Problema', icon: Siren },
   ];
 
+  const currentTruck =
+    ctx?.trucks.find((t) => t.id === selectedTruckId) ?? ctx?.trucks[0] ?? null;
+
   return (
-    <div className="min-h-screen bg-slate-50 pb-24">
+    <div className="min-h-screen bg-slate-100 pb-28">
       <header className="sticky top-0 z-30 bg-slate-950 text-white px-4 py-3 flex items-center justify-between shadow-md border-b-2 border-sky-500">
         <div className="flex items-center gap-3 min-w-0">
           <div className="bg-white rounded-lg px-1.5 py-0.5 shrink-0">
             <Image src="/logo.png" alt="VSM Garcia" width={950} height={440} className="h-8 w-auto" />
           </div>
           <div className="min-w-0">
-            <p className="text-xs text-slate-400 leading-none">Motorista</p>
-            <p className="text-sm font-semibold truncate">{ctx?.driver?.name ?? ctx?.userName ?? '…'}</p>
+            <p className="text-[11px] text-emerald-400 font-bold uppercase tracking-wider leading-none">
+              Motorista Conectado
+            </p>
+            <p className="text-sm font-bold truncate mt-0.5">
+              {ctx?.driver?.name ?? ctx?.userName ?? 'Carregando…'}
+            </p>
           </div>
         </div>
         <div className="flex items-center gap-1.5 shrink-0">
           {ctx?.role === 'ADMIN' && (
             <Link
               href="/"
-              className="inline-flex items-center gap-1.5 px-2.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-sky-300 text-xs font-semibold"
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-sky-300 text-xs font-bold"
             >
               <LayoutDashboard className="w-4 h-4" />
               <span>Painel Admin</span>
             </Link>
           )}
-          <button onClick={logout} aria-label="Sair" className="p-2.5 rounded-xl text-slate-300 hover:bg-slate-800">
+          <button
+            onClick={logout}
+            aria-label="Sair da conta"
+            title="Sair da conta"
+            className="p-2.5 rounded-xl text-slate-300 hover:bg-slate-800"
+          >
             <LogOut className="w-5 h-5" />
           </button>
         </div>
@@ -165,73 +310,147 @@ export default function DriverPage() {
       {toast && (
         <div
           role="status"
-          className={`fixed top-16 inset-x-4 z-40 mx-auto max-w-md flex items-center gap-2 rounded-xl p-3 text-sm shadow-lg ring-1 ${
-            toast.ok ? 'bg-emerald-50 text-emerald-900 ring-emerald-200' : 'bg-rose-50 text-rose-900 ring-rose-200'
+          className={`fixed top-16 inset-x-4 z-40 mx-auto max-w-md flex items-center gap-2.5 rounded-2xl p-4 text-sm font-bold shadow-xl ring-2 ${
+            toast.ok
+              ? 'bg-emerald-600 text-white ring-emerald-400'
+              : 'bg-rose-600 text-white ring-rose-400'
           }`}
         >
-          {toast.ok ? <CheckCircle2 className="w-5 h-5 shrink-0" /> : <AlertTriangle className="w-5 h-5 shrink-0" />}
+          {toast.ok ? (
+            <CheckCircle2 className="w-6 h-6 shrink-0" />
+          ) : (
+            <AlertTriangle className="w-6 h-6 shrink-0" />
+          )}
           <span>{toast.text}</span>
         </div>
       )}
 
       <main className="max-w-md mx-auto p-4 space-y-4">
         {(!online || pending > 0) && (
-          <div role="status" className="flex items-center gap-2 rounded-xl bg-amber-50 text-amber-900 ring-1 ring-amber-200 p-3 text-sm">
-            <WifiOff className="w-5 h-5 shrink-0" />
+          <div
+            role="status"
+            className="flex items-center gap-3 rounded-2xl bg-amber-50 text-amber-950 ring-1 ring-amber-300 p-3.5 text-xs font-semibold"
+          >
+            <WifiOff className="w-5 h-5 shrink-0 text-amber-600" />
             <span>
-              {!online ? 'Sem internet. ' : ''}
-              {pending > 0 ? `${pending} lançamento(s) aguardando sincronização — enviaremos assim que a conexão voltar.` : 'Seus lançamentos serão salvos no aparelho.'}
+              {!online ? 'Você está sem internet no momento. ' : ''}
+              {pending > 0
+                ? `${pending} lançamento(s) guardado(s) no celular — serão enviados sozinhos assim que o sinal voltar.`
+                : 'Pode lançar normalmente! Tudo fica salvo no celular e sincroniza depois.'}
             </span>
           </div>
         )}
+
         {cnhAlert && (
-          <div role="alert" className={`flex items-start gap-2 rounded-xl p-3 text-sm ring-1 ${cnhAlert.expired ? 'bg-rose-50 text-rose-900 ring-rose-200' : 'bg-amber-50 text-amber-900 ring-amber-200'}`}>
+          <div
+            role="alert"
+            className={`flex items-start gap-2.5 rounded-2xl p-3.5 text-xs font-semibold ring-1 ${
+              cnhAlert.expired
+                ? 'bg-rose-50 text-rose-900 ring-rose-200'
+                : 'bg-amber-50 text-amber-900 ring-amber-200'
+            }`}
+          >
             <AlertTriangle className="w-5 h-5 shrink-0" />
-            <span>{cnhAlert.expired ? `Sua CNH venceu há ${-cnhAlert.days} dia(s). Regularize antes de dirigir.` : `Sua CNH vence em ${cnhAlert.days} dia(s). Providencie a renovação.`}</span>
+            <span>
+              {cnhAlert.expired
+                ? `Sua CNH venceu há ${-cnhAlert.days} dia(s). Avise o escritório.`
+                : `Sua CNH vence em ${cnhAlert.days} dia(s).`}
+            </span>
           </div>
         )}
-        {loadError && (
-          <div role="alert" className="rounded-xl bg-rose-50 text-rose-900 ring-1 ring-rose-200 p-4 text-sm">
-            {loadError}
-            <button onClick={load} className="block mt-2 font-bold underline">
-              Tentar novamente
+
+        {loadError && !ctx && (
+          <div
+            role="alert"
+            className="rounded-2xl bg-rose-50 text-rose-900 ring-1 ring-rose-200 p-4 text-sm space-y-2"
+          >
+            <p className="font-semibold">{loadError}</p>
+            <button
+              onClick={load}
+              className="inline-flex items-center gap-1.5 font-bold text-rose-800 underline"
+            >
+              <RefreshCw className="w-4 h-4" /> Tentar novamente
             </button>
           </div>
         )}
 
         {!ctx && !loadError && (
-          <div className="flex justify-center py-16 text-sky-600">
+          <div className="flex flex-col items-center justify-center py-16 gap-2 text-sky-700">
             <Loader2 className="w-8 h-8 animate-spin" />
+            <span className="text-sm font-semibold">Carregando seu caminhão…</span>
           </div>
         )}
 
         {ctx && ctx.trucks.length === 0 && (
-          <div className="rounded-xl bg-amber-50 text-amber-900 ring-1 ring-amber-200 p-4 text-sm">
-            Nenhum caminhão liberado para você ainda. Peça ao administrador para vincular um caminhão ou criar um frete.
+          <div className="rounded-2xl bg-amber-50 text-amber-900 ring-1 ring-amber-200 p-4 text-sm font-medium">
+            Nenhum caminhão ativo cadastrado no sistema. Peça ao administrador para cadastrar.
           </div>
         )}
 
-        {ctx && ctx.trucks.length > 0 && (
+        {ctx && currentTruck && (
           <>
-            {tab === 'fuel' && <FuelForm ctx={ctx} onDone={(m) => { notify(true, m); load(); }} onError={(m) => notify(false, m)} />}
-            {tab === 'expense' && <ExpenseForm ctx={ctx} onDone={(m) => { notify(true, m); load(); }} onError={(m) => notify(false, m)} />}
-            {tab === 'odometer' && <OdometerForm ctx={ctx} onDone={(m) => { notify(true, m); load(); }} onError={(m) => notify(false, m)} />}
-            {tab === 'problem' && <ProblemForm ctx={ctx} onDone={(m) => notify(true, m)} onError={(m) => notify(false, m)} />}
+            {/* Card Inteligente do Caminhão Selecionado (evita que o motorista precise escolher toda vez) */}
+            <SmartTruckBar
+              trucks={ctx.trucks}
+              selectedTruck={currentTruck}
+              onSelectTruck={handleSelectTruck}
+            />
+
+            {tab === 'fuel' && (
+              <FuelForm
+                truck={currentTruck}
+                onDone={(msg, newOdo) => {
+                  if (newOdo) updateLocalOdometer(currentTruck.id, newOdo);
+                  notify(true, msg);
+                  load();
+                }}
+                onError={(m) => notify(false, m)}
+              />
+            )}
+
+            {tab === 'expense' && (
+              <ExpenseForm
+                ctx={ctx}
+                truck={currentTruck}
+                onDone={(m) => {
+                  notify(true, m);
+                  load();
+                }}
+                onError={(m) => notify(false, m)}
+              />
+            )}
+
+            {tab === 'odometer' && (
+              <OdometerForm
+                truck={currentTruck}
+                onDone={(msg, newOdo) => {
+                  if (newOdo) updateLocalOdometer(currentTruck.id, newOdo);
+                  notify(true, msg);
+                  load();
+                }}
+                onError={(m) => notify(false, m)}
+              />
+            )}
 
             {tab === 'expense' && ctx.expenses.length > 0 && (
-              <section className="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200 p-4 space-y-2">
-                <h3 className="text-sm font-bold text-slate-800">Minhas últimas despesas</h3>
+              <section className="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200 p-4 space-y-2.5">
+                <h3 className="text-sm font-extrabold text-slate-800 uppercase tracking-wide">
+                  Minhas últimas despesas lançadas
+                </h3>
                 {ctx.expenses.map((e) => (
-                  <div key={e.id} className="flex items-center justify-between text-sm border-b border-slate-100 last:border-0 pb-2 last:pb-0">
+                  <div
+                    key={e.id}
+                    className="flex items-center justify-between text-sm border-b border-slate-100 last:border-0 pb-2.5 last:pb-0"
+                  >
                     <div>
-                      <span className="font-medium text-slate-800">{catLabel(e.category)}</span>
+                      <span className="font-bold text-slate-900">{catLabel(e.category)}</span>
                       <span className="block text-xs text-slate-500">
                         {formatDate(e.date)}
                         {e.description ? ` • ${e.description}` : ''}
-                        {e.receiptPhotoUrl ? ' • 📎 recibo' : ''}
+                        {e.receiptPhotoUrl ? ' • 📎 Com foto' : ''}
                       </span>
                     </div>
-                    <strong className="text-rose-600">{formatBRL(e.amount)}</strong>
+                    <strong className="text-rose-600 text-base">{formatBRL(e.amount)}</strong>
                   </div>
                 ))}
               </section>
@@ -240,19 +459,27 @@ export default function DriverPage() {
         )}
       </main>
 
-      {/* Navegação inferior (polegar) */}
-      <nav className="fixed bottom-0 inset-x-0 z-30 bg-white border-t border-slate-200 grid grid-cols-4 pb-[env(safe-area-inset-bottom)]" aria-label="Seções">
-        {tabs.map(({ id, label: l, icon: Icon }) => (
-          <button
-            key={id}
-            onClick={() => setTab(id)}
-            aria-current={tab === id ? 'page' : undefined}
-            className={`flex flex-col items-center gap-0.5 py-3 text-xs font-semibold ${tab === id ? 'text-emerald-600' : 'text-slate-500'}`}
-          >
-            <Icon className="w-6 h-6" />
-            {l}
-          </button>
-        ))}
+      {/* Navegação inferior com 3 botões grandes e fáceis de tocar */}
+      <nav
+        className="fixed bottom-0 inset-x-0 z-30 bg-white border-t-2 border-slate-200 grid grid-cols-3 pb-[env(safe-area-inset-bottom)] shadow-lg"
+        aria-label="Menu do motorista"
+      >
+        {tabs.map(({ id, label: l, icon: Icon }) => {
+          const active = tab === id;
+          return (
+            <button
+              key={id}
+              onClick={() => setTab(id)}
+              aria-current={active ? 'page' : undefined}
+              className={`flex flex-col items-center justify-center gap-1 py-3.5 text-xs font-extrabold transition ${
+                active ? 'text-emerald-600 bg-emerald-50/60' : 'text-slate-500 active:bg-slate-100'
+              }`}
+            >
+              <Icon className="w-6 h-6" />
+              <span>{l}</span>
+            </button>
+          );
+        })}
       </nav>
     </div>
   );
@@ -260,19 +487,88 @@ export default function DriverPage() {
 
 /* ------------------------------------------------------------------ */
 
-type FormProps = { ctx: Ctx; onDone: (msg: string) => void; onError: (msg: string) => void };
+function SmartTruckBar({
+  trucks,
+  selectedTruck,
+  onSelectTruck,
+}: {
+  trucks: DriverTruck[];
+  selectedTruck: DriverTruck;
+  onSelectTruck: (id: string) => void;
+}) {
+  const [changing, setChanging] = useState(false);
 
-function TruckSelect({ ctx, value, onChange }: { ctx: Ctx; value: string; onChange: (v: string) => void }) {
   return (
-    <div>
-      <label className={label}>Caminhão</label>
-      <select className={field} value={value} onChange={(e) => onChange(e.target.value)}>
-        {ctx.trucks.map((t) => (
-          <option key={t.id} value={t.id}>
-            {t.plate} — {t.model}
-          </option>
-        ))}
-      </select>
+    <div className="bg-slate-900 text-white rounded-2xl p-4 shadow-md ring-1 ring-slate-800 space-y-3">
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="p-2.5 rounded-xl bg-emerald-500/20 text-emerald-400 shrink-0">
+            <TruckIcon className="w-6 h-6" />
+          </div>
+          <div className="min-w-0">
+            <div className="flex items-center gap-1.5">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-amber-400 flex items-center gap-1">
+                <Star className="w-3.5 h-3.5 fill-amber-400" />
+                Seu Caminhão Atual
+              </span>
+            </div>
+            <div className="text-lg font-extrabold tracking-tight truncate">
+              {selectedTruck.plate} — {selectedTruck.model}
+            </div>
+            <div className="text-xs text-slate-400">
+              Hodômetro atual: <strong className="text-slate-200">{selectedTruck.currentOdometer.toLocaleString('pt-BR')} km</strong>
+            </div>
+          </div>
+        </div>
+
+        {trucks.length > 1 && (
+          <button
+            type="button"
+            onClick={() => setChanging((v) => !v)}
+            className="shrink-0 px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-sky-300 text-xs font-bold border border-slate-700"
+          >
+            {changing ? 'Fechar' : 'Trocar'}
+          </button>
+        )}
+      </div>
+
+      {changing && trucks.length > 1 && (
+        <div className="pt-2 border-t border-slate-800 space-y-2">
+          <p className="text-xs text-slate-300 font-semibold">
+            Toque no caminhão que você está dirigindo hoje (ele ficará salvo como seu preferido):
+          </p>
+          <div className="grid grid-cols-1 gap-2">
+            {trucks.map((t) => {
+              const isSelected = t.id === selectedTruck.id;
+              return (
+                <button
+                  key={t.id}
+                  type="button"
+                  onClick={() => {
+                    onSelectTruck(t.id);
+                    setChanging(false);
+                  }}
+                  className={`w-full flex items-center justify-between p-3 rounded-xl text-left text-sm font-bold transition ${
+                    isSelected
+                      ? 'bg-emerald-600 text-white ring-2 ring-emerald-300'
+                      : 'bg-slate-800 text-slate-200 hover:bg-slate-700'
+                  }`}
+                >
+                  <div>
+                    <span className="text-base">{t.plate}</span> — {t.model}
+                    <span className="block text-xs font-normal opacity-80">
+                      {t.currentOdometer.toLocaleString('pt-BR')} km
+                    </span>
+                  </div>
+                  {isSelected && (
+                    <span className="text-xs bg-white/20 px-2.5 py-1 rounded-lg">Selecionado</span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -283,9 +579,16 @@ function nowLocalInput(): string {
   return new Date(d.getTime() - off).toISOString().slice(0, 16);
 }
 
-function FuelForm({ ctx, onDone, onError }: FormProps) {
-  const [truckId, setTruckId] = useState(ctx.trucks[0].id);
-  const truck = ctx.trucks.find((t) => t.id === truckId) ?? ctx.trucks[0];
+function FuelForm({
+  truck,
+  onDone,
+  onError,
+}: {
+  truck: DriverTruck;
+  onDone: (msg: string, newOdometer?: number) => void;
+  onError: (msg: string) => void;
+}) {
+  const [recordId, setRecordId] = useState(() => crypto.randomUUID());
   const [dateTime, setDateTime] = useState(nowLocalInput);
   const [odometer, setOdometer] = useState('');
   const [liters, setLiters] = useState('');
@@ -308,73 +611,105 @@ function FuelForm({ ctx, onDone, onError }: FormProps) {
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (busy) return;
+
+    const numOdo = Number(odometer);
+    if (!numOdo || numOdo <= 0) {
+      onError('Digite o KM (odômetro) que está no painel do caminhão.');
+      return;
+    }
+    if (numLiters <= 0 || numTotal <= 0) {
+      onError('Informe os litros e o valor total do abastecimento.');
+      return;
+    }
+
     setBusy(true);
     try {
       let receiptPhotoUrl: string | null = null;
-      if (file && navigator.onLine) {
-        const fd = new FormData();
-        fd.append('file', file);
-        const up = await fetch('/api/driver/upload', { method: 'POST', body: fd });
-        const upData = await up.json().catch(() => ({}));
-        if (!up.ok) throw new Error(upData?.error || 'Falha ao enviar a foto do recibo.');
-        receiptPhotoUrl = upData.path;
+      let offlinePhotoDataUrl: string | undefined;
+
+      if (file) {
+        if (navigator.onLine) {
+          try {
+            const fd = new FormData();
+            fd.append('file', file);
+            const up = await fetch('/api/driver/upload', { method: 'POST', body: fd });
+            if (up.ok) {
+              const upData = await up.json().catch(() => ({}));
+              receiptPhotoUrl = upData.path ?? null;
+            }
+          } catch {
+            offlinePhotoDataUrl = await compressImageToDataUrl(file).catch(() => undefined);
+          }
+        } else {
+          offlinePhotoDataUrl = await compressImageToDataUrl(file).catch(() => undefined);
+        }
       }
 
       const isoDate = dateTime ? new Date(dateTime).toISOString() : new Date().toISOString();
 
-      await post('/api/driver/fuel', {
-        truckId,
+      const res = await postDriverAction('/api/driver/fuel', {
+        id: recordId,
+        truckId: truck.id,
         date: isoDate,
-        odometer: Number(odometer),
+        odometer: numOdo,
         liters: numLiters,
         totalAmount: Number(numTotal.toFixed(2)),
         pricePerLiter: Number((numTotal / numLiters).toFixed(3)),
         receiptPhotoUrl,
+        ...(offlinePhotoDataUrl ? { _offlinePhotoDataUrl: offlinePhotoDataUrl } : {}),
       });
 
+      setRecordId(crypto.randomUUID());
       setDateTime(nowLocalInput());
       setOdometer('');
       setLiters('');
       setTotalAmount('');
       pick(null);
-      onDone('Abastecimento registrado!');
+
+      if (res.queued) {
+        onDone('Abastecimento salvo no celular! Será enviado quando a internet voltar.', numOdo);
+      } else {
+        onDone('Abastecimento registrado com sucesso!', numOdo);
+      }
     } catch (err) {
-      onError(err instanceof Error ? err.message : 'Erro ao registrar.');
+      onError(err instanceof Error ? err.message : 'Erro ao registrar abastecimento.');
     } finally {
       setBusy(false);
     }
   };
 
   return (
-    <form onSubmit={submit} className="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200 p-4 space-y-4">
-      <h2 className="text-lg font-bold text-slate-900">Lançar abastecimento</h2>
-      <TruckSelect ctx={ctx} value={truckId} onChange={setTruckId} />
+    <form
+      onSubmit={submit}
+      className="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200 p-4 space-y-4"
+    >
       <div>
-        <label className={label}>Data / Hora</label>
-        <input
-          required
-          type="datetime-local"
-          className={field}
-          value={dateTime}
-          onChange={(e) => setDateTime(e.target.value)}
-        />
+        <h2 className="text-lg font-extrabold text-slate-900">Lançar Abastecimento</h2>
+        <p className="text-xs text-slate-500">
+          Preencha os números da bomba e do painel do caminhão.
+        </p>
       </div>
+
       <div>
-        <label className={label}>Odômetro Atual (km) — último: {truck.currentOdometer.toLocaleString('pt-BR')}</label>
+        <label className={label}>
+          KM no Painel (Odômetro) — último: {truck.currentOdometer.toLocaleString('pt-BR')} km
+        </label>
         <input
           required
           type="number"
           inputMode="numeric"
-          min={truck.currentOdometer}
+          min={truck.currentOdometer > 0 ? truck.currentOdometer : 1}
           className={field}
           value={odometer}
           onChange={(e) => setOdometer(e.target.value)}
-          placeholder={`Ex: ${truck.currentOdometer + 500}`}
+          placeholder={truck.currentOdometer > 0 ? `Ex: ${truck.currentOdometer + 450}` : 'Ex: 228500'}
         />
       </div>
+
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className={label}>Litros Abastecidos</label>
+          <label className={label}>Litros</label>
           <input
             required
             type="number"
@@ -398,49 +733,91 @@ function FuelForm({ ctx, onDone, onError }: FormProps) {
             className={field}
             value={totalAmount}
             onChange={(e) => setTotalAmount(e.target.value)}
-            placeholder="Ex: 3272,50"
+            placeholder="Ex: 3250,00"
           />
         </div>
       </div>
 
       <div>
-        <label className={label}>Foto do Recibo</label>
+        <label className={label}>Foto da Nota / Cupom (Opcional)</label>
         {preview ? (
-          <div className="flex items-center gap-3 rounded-xl bg-slate-50 p-2.5 ring-1 ring-slate-200">
+          <div className="flex items-center gap-3 rounded-2xl bg-slate-50 p-3 ring-1 ring-slate-200">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={preview} alt="Recibo de abastecimento" className="w-16 h-16 object-cover rounded-lg" />
-            <span className="flex-1 text-xs text-slate-600 truncate">{file?.name}</span>
-            <button type="button" onClick={() => pick(null)} aria-label="Remover foto" className="p-2 text-slate-400 hover:text-rose-600">
+            <img
+              src={preview}
+              alt="Recibo de abastecimento"
+              className="w-16 h-16 object-cover rounded-xl"
+            />
+            <span className="flex-1 text-xs font-semibold text-emerald-700">
+              Foto anexada com sucesso
+            </span>
+            <button
+              type="button"
+              onClick={() => pick(null)}
+              aria-label="Remover foto"
+              className="p-2 text-slate-500 hover:text-rose-600"
+            >
               <X className="w-5 h-5" />
             </button>
           </div>
         ) : (
-          <label className="flex min-h-14 cursor-pointer items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 text-sm font-semibold text-slate-600 active:bg-slate-100">
+          <label className="flex min-h-14 cursor-pointer items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-sky-400 bg-sky-50/50 text-sm font-bold text-sky-900 active:bg-sky-100">
             <Camera className="w-5 h-5 text-sky-600" />
-            Tirar foto ou escolher recibo
-            <input type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => pick(e.target.files?.[0] ?? null)} />
+            Tirar Foto do Cupom
+            <input
+              type="file"
+              accept="image/*"
+              capture="environment"
+              className="hidden"
+              onChange={(e) => pick(e.target.files?.[0] ?? null)}
+            />
           </label>
         )}
       </div>
 
-      <div className="flex items-center justify-between rounded-xl bg-slate-900 text-white p-3.5">
+      <div>
+        <label className={label}>Data e Hora</label>
+        <input
+          required
+          type="datetime-local"
+          className={field}
+          value={dateTime}
+          onChange={(e) => setDateTime(e.target.value)}
+        />
+      </div>
+
+      <div className="flex items-center justify-between rounded-2xl bg-slate-900 text-white p-4">
         <div>
-          <span className="text-xs text-slate-400 block">Valor Total</span>
+          <span className="text-xs text-slate-400 block">Total do Abastecimento</span>
           {unitPrice > 0 && (
-            <span className="text-[11px] text-slate-400">R$ {unitPrice.toFixed(3).replace('.', ',')} / L</span>
+            <span className="text-xs text-emerald-400 font-semibold">
+              Preço por litro: R$ {unitPrice.toFixed(2).replace('.', ',')}
+            </span>
           )}
         </div>
-        <strong className="text-xl text-emerald-400">{formatBRL(numTotal)}</strong>
+        <strong className="text-2xl text-emerald-400">{formatBRL(numTotal)}</strong>
       </div>
+
       <button type="submit" disabled={busy} className={submitBtn}>
-        {busy ? <Loader2 className="w-5 h-5 animate-spin" /> : <Fuel className="w-5 h-5" />}
-        Confirmar abastecimento
+        {busy ? <Loader2 className="w-6 h-6 animate-spin" /> : <Fuel className="w-6 h-6" />}
+        {busy ? 'SALVANDO…' : 'CONFIRMAR ABASTECIMENTO'}
       </button>
     </form>
   );
 }
 
-function ExpenseForm({ ctx, onDone, onError }: FormProps) {
+function ExpenseForm({
+  ctx,
+  truck,
+  onDone,
+  onError,
+}: {
+  ctx: Ctx;
+  truck: DriverTruck;
+  onDone: (msg: string) => void;
+  onError: (msg: string) => void;
+}) {
+  const [recordId, setRecordId] = useState(() => crypto.randomUUID());
   const [tripId, setTripId] = useState(ctx.trips[0]?.id ?? '');
   const [category, setCategory] = useState('ALIMENTACAO');
   const [amount, setAmount] = useState('');
@@ -458,186 +835,258 @@ function ExpenseForm({ ctx, onDone, onError }: FormProps) {
     });
   };
 
-  if (ctx.trips.length === 0)
-    return (
-      <div className="rounded-xl bg-amber-50 text-amber-900 ring-1 ring-amber-200 p-4 text-sm">
-        Você não tem frete em aberto. Despesas só podem ser lançadas em um frete planejado ou em viagem.
-      </div>
-    );
-
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (busy) return;
+    const numAmount = Number(amount);
+    if (!numAmount || numAmount <= 0) {
+      onError('Informe o valor da despesa.');
+      return;
+    }
+
     setBusy(true);
     try {
       let receiptPhotoUrl: string | null = null;
-      if (file && navigator.onLine) {
-        const fd = new FormData();
-        fd.append('file', file);
-        const up = await fetch('/api/driver/upload', { method: 'POST', body: fd });
-        const upData = await up.json().catch(() => ({}));
-        if (!up.ok) throw new Error(upData?.error || 'Falha ao enviar o recibo.');
-        receiptPhotoUrl = upData.path;
+      let offlinePhotoDataUrl: string | undefined;
+
+      if (file) {
+        if (navigator.onLine) {
+          try {
+            const fd = new FormData();
+            fd.append('file', file);
+            const up = await fetch('/api/driver/upload', { method: 'POST', body: fd });
+            if (up.ok) {
+              const upData = await up.json().catch(() => ({}));
+              receiptPhotoUrl = upData.path ?? null;
+            }
+          } catch {
+            offlinePhotoDataUrl = await compressImageToDataUrl(file).catch(() => undefined);
+          }
+        } else {
+          offlinePhotoDataUrl = await compressImageToDataUrl(file).catch(() => undefined);
+        }
       }
-      await post('/api/driver/expense', {
-        tripId,
+
+      const res = await postDriverAction('/api/driver/expense', {
+        id: recordId,
+        tripId: tripId || null,
+        truckId: truck.id,
         date: `${date}T12:00:00.000Z`,
         category,
-        amount: Number(amount),
-        description: file && !receiptPhotoUrl ? `${description} [recibo pendente - sem internet]`.trim() : description,
+        amount: numAmount,
+        description: description.trim(),
         receiptPhotoUrl,
+        ...(offlinePhotoDataUrl ? { _offlinePhotoDataUrl: offlinePhotoDataUrl } : {}),
       });
-      setAmount(''); setDescription(''); pick(null);
-      onDone('Despesa registrada!');
+
+      setRecordId(crypto.randomUUID());
+      setAmount('');
+      setDescription('');
+      pick(null);
+
+      if (res.queued) {
+        onDone('Despesa salva no celular! Será enviada quando a internet voltar.');
+      } else {
+        onDone('Despesa registrada com sucesso!');
+      }
     } catch (err) {
-      onError(err instanceof Error ? err.message : 'Erro ao registrar.');
+      onError(err instanceof Error ? err.message : 'Erro ao registrar despesa.');
     } finally {
       setBusy(false);
     }
   };
 
   return (
-    <form onSubmit={submit} className="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200 p-4 space-y-4">
-      <h2 className="text-lg font-bold text-slate-900">Lançar despesa de viagem</h2>
+    <form
+      onSubmit={submit}
+      className="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200 p-4 space-y-4"
+    >
       <div>
-        <label className={label}>Frete</label>
-        <select className={field} value={tripId} onChange={(e) => setTripId(e.target.value)}>
-          {ctx.trips.map((t) => (
-            <option key={t.id} value={t.id}>
-              {t.origin} → {t.destination} ({t.customerName})
+        <h2 className="text-lg font-extrabold text-slate-900">Lançar Despesa de Viagem</h2>
+        <p className="text-xs text-slate-500">
+          Registre gastos com pedágio, refeição, chapa ou borracharia.
+        </p>
+      </div>
+
+      {ctx.trips.length > 0 && (
+        <div>
+          <label className={label}>Viagem / Frete</label>
+          <select className={field} value={tripId} onChange={(e) => setTripId(e.target.value)}>
+            {ctx.trips.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.origin} → {t.destination} ({t.customerName})
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+
+      <div>
+        <label className={label}>Tipo de Gasto</label>
+        <select className={field} value={category} onChange={(e) => setCategory(e.target.value)}>
+          {CATEGORIES.map((c) => (
+            <option key={c.value} value={c.value}>
+              {c.label}
             </option>
           ))}
         </select>
       </div>
+
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className={label}>Categoria</label>
-          <select className={field} value={category} onChange={(e) => setCategory(e.target.value)}>
-            {CATEGORIES.map((c) => (
-              <option key={c.value} value={c.value}>{c.label}</option>
-            ))}
-          </select>
+          <label className={label}>Valor (R$)</label>
+          <input
+            required
+            type="number"
+            inputMode="decimal"
+            step="0.01"
+            min="0.01"
+            className={field}
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            placeholder="Ex: 45,00"
+          />
         </div>
         <div>
-          <label className={label}>Valor (R$)</label>
-          <input required type="number" inputMode="decimal" step="0.01" min="0.01" className={field} value={amount} onChange={(e) => setAmount(e.target.value)} />
+          <label className={label}>Data</label>
+          <input
+            required
+            type="date"
+            max={today()}
+            className={field}
+            value={date}
+            onChange={(e) => setDate(e.target.value)}
+          />
         </div>
-      </div>
-      <div>
-        <label className={label}>Data</label>
-        <input required type="date" max={today()} className={field} value={date} onChange={(e) => setDate(e.target.value)} />
-      </div>
-      <div>
-        <label className={label}>Descrição (opcional)</label>
-        <input className={field} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Ex: almoço em Registro-SP" />
       </div>
 
       <div>
-        <label className={label}>Foto do recibo</label>
+        <label className={label}>Observação (Opcional)</label>
+        <input
+          className={field}
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          placeholder="Ex: Almoço no posto"
+        />
+      </div>
+
+      <div>
+        <label className={label}>Foto do Comprovante (Opcional)</label>
         {preview ? (
-          <div className="flex items-center gap-3 rounded-xl bg-slate-50 p-2.5 ring-1 ring-slate-200">
+          <div className="flex items-center gap-3 rounded-2xl bg-slate-50 p-3 ring-1 ring-slate-200">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={preview} alt="Recibo" className="w-16 h-16 object-cover rounded-lg" />
-            <span className="flex-1 text-xs text-slate-600 truncate">{file?.name}</span>
-            <button type="button" onClick={() => pick(null)} aria-label="Remover foto" className="p-2 text-slate-400 hover:text-rose-600">
+            <img src={preview} alt="Recibo" className="w-16 h-16 object-cover rounded-xl" />
+            <span className="flex-1 text-xs font-semibold text-emerald-700">
+              Foto anexada com sucesso
+            </span>
+            <button
+              type="button"
+              onClick={() => pick(null)}
+              aria-label="Remover foto"
+              className="p-2 text-slate-500 hover:text-rose-600"
+            >
               <X className="w-5 h-5" />
             </button>
           </div>
         ) : (
-          <label className="flex min-h-14 cursor-pointer items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 text-sm font-semibold text-slate-600 active:bg-slate-100">
+          <label className="flex min-h-14 cursor-pointer items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-sky-400 bg-sky-50/50 text-sm font-bold text-sky-900 active:bg-sky-100">
             <Camera className="w-5 h-5 text-sky-600" />
-            Tirar foto ou escolher imagem
-            <input type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => pick(e.target.files?.[0] ?? null)} />
+            Tirar Foto do Comprovante
+            <input
+              type="file"
+              accept="image/*"
+              capture="environment"
+              className="hidden"
+              onChange={(e) => pick(e.target.files?.[0] ?? null)}
+            />
           </label>
         )}
       </div>
 
       <button type="submit" disabled={busy} className={submitBtn}>
-        {busy ? <Loader2 className="w-5 h-5 animate-spin" /> : <Receipt className="w-5 h-5" />}
-        Registrar despesa
+        {busy ? <Loader2 className="w-6 h-6 animate-spin" /> : <Receipt className="w-6 h-6" />}
+        {busy ? 'SALVANDO…' : 'CONFIRMAR DESPESA'}
       </button>
     </form>
   );
 }
 
-function OdometerForm({ ctx, onDone, onError }: FormProps) {
-  const [truckId, setTruckId] = useState(ctx.trucks[0].id);
-  const truck = ctx.trucks.find((t) => t.id === truckId) ?? ctx.trucks[0];
+function OdometerForm({
+  truck,
+  onDone,
+  onError,
+}: {
+  truck: DriverTruck;
+  onDone: (msg: string, newOdometer?: number) => void;
+  onError: (msg: string) => void;
+}) {
   const [odometer, setOdometer] = useState('');
   const [busy, setBusy] = useState(false);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (busy) return;
+    const numOdo = Number(odometer);
+    if (!numOdo || numOdo <= 0) {
+      onError('Digite o KM atual do painel.');
+      return;
+    }
+
     setBusy(true);
     try {
-      await post('/api/driver/odometer', { truckId, odometer: Number(odometer) });
+      const res = await postDriverAction('/api/driver/odometer', {
+        truckId: truck.id,
+        odometer: numOdo,
+      });
       setOdometer('');
-      onDone('Hodômetro atualizado!');
+      if (res.queued) {
+        onDone('Hodômetro salvo no celular! Será sincronizado assim que a internet voltar.', numOdo);
+      } else {
+        onDone('Hodômetro atualizado com sucesso!', numOdo);
+      }
     } catch (err) {
-      onError(err instanceof Error ? err.message : 'Erro ao atualizar.');
+      onError(err instanceof Error ? err.message : 'Erro ao atualizar hodômetro.');
     } finally {
       setBusy(false);
     }
   };
 
   return (
-    <form onSubmit={submit} className="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200 p-4 space-y-4">
-      <h2 className="text-lg font-bold text-slate-900">Atualizar hodômetro</h2>
-      <TruckSelect ctx={ctx} value={truckId} onChange={setTruckId} />
-      <div className="rounded-xl bg-slate-50 p-3.5 ring-1 ring-slate-200 text-sm text-slate-600">
-        KM atual registrado: <strong className="text-slate-900">{truck.currentOdometer.toLocaleString('pt-BR')} km</strong>
-      </div>
+    <form
+      onSubmit={submit}
+      className="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200 p-4 space-y-4"
+    >
       <div>
-        <label className={label}>Novo KM no painel</label>
-        <input required type="number" inputMode="numeric" min={truck.currentOdometer + 1} className={field} value={odometer} onChange={(e) => setOdometer(e.target.value)} />
+        <h2 className="text-lg font-extrabold text-slate-900">Atualizar Hodômetro (KM)</h2>
+        <p className="text-xs text-slate-500">
+          Informe o KM que aparece agora no painel do caminhão.
+        </p>
       </div>
+
+      <div className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200 text-sm text-slate-600 flex items-center justify-between">
+        <span>Último KM registrado:</span>
+        <strong className="text-base text-slate-900">
+          {truck.currentOdometer.toLocaleString('pt-BR')} km
+        </strong>
+      </div>
+
+      <div>
+        <label className={label}>Novo KM no Painel</label>
+        <input
+          required
+          type="number"
+          inputMode="numeric"
+          min={truck.currentOdometer > 0 ? truck.currentOdometer : 1}
+          className={field}
+          value={odometer}
+          onChange={(e) => setOdometer(e.target.value)}
+          placeholder={truck.currentOdometer > 0 ? `Ex: ${truck.currentOdometer + 300}` : 'Ex: 150000'}
+        />
+      </div>
+
       <button type="submit" disabled={busy} className={submitBtn}>
-        {busy ? <Loader2 className="w-5 h-5 animate-spin" /> : <Gauge className="w-5 h-5" />}
-        Atualizar hodômetro
-      </button>
-    </form>
-  );
-}
-
-function ProblemForm({ ctx, onDone, onError }: FormProps) {
-  const [truckId, setTruckId] = useState(ctx.trucks[0].id);
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [urgent, setUrgent] = useState(false);
-  const [busy, setBusy] = useState(false);
-
-  const submit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setBusy(true);
-    try {
-      await post('/api/driver/problem', { truckId, title, description, urgent });
-      setTitle(''); setDescription(''); setUrgent(false);
-      onDone('Problema enviado ao administrador!');
-    } catch (err) {
-      onError(err instanceof Error ? err.message : 'Erro ao enviar.');
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-    <form onSubmit={submit} className="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200 p-4 space-y-4">
-      <h2 className="text-lg font-bold text-slate-900">Relatar problema</h2>
-      <TruckSelect ctx={ctx} value={truckId} onChange={setTruckId} />
-      <div>
-        <label className={label}>O que aconteceu?</label>
-        <input required minLength={3} className={field} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Ex: pneu furado, luz do painel acesa" />
-      </div>
-      <div>
-        <label className={label}>Detalhes (opcional)</label>
-        <textarea rows={3} className={field} value={description} onChange={(e) => setDescription(e.target.value)} />
-      </div>
-      <label className="flex items-center justify-between rounded-xl bg-rose-50 p-3.5 ring-1 ring-rose-200">
-        <span className="text-sm font-semibold text-rose-900">Urgente (caminhão parado)</span>
-        <input type="checkbox" checked={urgent} onChange={(e) => setUrgent(e.target.checked)} className="w-6 h-6 accent-rose-600" />
-      </label>
-      <button type="submit" disabled={busy} className={submitBtn}>
-        {busy ? <Loader2 className="w-5 h-5 animate-spin" /> : <Siren className="w-5 h-5" />}
-        Enviar relato
+        {busy ? <Loader2 className="w-6 h-6 animate-spin" /> : <Gauge className="w-6 h-6" />}
+        {busy ? 'SALVANDO…' : 'CONFIRMAR KM'}
       </button>
     </form>
   );

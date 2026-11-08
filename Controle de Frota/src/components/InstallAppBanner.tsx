@@ -9,19 +9,45 @@ interface BeforeInstallPromptEvent extends Event {
 }
 
 const DISMISS_KEY = 'vsm_pwa_banner_dismissed_v1';
+const INSTALLED_KEY = 'vsm_pwa_installed_v1';
+
+function checkStandalone(): boolean {
+  if (typeof window === 'undefined') return true;
+  return (
+    window.matchMedia('(display-mode: standalone)').matches ||
+    window.matchMedia('(display-mode: fullscreen)').matches ||
+    window.matchMedia('(display-mode: minimal-ui)').matches ||
+    (window.navigator as unknown as { standalone?: boolean }).standalone === true ||
+    document.referrer.includes('android-app://')
+  );
+}
+
+function checkIsMobilePhone(): boolean {
+  if (typeof window === 'undefined') return false;
+  const ua = window.navigator.userAgent || '';
+  const mobileUa = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua);
+  const coarsePointer = window.matchMedia('(pointer: coarse)').matches;
+  const smallScreen = window.innerWidth <= 900;
+  return mobileUa && (coarsePointer || smallScreen);
+}
 
 export function InstallAppBanner() {
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [isIos, setIsIos] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
   const [isStandalone, setIsStandalone] = useState(true);
   const [dismissed, setDismissed] = useState(false);
   const [showIosGuide, setShowIosGuide] = useState(false);
 
   useEffect(() => {
-    const standalone =
-      window.matchMedia('(display-mode: standalone)').matches ||
-      (window.navigator as any).standalone === true;
+    const standalone = checkStandalone();
     setIsStandalone(standalone);
+    setIsMobile(checkIsMobilePhone());
+
+    if (standalone) {
+      localStorage.setItem(INSTALLED_KEY, '1');
+      return;
+    }
 
     if (sessionStorage.getItem(DISMISS_KEY) === '1') {
       setDismissed(true);
@@ -31,25 +57,39 @@ export function InstallAppBanner() {
     const ios = /iphone|ipad|ipod/.test(ua);
     setIsIos(ios);
 
+    const mediaQuery = window.matchMedia('(display-mode: standalone)');
+    const onDisplayModeChange = (e: MediaQueryListEvent) => {
+      if (e.matches) {
+        setIsStandalone(true);
+        localStorage.setItem(INSTALLED_KEY, '1');
+      }
+    };
+
     const onBeforeInstallPrompt = (e: Event) => {
       e.preventDefault();
-      setDeferredPrompt(e as BeforeInstallPromptEvent);
+      if (!checkStandalone() && checkIsMobilePhone()) {
+        setDeferredPrompt(e as BeforeInstallPromptEvent);
+      }
     };
 
     const onAppInstalled = () => {
       setDeferredPrompt(null);
       setIsStandalone(true);
+      localStorage.setItem(INSTALLED_KEY, '1');
     };
 
+    mediaQuery.addEventListener?.('change', onDisplayModeChange);
     window.addEventListener('beforeinstallprompt', onBeforeInstallPrompt);
     window.addEventListener('appinstalled', onAppInstalled);
     return () => {
+      mediaQuery.removeEventListener?.('change', onDisplayModeChange);
       window.removeEventListener('beforeinstallprompt', onBeforeInstallPrompt);
       window.removeEventListener('appinstalled', onAppInstalled);
     };
   }, []);
 
-  if (isStandalone || dismissed) return null;
+  // Mostra APENAS em celulares e NUNCA quando já está aberto dentro do app PWA instalado
+  if (!isMobile || isStandalone || dismissed) return null;
   if (!deferredPrompt && !isIos) return null;
 
   const handleDismiss = () => {
@@ -63,6 +103,8 @@ export function InstallAppBanner() {
       const choice = await deferredPrompt.userChoice;
       if (choice.outcome === 'accepted') {
         setDeferredPrompt(null);
+        setIsStandalone(true);
+        localStorage.setItem(INSTALLED_KEY, '1');
       }
       return;
     }
@@ -84,7 +126,7 @@ export function InstallAppBanner() {
                 Instale o aplicativo VSM Frota no celular
               </p>
               <p className="text-[11px] text-slate-400 truncate">
-                Acesso rápido na tela inicial, tela cheia e funcionamento offline
+                Abre direto na tela inicial e funciona mesmo sem internet
               </p>
             </div>
           </div>
@@ -122,7 +164,7 @@ export function InstallAppBanner() {
               <div>
                 <h3 className="text-base font-bold text-slate-900">Instalar no iPhone / iPad</h3>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  Adicione o VSM Frota à sua Tela de Início em 2 passos:
+                  Coloque o aplicativo na tela inicial do celular em 2 passos:
                 </p>
               </div>
               <button
@@ -134,13 +176,13 @@ export function InstallAppBanner() {
               </button>
             </div>
 
-            <ol className="space-y-3 text-xs text-slate-700">
+            <ol className="space-y-3 text-sm text-slate-700">
               <li className="flex items-center gap-3 bg-slate-50 p-3 rounded-xl ring-1 ring-slate-200">
                 <span className="p-2 rounded-lg bg-sky-100 text-sky-700 font-bold">
                   <Share className="w-4 h-4" />
                 </span>
                 <span>
-                  1. Toque no botão <strong>Compartilhar</strong> na barra do Safari.
+                  1. Toque no botão <strong>Compartilhar</strong> na barra inferior do Safari.
                 </span>
               </li>
               <li className="flex items-center gap-3 bg-slate-50 p-3 rounded-xl ring-1 ring-slate-200">
@@ -148,7 +190,7 @@ export function InstallAppBanner() {
                   <PlusSquare className="w-4 h-4" />
                 </span>
                 <span>
-                  2. Role para baixo e selecione <strong>&quot;Adicionar à Tela de Início&quot;</strong>.
+                  2. Role para baixo e toque em <strong>&quot;Adicionar à Tela de Início&quot;</strong>.
                 </span>
               </li>
             </ol>
@@ -156,7 +198,7 @@ export function InstallAppBanner() {
             <button
               type="button"
               onClick={() => setShowIosGuide(false)}
-              className="w-full min-h-11 rounded-xl bg-slate-900 text-white text-xs font-bold"
+              className="w-full min-h-12 rounded-xl bg-slate-900 text-white text-sm font-bold"
             >
               Entendi
             </button>
