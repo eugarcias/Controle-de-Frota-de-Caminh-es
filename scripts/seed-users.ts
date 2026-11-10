@@ -43,13 +43,16 @@ async function upsertUser(
       INSERT INTO auth.users (
         id, instance_id, email, encrypted_password, email_confirmed_at,
         created_at, updated_at, raw_app_meta_data, raw_user_meta_data,
-        is_super_admin, role, aud
+        is_super_admin, role, aud,
+        confirmation_token, recovery_token, email_change_token_new, email_change,
+        email_change_token_current, phone_change, phone_change_token, reauthentication_token
       ) VALUES (
         $1::uuid, '00000000-0000-0000-0000-000000000000'::uuid, $2,
         crypt($3, gen_salt('bf')), now(), now(), now(),
         jsonb_build_object('provider', 'email', 'providers', jsonb_build_array('email'), 'role', $4::text),
         jsonb_build_object('role', $4::text, 'name', $5::text),
-        false, 'authenticated', 'authenticated'
+        false, 'authenticated', 'authenticated',
+        '', '', '', '', '', '', '', ''
       )
     `,
       userId,
