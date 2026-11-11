@@ -179,7 +179,7 @@ function LoginForm() {
             value={username}
             onChange={(e) => setUsername(e.target.value)}
             className="w-full h-12 sm:h-14 text-base font-semibold px-4 rounded-xl bg-white text-black border-2 border-zinc-300 placeholder:text-zinc-400 focus:border-black focus:outline-none transition-colors"
-            placeholder={mode === 'DRIVER' ? 'Ex: motorista ou seu nome' : 'Ex: admin ou vinicius'}
+            placeholder="Digite seu usuário"
           />
         </div>
 

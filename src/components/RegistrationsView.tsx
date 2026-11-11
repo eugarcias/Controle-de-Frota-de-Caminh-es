@@ -158,7 +158,7 @@ function TruckForm({
           className={`${inputCls} uppercase font-bold`}
           value={plate}
           onChange={(e) => setPlate(e.target.value)}
-          placeholder="Ex: LBQ-2G04"
+          placeholder="Placa"
         />
       </Field>
       <Field label="Marca *">
@@ -167,7 +167,7 @@ function TruckForm({
           className={inputCls}
           value={brand}
           onChange={(e) => setBrand(e.target.value)}
-          placeholder="Volvo, Scania, Mercedes..."
+          placeholder="Marca"
         />
       </Field>
       <Field label="Modelo *">
@@ -176,7 +176,7 @@ function TruckForm({
           className={inputCls}
           value={model}
           onChange={(e) => setModel(e.target.value)}
-          placeholder="Ex: FH 420, NH 380, EDC"
+          placeholder="Modelo"
         />
       </Field>
       <Field label="Ano">
@@ -322,7 +322,7 @@ function DriverForm({
             className={inputCls}
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="Ex: Carlos Alberto Silva"
+            placeholder="Nome do motorista"
           />
         </Field>
         <Field label="Telefone / WhatsApp *">
@@ -332,7 +332,7 @@ function DriverForm({
             className={inputCls}
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
-            placeholder="Ex: (51) 99999-9999"
+            placeholder="(00) 00000-0000"
           />
         </Field>
         <Field label="Situação">
@@ -369,22 +369,19 @@ function DriverForm({
       </div>
 
       {/* Bloco Simples de Acesso ao Aplicativo e Caminhão Preferido */}
-      <div className="rounded-2xl bg-sky-50/70 border border-sky-200 p-4 space-y-3">
-        <div className="flex items-center gap-2 text-sky-950 font-bold text-sm">
-          <KeyRound className="w-4 h-4 text-sky-600" />
+      <div className="rounded-2xl bg-slate-50 border border-slate-200 p-4 space-y-3">
+        <div className="flex items-center gap-2 text-slate-900 font-bold text-sm">
+          <KeyRound className="w-4 h-4 text-slate-700" />
           <span>Acesso do Motorista no Celular &amp; Caminhão Preferido</span>
         </div>
-        <p className="text-xs text-slate-600">
-          Defina um usuário simples (ex: <strong>carlos</strong>) e uma senha para o motorista entrar no aplicativo.
-        </p>
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <Field label="Usuário de Login (ou E-mail)">
+          <Field label="Usuário de Login">
             <input
               className={inputCls}
               value={login}
               onChange={(e) => setLogin(e.target.value)}
-              placeholder="Ex: carlos"
+              placeholder="Digite o usuário"
             />
           </Field>
 
@@ -401,7 +398,7 @@ function DriverForm({
                 className={`${inputCls} pr-16`}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder={existingAccount ? 'Manter atual' : 'Ex: 123456'}
+                placeholder={existingAccount ? 'Manter atual' : 'Senha'}
               />
               <button
                 type="button"
@@ -684,7 +681,6 @@ function UserAccessModal({
   return (
     <Modal
       title={initialUser ? `Alterar Acesso / Senha (${initialUser.name})` : 'Criar Usuário e Senha de Acesso'}
-      subtitle="O usuário criado aqui poderá entrar no sistema pelo celular ou computador."
       onClose={onClose}
     >
       <form onSubmit={submit} className="space-y-4">
@@ -706,17 +702,17 @@ function UserAccessModal({
               className={inputCls}
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="Ex: Vinicius Garcia"
+              placeholder="Nome completo"
             />
           </Field>
 
-          <Field label="Usuário para Login (ou E-mail) *">
+          <Field label="Usuário de Login *">
             <input
               required
               className={`${inputCls} font-bold`}
               value={login}
               onChange={(e) => setLogin(e.target.value)}
-              placeholder="Ex: vinicius ou carlos"
+              placeholder="Usuário"
             />
           </Field>
 
@@ -728,7 +724,7 @@ function UserAccessModal({
                 className={`${inputCls} pr-20 font-bold`}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder={initialUser ? 'Digite p/ trocar a senha' : 'Ex: 123456'}
+                placeholder={initialUser ? 'Digite p/ trocar a senha' : 'Senha'}
               />
               <button
                 type="button"
@@ -1137,18 +1133,6 @@ export const RegistrationsView: React.FC<Props> = (p) => {
       {/* Lista de Logins e Senhas (Administradores e Motoristas) */}
       {tab === 'users' && (
         <div className="space-y-4">
-          <div className="bg-sky-50 border border-sky-200 rounded-2xl p-4 text-xs text-sky-950 flex items-start gap-3">
-            <ShieldCheck className="w-5 h-5 text-sky-600 shrink-0 mt-0.5" />
-            <div className="space-y-1">
-              <p className="font-bold text-sm">Como funciona o login dos motoristas e administradores:</p>
-              <p>
-                Os motoristas não precisam criar conta. Você cria o <strong>Usuário</strong> (ex:{' '}
-                <code>carlos</code>) e a <strong>Senha</strong> (ex: <code>123456</code>) aqui mesmo. Quando o
-                motorista entra no celular, o login dele fica salvo para sempre.
-              </p>
-            </div>
-          </div>
-
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
             {accounts.length === 0 ? (
               <EmptyState text="Nenhum login cadastrado." />
