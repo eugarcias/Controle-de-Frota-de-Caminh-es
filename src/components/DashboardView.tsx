@@ -10,14 +10,26 @@ import {
   AlertTriangle,
   AlertCircle,
   MapPin,
-  Sparkles,
   ArrowUpRight,
   Calendar,
+  Truck as TruckIcon,
+  Package,
+  Receipt,
+  Activity,
+  Navigation,
+  User,
+  CheckCircle2,
+  Clock,
+  ArrowRight,
+  Layers,
 } from 'lucide-react';
 import {
   ResponsiveContainer,
   BarChart,
   Bar,
+  AreaChart,
+  Area,
+  ComposedChart,
   XAxis,
   YAxis,
   Tooltip,
@@ -25,15 +37,26 @@ import {
   PieChart,
   Pie,
   Cell,
-  LineChart,
   Line,
   CartesianGrid,
 } from 'recharts';
-import { Truck, Driver, FuelLog, MaintenanceLog, FreightTrip } from '@/types';
+import {
+  Truck,
+  Driver,
+  FuelLog,
+  MaintenanceLog,
+  FreightTrip,
+  TravelExpenseRecord,
+  CargoSchedule,
+} from '@/types';
 import { computeDashboardMetrics } from '@/mock-data';
 import { DashboardFilterBar } from '@/components/DashboardFilterBar';
-import { DashboardFilters, defaultDashboardFilters, isDateInFilter } from '@/lib/dashboardFilters';
-import { formatBRL } from '@/components/ui';
+import {
+  DashboardFilters,
+  defaultDashboardFilters,
+  isDateInFilter,
+} from '@/lib/dashboardFilters';
+import { formatBRL, formatDate } from '@/components/ui';
 import { routeLabel } from '@/lib/geo';
 
 interface DashboardViewProps {
@@ -42,11 +65,25 @@ interface DashboardViewProps {
   fuelLogs: FuelLog[];
   maintenanceLogs: MaintenanceLog[];
   trips: FreightTrip[];
+  travelExpenses?: TravelExpenseRecord[];
+  schedules?: CargoSchedule[];
   onOpenQuickEntry: () => void;
 }
 
-const fmtKmL = (val: number) => val.toFixed(1).replace('.', ',');
+const fmtKmL = (val: number) => val.toFixed(2).replace('.', ',');
 const fmtCpk = (val: number) => val.toFixed(2).replace('.', ',');
+
+const EXPENSE_CATEGORY_LABELS: Record<string, string> = {
+  ALIMENTACAO: 'Alimentação / Refeição',
+  PEDAGIO: 'Pedágio',
+  CHAPA: 'Chapa / Descarga',
+  BORRACHARIA: 'Borracharia / Pneu',
+  ESTACIONAMENTO: 'Estacionamento / Pátio',
+  HOSPEDAGEM: 'Pernoite / Hotel',
+  OUTROS: 'Outros Gastos',
+};
+
+const MODERN_COST_COLORS = ['#10b981', '#0ea5e9', '#8b5cf6', '#f59e0b', '#64748b'];
 
 export const DashboardView: React.FC<DashboardViewProps> = ({
   trucks,
@@ -54,11 +91,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   fuelLogs,
   maintenanceLogs,
   trips,
+  travelExpenses = [],
+  schedules = [],
   onOpenQuickEntry,
 }) => {
-  // Filtros Globais Dinâmicos
   const [filters, setFilters] = useState<DashboardFilters>(defaultDashboardFilters);
-  // Filtro opcional de mês específico para inspeção da Média Mensal Acumulada por caminhão
   const [selectedPeriodKey, setSelectedPeriodKey] = useState<string>('ALL');
   const { truckIds: selectedTruckIds, driverIds: selectedDriverIds } = filters;
 
@@ -84,6 +121,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       return true;
     });
 
+    const filteredTravelExpenses = travelExpenses.filter((e) => {
+      if (!isDateInFilter(e.date, filters)) return false;
+      if (selectedTruckIds.length > 0 && e.truckId && !selectedTruckIds.includes(e.truckId))
+        return false;
+      if (selectedDriverIds.length > 0 && !selectedDriverIds.includes(e.driverId)) return false;
+      return true;
+    });
+
     const targetTrucks =
       selectedTruckIds.length > 0
         ? trucks.filter((t) => selectedTruckIds.includes(t.id))
@@ -94,6 +139,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       fuelLogs: filteredFuelLogs,
       maintenanceLogs: filteredMaintenanceLogs,
       trips: filteredTrips,
+      travelExpenses: filteredTravelExpenses,
     });
 
     const routePerformance: Record<
@@ -129,21 +175,83 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       filteredTrips,
       filteredFuelLogs,
       filteredMaintenanceLogs,
+      filteredTravelExpenses,
       targetTrucks,
       routeList,
     };
-  }, [trucks, drivers, fuelLogs, maintenanceLogs, trips, filters, selectedTruckIds, selectedDriverIds]);
+  }, [
+    trucks,
+    fuelLogs,
+    maintenanceLogs,
+    trips,
+    travelExpenses,
+    filters,
+    selectedTruckIds,
+    selectedDriverIds,
+  ]);
 
-  const { metrics, routeList } = filteredData;
+  const { metrics, routeList, filteredTravelExpenses, filteredTrips, filteredFuelLogs } =
+    filteredData;
 
-  // Quando o administrador escolhe um mês específico no seletor de mês, exibe os dados daquele mês no card do caminhão
+  // Status ao vivo de cada caminhão e qual carga está realizando no momento
+  const liveFleetStatus = useMemo(() => {
+    return trucks.map((truck) => {
+      const activeTrip = trips.find(
+        (t) => t.truckId === truck.id && t.status === 'EM_VIAGEM'
+      );
+      const plannedTrip = trips.find(
+        (t) => t.truckId === truck.id && t.status === 'PLANEJADO'
+      );
+      const scheduled = schedules.find(
+        (s) => s.truckId === truck.id && s.status === 'AGENDADA'
+      );
+      const lastFuel = fuelLogs.find((f) => f.truckId === truck.id);
+
+      const driverId =
+        activeTrip?.driverId || plannedTrip?.driverId || scheduled?.driverId || lastFuel?.driverId;
+      const driver = drivers.find((d) => d.id === driverId) ?? null;
+
+      // Soma das despesas diárias desta viagem ativa
+      const tripExpensesSum = activeTrip
+        ? (Number(activeTrip.tollCosts) || 0) +
+          (Number(activeTrip.loadingUnloadingCosts) || 0) +
+          (Number(activeTrip.otherExpenses) || 0)
+        : 0;
+
+      return {
+        truck,
+        driver,
+        activeTrip: activeTrip ?? null,
+        plannedTrip: plannedTrip ?? null,
+        scheduled: scheduled ?? null,
+        tripExpensesSum,
+      };
+    });
+  }, [trucks, trips, schedules, fuelLogs, drivers]);
+
+  const activeLoadsCount = useMemo(
+    () => liveFleetStatus.filter((item) => item.activeTrip !== null).length,
+    [liveFleetStatus]
+  );
+
+  const totalDriverDailyExpenses = useMemo(
+    () => filteredTravelExpenses.reduce((acc, e) => acc + Number(e.amount || 0), 0),
+    [filteredTravelExpenses]
+  );
+
+  // Dados dos caminhões para o gráfico e cards
   const truckCardsData = useMemo(() => {
     return metrics.truckMetrics.map((t) => {
+      const truckRevenue = filteredTrips
+        .filter((tr) => tr.truckId === t.truckId)
+        .reduce((sum, tr) => sum + tr.grossFreightValue, 0);
+
       if (selectedPeriodKey !== 'ALL') {
         const monthEntry = t.monthlyHistory.find((m) => m.periodKey === selectedPeriodKey);
         if (monthEntry) {
           return {
             ...t,
+            revenue: truckRevenue,
             kmTraveled: monthEntry.distanceTraveled,
             totalLiters: monthEntry.totalLiters,
             startOdometer: monthEntry.startOdometer,
@@ -159,6 +267,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         }
         return {
           ...t,
+          revenue: 0,
           kmTraveled: 0,
           totalLiters: 0,
           startOdometer: 0,
@@ -172,38 +281,245 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           anomalyPeriodLabel: null,
         };
       }
-      return t;
+      return { ...t, revenue: truckRevenue };
     });
-  }, [metrics.truckMetrics, selectedPeriodKey]);
+  }, [metrics.truckMetrics, selectedPeriodKey, filteredTrips]);
+
+  const totalLitersAll = useMemo(
+    () => filteredFuelLogs.reduce((acc, f) => acc + f.liters, 0),
+    [filteredFuelLogs]
+  );
+
+  const coloredCostBreakdown = useMemo(() => {
+    return metrics.costBreakdown.map((item, idx) => ({
+      ...item,
+      color: MODERN_COST_COLORS[idx % MODERN_COST_COLORS.length],
+      pct:
+        metrics.totalExpenses > 0
+          ? Number(((item.value / metrics.totalExpenses) * 100).toFixed(1))
+          : 0,
+    }));
+  }, [metrics.costBreakdown, metrics.totalExpenses]);
 
   return (
     <div className="space-y-6">
-      {/* Top Banner Executivo */}
-      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 p-6 rounded-2xl text-white shadow-md ring-1 ring-slate-800">
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="p-1.5 bg-emerald-500/20 text-emerald-400 rounded-lg">
-              <Sparkles className="w-4 h-4" />
-            </span>
-            <span className="text-xs font-semibold text-emerald-400 uppercase tracking-wider">
-              Inteligência Financeira • Média Mensal Acumulada
-            </span>
+      {/* 1. HERO COMMAND CENTER */}
+      <div className="relative overflow-hidden rounded-3xl bg-slate-950 text-white p-6 sm:p-7 shadow-xl border border-slate-800">
+        <div
+          className="pointer-events-none absolute -top-24 -right-24 w-96 h-96 rounded-full bg-emerald-500/10 blur-3xl"
+          aria-hidden="true"
+        />
+        <div
+          className="pointer-events-none absolute -bottom-24 -left-24 w-80 h-80 rounded-full bg-sky-500/10 blur-3xl"
+          aria-hidden="true"
+        />
+
+        <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-5">
+          <div className="space-y-2">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-xs font-bold tracking-wider uppercase">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+              <span>Telemetria &amp; Gestão em Tempo Real</span>
+            </div>
+            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white">
+              Central de Inteligência da Frota
+            </h1>
+            <p className="text-xs sm:text-sm text-slate-400 max-w-2xl">
+              Monitoramento integrado de cargas em andamento, despesas diárias dos motoristas,
+              consumo acumulado (km/L) e rentabilidade por veículo.
+            </p>
           </div>
-          <h1 className="text-2xl font-bold tracking-tight mt-1">Painel Executivo da Frota</h1>
-          <p className="text-xs text-slate-300 mt-1">
-            Análise de CPK, Média Mensal (km/L), Custo de Diesel por KM e detecção de anomalias.
-          </p>
+
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="grid grid-cols-2 sm:flex items-center gap-2.5 w-full sm:w-auto">
+              <div className="bg-slate-900/90 border border-slate-800 rounded-2xl px-4 py-2.5">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                  Cargas Ativas
+                </span>
+                <span className="text-lg font-extrabold text-emerald-400">
+                  {activeLoadsCount} / {trucks.length} veíc.
+                </span>
+              </div>
+              <div className="bg-slate-900/90 border border-slate-800 rounded-2xl px-4 py-2.5">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                  KM Monitorados
+                </span>
+                <span className="text-lg font-extrabold text-white">
+                  {metrics.totalKmTraveled.toLocaleString('pt-BR')} km
+                </span>
+              </div>
+            </div>
+
+            <button
+              onClick={onOpenQuickEntry}
+              className="w-full sm:w-auto flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold px-5 py-3.5 rounded-2xl shadow-lg shadow-emerald-500/20 transition-all active:scale-95 text-sm"
+            >
+              <Fuel className="w-4 h-4" />
+              <span>+ Lançar Abastecimento</span>
+            </button>
+          </div>
         </div>
-        <button
-          onClick={onOpenQuickEntry}
-          className="w-full md:w-auto flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold px-4 py-2.5 rounded-xl shadow-md shadow-emerald-600/20 transition-all active:scale-95 text-sm"
-        >
-          <Fuel className="w-4 h-4" />
-          <span>+ Lançar Abastecimento / IA</span>
-        </button>
       </div>
 
-      {/* BARRA DE FILTROS GLOBAIS DINÂMICOS NO TOPO */}
+      {/* 2. RADAR DE CARGAS E OPERAÇÃO EM TEMPO REAL (O que cada caminhão/motorista está fazendo agora) */}
+      <section className="bg-white rounded-3xl p-5 sm:p-6 shadow-sm border border-slate-200/90 space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3.5">
+          <div className="flex items-center gap-2.5">
+            <div className="p-2 rounded-xl bg-slate-900 text-emerald-400">
+              <Navigation className="w-5 h-5" />
+            </div>
+            <div>
+              <h2 className="text-base sm:text-lg font-extrabold text-slate-900">
+                Status ao Vivo da Frota &amp; Cargas no Momento
+              </h2>
+              <p className="text-xs text-slate-500">
+                Atualizado diretamente pelo aplicativo dos motoristas e programação de fretes
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 text-xs font-bold">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 text-emerald-800 border border-emerald-200">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              {activeLoadsCount} em viagem agora
+            </span>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {liveFleetStatus.map(
+            ({ truck, driver, activeTrip, plannedTrip, scheduled, tripExpensesSum }) => {
+              const isTraveling = Boolean(activeTrip);
+              const hasPlanned = !isTraveling && Boolean(plannedTrip || scheduled);
+
+              return (
+                <div
+                  key={truck.id}
+                  className={`rounded-2xl p-4 border transition-all flex flex-col justify-between gap-3 ${
+                    isTraveling
+                      ? 'bg-gradient-to-br from-slate-900 to-slate-950 text-white border-slate-800 shadow-md'
+                      : hasPlanned
+                      ? 'bg-sky-50/50 border-sky-200 text-slate-900'
+                      : 'bg-slate-50/80 border-slate-200 text-slate-900'
+                  }`}
+                >
+                  <div className="space-y-3">
+                    {/* Topo do Card: Placa e Badge de Status */}
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={`px-2.5 py-1 rounded-lg text-xs font-extrabold tracking-wider ${
+                            isTraveling
+                              ? 'bg-white text-slate-950'
+                              : 'bg-slate-900 text-white'
+                          }`}
+                        >
+                          {truck.plate}
+                        </span>
+                        <span
+                          className={`text-xs font-bold truncate ${
+                            isTraveling ? 'text-slate-300' : 'text-slate-600'
+                          }`}
+                        >
+                          {truck.brand} {truck.model}
+                        </span>
+                      </div>
+
+                      {isTraveling ? (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-[11px] font-bold">
+                          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+                          EM CARGA
+                        </span>
+                      ) : hasPlanned ? (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-sky-100 text-sky-900 text-[11px] font-bold">
+                          <Clock className="w-3 h-3" />
+                          PROGRAMADO
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-slate-200 text-slate-700 text-[11px] font-bold">
+                          <CheckCircle2 className="w-3 h-3" />
+                          DISPONÍVEL
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Informações da Carga Atual */}
+                    {activeTrip ? (
+                      <div className="rounded-xl bg-white/10 border border-white/10 p-3 space-y-2">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex items-center gap-1.5 text-emerald-400 text-xs font-extrabold uppercase tracking-wide">
+                            <Package className="w-4 h-4 shrink-0" />
+                            <span>{activeTrip.cargoDescription || 'Carga em Trânsito'}</span>
+                          </div>
+                          {activeTrip.cargoWeightKg ? (
+                            <span className="text-[11px] font-bold bg-white/15 px-2 py-0.5 rounded text-white">
+                              {(activeTrip.cargoWeightKg / 1000).toFixed(1).replace('.', ',')} t
+                            </span>
+                          ) : null}
+                        </div>
+
+                        <div className="flex items-center gap-1.5 text-sm font-bold text-white">
+                          <MapPin className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                          <span className="truncate">{activeTrip.origin}</span>
+                          <ArrowRight className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                          <span className="truncate">{activeTrip.destination}</span>
+                        </div>
+
+                        <div className="text-[11px] text-slate-300 flex items-center justify-between pt-1 border-t border-white/10">
+                          <span className="truncate">Cliente: {activeTrip.customerName}</span>
+                          {tripExpensesSum > 0 && (
+                            <span className="font-bold text-amber-300 shrink-0 ml-2">
+                              Despesas: {formatBRL(tripExpensesSum)}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    ) : plannedTrip || scheduled ? (
+                      <div className="rounded-xl bg-white p-3 border border-sky-200/80 space-y-1.5">
+                        <div className="flex items-center gap-1.5 text-xs font-bold text-sky-900">
+                          <Package className="w-3.5 h-3.5 text-sky-600" />
+                          <span>
+                            {plannedTrip?.cargoDescription ||
+                              scheduled?.cargoDescription ||
+                              'Próxima Carga'}
+                          </span>
+                        </div>
+                        <div className="text-xs font-semibold text-slate-700 flex items-center gap-1">
+                          <span>{plannedTrip?.origin || scheduled?.origin}</span>
+                          <ArrowRight className="w-3 h-3 text-slate-400" />
+                          <span>{plannedTrip?.destination || scheduled?.destination}</span>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="rounded-xl bg-white p-3 border border-slate-200/80 text-xs text-slate-500">
+                        Sem carga ativa no momento. Aguardando início de viagem pelo motorista ou
+                        programação.
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Rodapé do Card: Motorista & Hodômetro */}
+                  <div
+                    className={`flex items-center justify-between text-xs pt-2 border-t ${
+                      isTraveling
+                        ? 'border-slate-800 text-slate-300'
+                        : 'border-slate-200/80 text-slate-600'
+                    }`}
+                  >
+                    <span className="flex items-center gap-1.5 font-semibold truncate">
+                      <User className="w-3.5 h-3.5 shrink-0" />
+                      <span className="truncate">{driver?.name ?? 'Motorista'}</span>
+                    </span>
+                    <span className="font-bold shrink-0">
+                      {truck.currentOdometer.toLocaleString('pt-BR')} km
+                    </span>
+                  </div>
+                </div>
+              );
+            }
+          )}
+        </div>
+      </section>
+
+      {/* 3. BARRA DE FILTROS GLOBAIS DINÂMICOS */}
       <DashboardFilterBar
         trucks={trucks}
         drivers={drivers}
@@ -212,134 +528,174 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         resultCount={
           filteredData.filteredTrips.length +
           filteredData.filteredFuelLogs.length +
-          filteredData.filteredMaintenanceLogs.length
+          filteredData.filteredMaintenanceLogs.length +
+          filteredData.filteredTravelExpenses.length
         }
       />
 
-      {/* Cards de KPIs Principais */}
+      {/* 4. CARDS DE KPIS EXECUTIVOS (HIGH-TECH) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* 1. Faturamento Fretes */}
-        <div className="bg-white p-5 rounded-2xl shadow-sm ring-1 ring-slate-200">
+        {/* KPI 1: Receita Bruta */}
+        <div className="bg-white p-5 rounded-3xl shadow-sm border border-slate-200/90 flex flex-col justify-between relative overflow-hidden">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+            <span className="text-xs font-extrabold text-slate-500 uppercase tracking-wider">
               Faturamento Bruto
             </span>
-            <div className="p-2 bg-emerald-50 rounded-xl text-emerald-600">
+            <div className="p-2.5 bg-emerald-500/10 rounded-2xl text-emerald-600">
               <TrendingUp className="w-5 h-5" />
             </div>
           </div>
-          <div className="mt-3">
-            <div className="text-2xl font-bold text-slate-900">
+          <div className="my-3">
+            <div className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
               {formatBRL(metrics.totalRevenue)}
             </div>
-            <div className="text-xs text-emerald-600 font-semibold mt-1 flex items-center gap-1">
+            <div className="text-xs text-emerald-700 font-bold mt-1.5 flex items-center gap-1">
               <ArrowUpRight className="w-3.5 h-3.5" />
-              <span>Receita dos fretes no escopo</span>
+              <span>{filteredTrips.length} viagem(ns) contabilizada(s)</span>
             </div>
+          </div>
+          <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
+            <div className="bg-emerald-500 h-full rounded-full w-full" />
           </div>
         </div>
 
-        {/* 2. Gasto Operacional Total */}
-        <div className="bg-white p-5 rounded-2xl shadow-sm ring-1 ring-slate-200">
+        {/* KPI 2: Gasto Operacional */}
+        <div className="bg-white p-5 rounded-3xl shadow-sm border border-slate-200/90 flex flex-col justify-between">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-              Gasto Operacional
+            <span className="text-xs font-extrabold text-slate-500 uppercase tracking-wider">
+              Custo Operacional Total
             </span>
-            <div className="p-2 bg-rose-50 rounded-xl text-rose-600">
+            <div className="p-2.5 bg-rose-500/10 rounded-2xl text-rose-600">
               <TrendingDown className="w-5 h-5" />
             </div>
           </div>
-          <div className="mt-3">
-            <div className="text-2xl font-bold text-rose-600">
+          <div className="my-3">
+            <div className="text-2xl sm:text-3xl font-extrabold text-rose-600 tracking-tight">
               {formatBRL(metrics.totalExpenses)}
             </div>
-            <div className="text-xs text-slate-500 mt-1">
-              Diesel + Manutenção + Pedágios
+            <div className="text-xs text-slate-600 font-semibold mt-1.5 flex items-center justify-between">
+              <span>Diesel + Oficina + Diárias</span>
+              {totalDriverDailyExpenses > 0 && (
+                <span className="text-[11px] font-bold bg-amber-100 text-amber-900 px-2 py-0.5 rounded-md">
+                  Diárias: {formatBRL(totalDriverDailyExpenses)}
+                </span>
+              )}
             </div>
+          </div>
+          <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
+            <div
+              className="bg-rose-500 h-full rounded-full"
+              style={{
+                width: `${
+                  metrics.totalRevenue > 0
+                    ? Math.min(100, Math.round((metrics.totalExpenses / metrics.totalRevenue) * 100))
+                    : 60
+                }%`,
+              }}
+            />
           </div>
         </div>
 
-        {/* 3. Lucro Líquido Real & Margem */}
-        <div className="bg-white p-5 rounded-2xl shadow-sm ring-1 ring-slate-200">
+        {/* KPI 3: Lucro Líquido Real */}
+        <div className="bg-white p-5 rounded-3xl shadow-sm border border-slate-200/90 flex flex-col justify-between">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-              Lucro Líquido Real
+            <span className="text-xs font-extrabold text-slate-500 uppercase tracking-wider">
+              Resultado Líquido
             </span>
             <div
-              className={`p-2 rounded-xl ${
+              className={`p-2.5 rounded-2xl ${
                 metrics.netProfit >= 0
-                  ? 'bg-emerald-50 text-emerald-600'
-                  : 'bg-rose-50 text-rose-600'
+                  ? 'bg-emerald-500/10 text-emerald-600'
+                  : 'bg-rose-500/10 text-rose-600'
               }`}
             >
               <DollarSign className="w-5 h-5" />
             </div>
           </div>
-          <div className="mt-3">
+          <div className="my-3">
             <div
-              className={`text-2xl font-bold ${
+              className={`text-2xl sm:text-3xl font-extrabold tracking-tight ${
                 metrics.netProfit >= 0 ? 'text-emerald-600' : 'text-rose-600'
               }`}
             >
               {formatBRL(metrics.netProfit)}
             </div>
-            <div className="text-xs font-medium mt-1 flex items-center gap-1.5">
+            <div className="text-xs font-semibold mt-1.5 flex items-center gap-2">
               <span
-                className={`px-1.5 py-0.5 rounded font-bold text-[11px] ${
+                className={`px-2 py-0.5 rounded-md font-extrabold text-xs ${
                   metrics.profitMarginPercent >= 0
                     ? 'bg-emerald-100 text-emerald-800'
                     : 'bg-rose-100 text-rose-800'
                 }`}
               >
-                {metrics.profitMarginPercent}%
+                {metrics.profitMarginPercent}% margem
               </span>
-              <span className="text-slate-500">Margem Líquida</span>
+              <span className="text-slate-500">Lucro livre</span>
             </div>
+          </div>
+          <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
+            <div
+              className={`h-full rounded-full ${
+                metrics.netProfit >= 0 ? 'bg-emerald-500' : 'bg-rose-500'
+              }`}
+              style={{
+                width: `${Math.max(0, Math.min(100, Math.abs(metrics.profitMarginPercent)))}%`,
+              }}
+            />
           </div>
         </div>
 
-        {/* 4. Média Mensal & Custo de Diesel por KM */}
-        <div className="bg-white p-5 rounded-2xl shadow-sm ring-1 ring-slate-200">
+        {/* KPI 4: Telemetria de Combustível */}
+        <div className="bg-white p-5 rounded-3xl shadow-sm border border-slate-200/90 flex flex-col justify-between">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-              Eficiência de Combustível
+            <span className="text-xs font-extrabold text-slate-500 uppercase tracking-wider">
+              Eficiência &amp; Consumo
             </span>
-            <div className="p-2 bg-amber-50 rounded-xl text-amber-600">
+            <div className="p-2.5 bg-sky-500/10 rounded-2xl text-sky-600">
               <Gauge className="w-5 h-5" />
             </div>
           </div>
-          <div className="mt-3">
-            <div className="text-lg font-bold text-slate-900">
-              Média Mensal: {fmtKmL(metrics.fleetAverageKmL)} km/L
+          <div className="my-3">
+            <div className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
+              {fmtKmL(metrics.fleetAverageKmL)} <span className="text-base font-bold text-slate-500">km/L</span>
             </div>
-            <div className="text-xs text-slate-700 font-semibold mt-1">
-              Custo de Diesel por KM:{' '}
-              <span className="font-bold text-slate-900">R$ {fmtCpk(metrics.fleetFuelCpk)}</span>
+            <div className="text-xs text-slate-600 font-semibold mt-1.5 flex items-center justify-between">
+              <span>
+                Diesel/KM: <strong className="text-slate-900">R$ {fmtCpk(metrics.fleetFuelCpk)}</strong>
+              </span>
+              <span className="text-slate-500">
+                {Math.round(totalLitersAll).toLocaleString('pt-BR')} L
+              </span>
             </div>
-            <div className="text-[11px] text-slate-500 mt-0.5">
-              CPK Total: R$ {fmtCpk(metrics.fleetCpk)} / km
-            </div>
+          </div>
+          <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
+            <div
+              className="bg-sky-500 h-full rounded-full"
+              style={{
+                width: `${Math.min(100, Math.round((metrics.fleetAverageKmL / 4.0) * 100))}%`,
+              }}
+            />
           </div>
         </div>
       </div>
 
-      {/* Alertas Ativos da Frota (Manutenção) */}
+      {/* Alertas Ativos de Manutenção */}
       {metrics.activeAlerts.length > 0 && (
-        <div className="bg-amber-50/80 ring-1 ring-amber-200 rounded-2xl p-5 shadow-sm">
+        <div className="bg-amber-50/90 border border-amber-200 rounded-3xl p-5 shadow-sm">
           <div className="flex items-center gap-2 mb-3">
             <AlertTriangle className="w-5 h-5 text-amber-600" />
-            <h2 className="text-base font-bold text-amber-950">
-              Avisos Operacionais e Preditivos ({metrics.activeAlerts.length})
+            <h2 className="text-base font-extrabold text-amber-950">
+              Alertas Preditivos de Manutenção ({metrics.activeAlerts.length})
             </h2>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {metrics.activeAlerts.map((alert, idx) => (
               <div
                 key={idx}
-                className={`flex items-start gap-3 p-3.5 rounded-xl ring-1 ${
+                className={`flex items-start gap-3 p-3.5 rounded-2xl border ${
                   alert.severity === 'CRITICAL'
-                    ? 'bg-rose-50 ring-rose-200 text-rose-900'
-                    : 'bg-white ring-amber-200 text-amber-900'
+                    ? 'bg-rose-50 border-rose-200 text-rose-900'
+                    : 'bg-white border-amber-200 text-amber-900'
                 }`}
               >
                 {alert.severity === 'CRITICAL' ? (
@@ -356,7 +712,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   </div>
                   <p>{alert.message}</p>
                   <p className="text-[11px] text-slate-500">
-                    Hodômetro Atual: {alert.currentOdometer.toLocaleString('pt-BR')} km • Limite:{' '}
+                    Hodômetro Atual: {alert.currentOdometer.toLocaleString('pt-BR')} km • Revisão:{' '}
                     {alert.nextServiceOdometer.toLocaleString('pt-BR')} km
                   </p>
                 </div>
@@ -366,18 +722,23 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
       )}
 
-      {/* Desempenho Mensal Acumulado por Caminhão (Cards + Gráficos) */}
+      {/* 5. GRÁFICO PRINCIPAL: TELEMETRIA E DESEMPENHO POR CAMINHÃO + DONUT DE CUSTOS */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 bg-white p-5 rounded-2xl shadow-sm ring-1 ring-slate-200 flex flex-col justify-between space-y-5">
+        <div className="lg:col-span-2 bg-white p-5 sm:p-6 rounded-3xl shadow-sm border border-slate-200/90 flex flex-col justify-between space-y-5">
           <div>
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4">
-              <div>
-                <h3 className="text-base font-bold text-slate-900">
-                  Desempenho por Caminhão (Média Mensal Acumulada)
-                </h3>
-                <p className="text-xs text-slate-500">
-                  Fórmula: (MAX(odômetro) − MIN(odômetro)) ÷ SOMA(litros) • Alerta se &lt; 2,0 ou &gt; 4,5 km/L (&gt; 1.000 km)
-                </p>
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-5">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-600">
+                  <Activity className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base sm:text-lg font-extrabold text-slate-900">
+                    Performance Operacional por Caminhão
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Comparativo de Quilometragem Rodada, Custo de Combustível e Eficiência (km/L)
+                  </p>
+                </div>
               </div>
               <div className="flex items-center gap-2 self-stretch sm:self-auto">
                 <Calendar className="w-4 h-4 text-slate-400 shrink-0" />
@@ -385,9 +746,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   aria-label="Selecionar mês de referência"
                   value={selectedPeriodKey}
                   onChange={(e) => setSelectedPeriodKey(e.target.value)}
-                  className="text-xs font-semibold bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 focus:ring-2 focus:ring-sky-500 focus:outline-none"
+                  className="text-xs font-bold bg-slate-100 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 focus:ring-2 focus:ring-slate-900 focus:outline-none"
                 >
-                  <option value="ALL">Acumulado do período ({metrics.truckMetrics.length} veíc.)</option>
+                  <option value="ALL">
+                    Período Acumulado ({metrics.truckMetrics.length} veículos)
+                  </option>
                   {metrics.monthlyFuelSeries.map((m) => (
                     <option key={m.periodKey} value={m.periodKey}>
                       Mês: {m.periodLabel}
@@ -397,106 +760,152 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               </div>
             </div>
 
-            <div className="h-64 w-full">
+            <div className="h-72 w-full">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={truckCardsData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                  <XAxis dataKey="plate" tick={{ fontSize: 12, fill: '#64748b' }} />
-                  <YAxis yAxisId="left" tick={{ fontSize: 11, fill: '#64748b' }} />
+                <ComposedChart
+                  data={truckCardsData}
+                  margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
+                >
+                  <defs>
+                    <linearGradient id="gradKm" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#10b981" stopOpacity={0.95} />
+                      <stop offset="100%" stopColor="#059669" stopOpacity={0.65} />
+                    </linearGradient>
+                    <linearGradient id="gradFuelCost" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#0ea5e9" stopOpacity={0.95} />
+                      <stop offset="100%" stopColor="#0284c7" stopOpacity={0.65} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                  <XAxis
+                    dataKey="plate"
+                    tick={{ fontSize: 12, fontWeight: 700, fill: '#0f172a' }}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                  <YAxis
+                    yAxisId="left"
+                    tick={{ fontSize: 11, fill: '#64748b' }}
+                    axisLine={false}
+                    tickLine={false}
+                    tickFormatter={(v) => `${Number(v).toLocaleString('pt-BR')} km`}
+                  />
                   <YAxis
                     yAxisId="right"
                     orientation="right"
                     tick={{ fontSize: 11, fill: '#64748b' }}
+                    axisLine={false}
+                    tickLine={false}
                     tickFormatter={(v) => `R$ ${(v / 1000).toFixed(0)}k`}
                   />
                   <Tooltip
+                    contentStyle={{
+                      backgroundColor: '#0f172a',
+                      borderColor: '#1e293b',
+                      borderRadius: '14px',
+                      color: '#f8fafc',
+                      fontSize: '12px',
+                      fontWeight: 600,
+                    }}
+                    itemStyle={{ color: '#f8fafc' }}
                     formatter={(value: any, name: any, item: any) => {
                       if (name === 'KM Rodados') {
                         const p = item?.payload;
                         return [
-                          `${Number(value).toLocaleString('pt-BR')} km (Média Mensal: ${fmtKmL(p?.monthlyAvgKmL ?? 0)} km/L)`,
+                          `${Number(value).toLocaleString('pt-BR')} km (Média: ${fmtKmL(
+                            p?.monthlyAvgKmL ?? 0
+                          )} km/L)`,
                           name,
                         ];
                       }
                       if (name === 'Combustível (R$)') {
                         const p = item?.payload;
                         return [
-                          `${formatBRL(Number(value))} (Custo de Diesel por KM: R$ ${fmtCpk(p?.fuelCpk ?? 0)})`,
+                          `${formatBRL(Number(value))} (R$ ${fmtCpk(p?.fuelCpk ?? 0)}/km)`,
                           name,
                         ];
                       }
                       return [formatBRL(Number(value)), name];
                     }}
                   />
-                  <Legend wrapperStyle={{ fontSize: 12 }} />
+                  <Legend wrapperStyle={{ fontSize: 12, fontWeight: 600 }} />
                   <Bar
                     yAxisId="left"
                     dataKey="kmTraveled"
                     name="KM Rodados"
-                    fill="#10b981"
-                    radius={[4, 4, 0, 0]}
+                    fill="url(#gradKm)"
+                    radius={[8, 8, 0, 0]}
+                    barSize={38}
                   />
                   <Bar
                     yAxisId="right"
                     dataKey="fuelCost"
                     name="Combustível (R$)"
-                    fill="#0ea5e9"
-                    radius={[4, 4, 0, 0]}
+                    fill="url(#gradFuelCost)"
+                    radius={[8, 8, 0, 0]}
+                    barSize={38}
                   />
-                </BarChart>
+                </ComposedChart>
               </ResponsiveContainer>
             </div>
           </div>
 
-          {/* Cards de Desempenho Individual de cada Caminhão */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-4 border-t border-slate-100">
+          {/* Cards de Telemetria Individual de cada Caminhão */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5 pt-4 border-t border-slate-100">
             {truckCardsData.map((t) => (
               <div
                 key={t.truckId}
-                className={`p-4 rounded-2xl ring-1 flex flex-col justify-between gap-2.5 ${
+                className={`p-4 rounded-2xl border flex flex-col justify-between gap-3 transition ${
                   t.isAnomalous
-                    ? 'bg-amber-50/70 ring-amber-300'
-                    : 'bg-slate-50 ring-slate-200/80'
+                    ? 'bg-amber-50/70 border-amber-300'
+                    : 'bg-slate-50/90 border-slate-200/90 hover:border-slate-300'
                 }`}
               >
                 <div className="space-y-1">
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-sm font-bold text-slate-900">{t.plate}</span>
-                    <span className="text-[11px] font-semibold text-slate-500">
-                      {t.kmTraveled.toLocaleString('pt-BR')} km • {t.totalLiters.toLocaleString('pt-BR')} L
+                    <span className="text-sm font-extrabold text-slate-900 bg-white px-2.5 py-0.5 rounded-lg border border-slate-200">
+                      {t.plate}
+                    </span>
+                    <span className="text-[11px] font-bold text-slate-600">
+                      {t.kmTraveled.toLocaleString('pt-BR')} km
                     </span>
                   </div>
-                  <span className="text-xs text-slate-500 block truncate">{t.model}</span>
+                  <span className="text-xs font-semibold text-slate-500 block truncate pt-0.5">
+                    {t.model} • {Math.round(t.totalLiters).toLocaleString('pt-BR')} L
+                  </span>
                 </div>
 
-                {/* Métricas consolidadas exigidas */}
-                <div className="bg-white rounded-xl p-3 ring-1 ring-slate-200/70 space-y-1">
-                  <div
-                    className={`text-sm font-bold ${
-                      t.isAnomalous ? 'text-rose-600' : 'text-emerald-700'
-                    }`}
-                  >
-                    Média Mensal: {fmtKmL(t.monthlyAvgKmL)} km/L
+                <div className="bg-white rounded-xl p-3 border border-slate-200/80 space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-semibold text-slate-500">Consumo:</span>
+                    <span
+                      className={`text-sm font-extrabold ${
+                        t.isAnomalous ? 'text-rose-600' : 'text-emerald-600'
+                      }`}
+                    >
+                      {fmtKmL(t.monthlyAvgKmL)} km/L
+                    </span>
                   </div>
-                  <div className="text-xs font-semibold text-slate-800">
-                    Custo de Diesel por KM: R$ {fmtCpk(t.fuelCpk)}
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-semibold text-slate-500">Custo Diesel:</span>
+                    <span className="text-xs font-extrabold text-slate-900">
+                      R$ {fmtCpk(t.fuelCpk)} / km
+                    </span>
                   </div>
                 </div>
 
-                {/* Badge de alerta quando < 2,0 km/L ou > 4,5 km/L em mês com > 1.000 km rodados */}
                 {t.isAnomalous && (
                   <div
                     role="alert"
-                    className="flex items-start gap-2 rounded-xl bg-rose-100/90 text-rose-950 ring-1 ring-rose-300 px-3 py-2 text-[11px]"
+                    className="flex items-start gap-2 rounded-xl bg-rose-100 text-rose-950 border border-rose-300 px-3 py-2 text-[11px]"
                   >
                     <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
                     <div>
                       <strong className="block font-bold uppercase tracking-wide text-rose-800">
-                        Alerta de Eficiência {t.anomalyPeriodLabel ? `(${t.anomalyPeriodLabel})` : ''}
+                        Alerta {t.anomalyPeriodLabel ? `(${t.anomalyPeriodLabel})` : ''}
                       </strong>
                       <span>
-                        {t.anomalyMessage ??
-                          'Consumo fora da faixa (2,0 a 4,5 km/L) com mais de 1.000 km rodados. Sugerida conferência de notas ou revisão do veículo.'}
+                        {t.anomalyMessage ?? 'Consumo fora da faixa padrão (2,0 a 4,5 km/L).'}
                       </span>
                     </div>
                   </div>
@@ -506,195 +915,375 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
         </div>
 
-        {/* Gráfico 2: Composição de Custos Operacionais */}
-        <div className="bg-white p-5 rounded-2xl shadow-sm ring-1 ring-slate-200 flex flex-col justify-between">
+        {/* Gráfico 2: Donut de Composição de Custos com Barras de Proporção */}
+        <div className="bg-white p-5 sm:p-6 rounded-3xl shadow-sm border border-slate-200/90 flex flex-col justify-between">
           <div>
-            <h3 className="text-base font-bold text-slate-900">Composição dos Custos</h3>
-            <p className="text-xs text-slate-500 mb-2">
-              Distribuição percentual dos gastos operacionais
-            </p>
-            <div className="h-60 w-full relative">
+            <div className="flex items-center gap-2.5 mb-1">
+              <div className="p-2 rounded-xl bg-sky-500/10 text-sky-600">
+                <Layers className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-base sm:text-lg font-extrabold text-slate-900">
+                  Distribuição de Custos
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Peso de cada centro de custo na operação
+                </p>
+              </div>
+            </div>
+
+            <div className="h-56 w-full relative my-2">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
-                    data={metrics.costBreakdown}
-                    innerRadius={55}
-                    outerRadius={85}
-                    paddingAngle={3}
+                    data={coloredCostBreakdown}
+                    innerRadius={60}
+                    outerRadius={86}
+                    paddingAngle={4}
                     dataKey="value"
+                    stroke="none"
                   >
-                    {metrics.costBreakdown.map((entry, index) => (
+                    {coloredCostBreakdown.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={entry.color} />
                     ))}
                   </Pie>
-                  <Tooltip formatter={(value: any) => formatBRL(Number(value))} />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: '#0f172a',
+                      borderColor: '#1e293b',
+                      borderRadius: '12px',
+                      color: '#f8fafc',
+                      fontSize: '12px',
+                      fontWeight: 700,
+                    }}
+                    itemStyle={{ color: '#f8fafc' }}
+                    formatter={(value: any) => formatBRL(Number(value))}
+                  />
                 </PieChart>
               </ResponsiveContainer>
               <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                <span className="text-xs text-slate-400">Total</span>
-                <span className="text-sm font-bold text-slate-800">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                  Gasto Total
+                </span>
+                <span className="text-sm font-extrabold text-slate-900 mt-0.5">
                   {formatBRL(metrics.totalExpenses)}
                 </span>
               </div>
             </div>
           </div>
 
-          <div className="space-y-1.5 mt-2 border-t border-slate-100 pt-3">
-            {metrics.costBreakdown.map((item, idx) => (
-              <div key={idx} className="flex items-center justify-between text-xs">
-                <div className="flex items-center gap-2">
-                  <span
-                    className="w-2.5 h-2.5 rounded-full"
-                    style={{ backgroundColor: item.color }}
-                  />
-                  <span className="text-slate-600">{item.name}</span>
+          <div className="space-y-2.5 border-t border-slate-100 pt-3.5">
+            {coloredCostBreakdown.map((item, idx) => (
+              <div key={idx} className="space-y-1">
+                <div className="flex items-center justify-between text-xs">
+                  <div className="flex items-center gap-2">
+                    <span
+                      className="w-3 h-3 rounded-md shrink-0"
+                      style={{ backgroundColor: item.color }}
+                    />
+                    <span className="font-semibold text-slate-700">{item.name}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] font-bold text-slate-400">{item.pct}%</span>
+                    <span className="font-extrabold text-slate-900">{formatBRL(item.value)}</span>
+                  </div>
                 </div>
-                <span className="font-semibold text-slate-900">{formatBRL(item.value)}</span>
+                <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
+                  <div
+                    className="h-full rounded-full"
+                    style={{
+                      width: `${Math.min(100, item.pct)}%`,
+                      backgroundColor: item.color,
+                    }}
+                  />
+                </div>
               </div>
             ))}
           </div>
         </div>
       </div>
 
-      {/* Gráficos Mensais Consolidados: Evolução da Média Mensal (km/L) e Custo de Diesel por KM */}
+      {/* 6. EVOLUÇÃO MENSAL DE CONSUMO E CPK (AREA + LINE COM GRADIENTE) */}
       {metrics.monthlyFuelSeries.length > 0 && (
-        <div className="bg-white p-5 rounded-2xl shadow-sm ring-1 ring-slate-200 space-y-4">
+        <div className="bg-white p-5 sm:p-6 rounded-3xl shadow-sm border border-slate-200/90 space-y-5">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <div>
-              <h3 className="text-base font-bold text-slate-900">
-                Evolução Mensal Consolidada (Média Mensal km/L &amp; Custo de Diesel por KM)
+              <h3 className="text-base sm:text-lg font-extrabold text-slate-900">
+                Curva de Evolução Mensal (Média km/L vs Custo por KM)
               </h3>
               <p className="text-xs text-slate-500">
-                Acompanhamento mês a mês pelo método de Média Mensal Acumulada
+                Histórico consolidado de rendimento energético mês a mês
               </p>
             </div>
-            <span className="text-xs font-semibold text-slate-600 bg-slate-100 px-3 py-1.5 rounded-lg">
-              {metrics.monthlyFuelSeries.length} mês(es) apurado(s)
+            <span className="text-xs font-extrabold text-slate-700 bg-slate-100 px-3 py-1.5 rounded-xl">
+              {metrics.monthlyFuelSeries.length} período(s) analisado(s)
             </span>
           </div>
 
-          <div className="h-64 w-full">
+          <div className="h-72 w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart
+              <ComposedChart
                 data={metrics.monthlyFuelSeries}
                 margin={{ top: 10, right: 20, left: 0, bottom: 0 }}
               >
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                <XAxis dataKey="periodLabel" tick={{ fontSize: 12, fill: '#64748b' }} />
+                <defs>
+                  <linearGradient id="gradMonthlyKml" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.35} />
+                    <stop offset="95%" stopColor="#10b981" stopOpacity={0.02} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                <XAxis
+                  dataKey="periodLabel"
+                  tick={{ fontSize: 12, fontWeight: 700, fill: '#334155' }}
+                  axisLine={false}
+                  tickLine={false}
+                />
                 <YAxis
                   yAxisId="kml"
                   tick={{ fontSize: 11, fill: '#64748b' }}
+                  axisLine={false}
+                  tickLine={false}
                   tickFormatter={(v) => `${fmtKmL(Number(v))} km/L`}
                 />
                 <YAxis
                   yAxisId="cpk"
                   orientation="right"
                   tick={{ fontSize: 11, fill: '#64748b' }}
+                  axisLine={false}
+                  tickLine={false}
                   tickFormatter={(v) => `R$ ${fmtCpk(Number(v))}`}
                 />
                 <Tooltip
+                  contentStyle={{
+                    backgroundColor: '#0f172a',
+                    borderColor: '#1e293b',
+                    borderRadius: '14px',
+                    color: '#f8fafc',
+                    fontSize: '12px',
+                    fontWeight: 600,
+                  }}
+                  itemStyle={{ color: '#f8fafc' }}
                   formatter={(val: any, name: any) => {
                     if (name === 'Média Mensal (km/L)') {
-                      return [`Média Mensal: ${fmtKmL(Number(val))} km/L`, name];
+                      return [`${fmtKmL(Number(val))} km/L`, name];
                     }
-                    return [`Custo de Diesel por KM: R$ ${fmtCpk(Number(val))}`, name];
+                    return [`R$ ${fmtCpk(Number(val))} / km`, name];
                   }}
                 />
-                <Legend wrapperStyle={{ fontSize: 12 }} />
-                <Bar
+                <Legend wrapperStyle={{ fontSize: 12, fontWeight: 600 }} />
+                <Area
                   yAxisId="kml"
+                  type="monotone"
                   dataKey="monthlyAvgKmL"
                   name="Média Mensal (km/L)"
-                  fill="#10b981"
-                  radius={[4, 4, 0, 0]}
+                  stroke="#10b981"
+                  strokeWidth={3}
+                  fill="url(#gradMonthlyKml)"
                 />
-                <Bar
+                <Line
                   yAxisId="cpk"
+                  type="monotone"
                   dataKey="fuelCpk"
                   name="Custo de Diesel por KM (R$)"
-                  fill="#0284c7"
-                  radius={[4, 4, 0, 0]}
+                  stroke="#0ea5e9"
+                  strokeWidth={3}
+                  dot={{ r: 5, fill: '#0ea5e9', strokeWidth: 2, stroke: '#fff' }}
                 />
-              </BarChart>
+              </ComposedChart>
             </ResponsiveContainer>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-2 border-t border-slate-100">
-            {metrics.monthlyFuelSeries.map((m) => (
-              <div
-                key={m.periodKey}
-                className={`p-3.5 rounded-xl ring-1 space-y-1 ${
-                  m.isAnomalous
-                    ? 'bg-amber-50/70 ring-amber-300'
-                    : 'bg-slate-50 ring-slate-200/80'
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-slate-900">{m.periodLabel}</span>
-                  <span className="text-[11px] text-slate-500">
-                    {m.distanceTraveled.toLocaleString('pt-BR')} km • {m.totalLiters.toLocaleString('pt-BR')} L
-                  </span>
-                </div>
-                <div className="text-xs font-bold text-emerald-700">
-                  Média Mensal: {fmtKmL(m.monthlyAvgKmL)} km/L
-                </div>
-                <div className="text-xs font-semibold text-slate-800">
-                  Custo de Diesel por KM: R$ {fmtCpk(m.fuelCpk)}
-                </div>
-                {m.isAnomalous && (
-                  <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-rose-100 text-rose-800 px-2 py-0.5 rounded-full">
-                    <AlertTriangle className="w-3 h-3" />
-                    Conferir notas / revisão do veículo
-                  </span>
-                )}
-              </div>
-            ))}
           </div>
         </div>
       )}
 
-      {/* RANKING DE RENTABILIDADE POR ROTA */}
-      {routeList.length > 0 && (
-        <div className="bg-white p-5 rounded-2xl shadow-sm ring-1 ring-slate-200 space-y-3">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
-            <div>
-              <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                <MapPin className="w-4 h-4 text-emerald-600" />
-                Rentabilidade por Rota de Destino
-              </h3>
-              <p className="text-xs text-slate-500">
-                Rotas mais rentáveis vs rotas com gargalo de margem no período filtrado
-              </p>
+      {/* 7. SEÇÃO DUPLA: DESPESAS DIÁRIAS DOS MOTORISTAS + CURVA DO PREÇO DO DIESEL */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Painel de Despesas Diárias Integradas do Motorista */}
+        <div className="bg-white p-5 sm:p-6 rounded-3xl shadow-sm border border-slate-200/90 flex flex-col justify-between space-y-4">
+          <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-3">
+            <div className="flex items-center gap-2.5">
+              <div className="p-2 rounded-xl bg-amber-500/10 text-amber-600">
+                <Receipt className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-base font-extrabold text-slate-900">
+                  Despesas Diárias dos Motoristas
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Gastos lançados em tempo real pelo aplicativo na estrada
+                </p>
+              </div>
             </div>
-            <span className="text-xs font-semibold text-slate-500">
-              {routeList.length} rotas monitoradas
+            <span className="text-xs font-extrabold bg-slate-900 text-white px-3 py-1.5 rounded-xl">
+              {formatBRL(totalDriverDailyExpenses)}
             </span>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 pt-1">
+          {filteredTravelExpenses.length === 0 ? (
+            <div className="py-12 text-center text-xs text-slate-400 font-medium">
+              Nenhuma despesa diária registrada pelos motoristas no período selecionado.
+            </div>
+          ) : (
+            <div className="divide-y divide-slate-100 max-h-72 overflow-y-auto pr-1">
+              {filteredTravelExpenses.slice(0, 10).map((exp) => {
+                const drv = drivers.find((d) => d.id === exp.driverId);
+                const trk = trucks.find((t) => t.id === exp.truckId);
+                const trp = trips.find((t) => t.id === exp.tripId);
+                return (
+                  <div
+                    key={exp.id}
+                    className="py-2.5 flex items-center justify-between gap-3 text-xs"
+                  >
+                    <div className="min-w-0 space-y-0.5">
+                      <div className="flex items-center gap-2">
+                        <span className="font-extrabold text-slate-900">
+                          {EXPENSE_CATEGORY_LABELS[exp.category] ?? exp.category}
+                        </span>
+                        {trk && (
+                          <span className="px-1.5 py-0.5 rounded bg-slate-100 text-slate-800 font-bold text-[10px]">
+                            {trk.plate}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-slate-500 truncate">
+                        {drv?.name ?? 'Motorista'} • {formatDate(exp.date)}
+                        {exp.description ? ` • ${exp.description}` : ''}
+                        {trp ? ` • Carga: ${trp.origin} → ${trp.destination}` : ''}
+                      </p>
+                    </div>
+                    <span className="text-sm font-extrabold text-slate-900 shrink-0">
+                      {formatBRL(exp.amount)}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Gráfico: Variação do Preço do Diesel S10 nos Postos */}
+        <div className="bg-white p-5 sm:p-6 rounded-3xl shadow-sm border border-slate-200/90 flex flex-col justify-between space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
+            <div className="flex items-center gap-2.5">
+              <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-600">
+                <Fuel className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-base font-extrabold text-slate-900">
+                  Curva do Preço do Diesel S10 (R$/L)
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Monitoramento dos valores pagos nos postos
+                </p>
+              </div>
+            </div>
+            {metrics.dieselPriceTrend.length > 0 && (
+              <span className="text-xs font-extrabold text-emerald-800 bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-xl">
+                Último: R$ {(metrics.dieselPriceTrend.at(-1)?.price ?? 0).toFixed(2).replace('.', ',')}/L
+              </span>
+            )}
+          </div>
+
+          <div className="h-64 w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart
+                data={metrics.dieselPriceTrend}
+                margin={{ top: 10, right: 15, left: 0, bottom: 0 }}
+              >
+                <defs>
+                  <linearGradient id="gradDieselPrice" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.4} />
+                    <stop offset="95%" stopColor="#10b981" stopOpacity={0.0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                <XAxis
+                  dataKey="date"
+                  tick={{ fontSize: 11, fill: '#64748b' }}
+                  axisLine={false}
+                  tickLine={false}
+                />
+                <YAxis
+                  domain={['auto', 'auto']}
+                  tick={{ fontSize: 11, fill: '#64748b' }}
+                  axisLine={false}
+                  tickLine={false}
+                  tickFormatter={(v) => `R$ ${Number(v).toFixed(2)}`}
+                />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: '#0f172a',
+                    borderColor: '#1e293b',
+                    borderRadius: '12px',
+                    color: '#f8fafc',
+                    fontSize: '12px',
+                    fontWeight: 700,
+                  }}
+                  itemStyle={{ color: '#f8fafc' }}
+                  formatter={(val: any, _name: any, item: any) => [
+                    `R$ ${Number(val).toFixed(2)} / L (${item?.payload?.station || 'Posto'})`,
+                    'Diesel S10',
+                  ]}
+                />
+                <Area
+                  type="monotone"
+                  dataKey="price"
+                  stroke="#10b981"
+                  strokeWidth={3}
+                  fill="url(#gradDieselPrice)"
+                  dot={{ r: 4, fill: '#10b981', strokeWidth: 2, stroke: '#fff' }}
+                  activeDot={{ r: 6 }}
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      </div>
+
+      {/* 8. RANKING DE RENTABILIDADE POR ROTA */}
+      {routeList.length > 0 && (
+        <div className="bg-white p-5 sm:p-6 rounded-3xl shadow-sm border border-slate-200/90 space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+            <div>
+              <h3 className="text-base sm:text-lg font-extrabold text-slate-900 flex items-center gap-2">
+                <MapPin className="w-5 h-5 text-emerald-600" />
+                Rentabilidade por Rota de Destino
+              </h3>
+              <p className="text-xs text-slate-500">
+                Comparativo de margem líquida real entre os trajetos operados
+              </p>
+            </div>
+            <span className="text-xs font-bold text-slate-500">
+              {routeList.length} rota(s) apurada(s)
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
             {routeList.map((r, idx) => {
               const isProfit = r.net >= 0;
               return (
                 <div
                   key={idx}
-                  className="bg-slate-50 p-3.5 rounded-xl ring-1 ring-slate-200/80 flex items-center justify-between"
+                  className="bg-slate-50/90 p-4 rounded-2xl border border-slate-200/90 flex items-center justify-between gap-3"
                 >
-                  <div className="space-y-0.5">
-                    <span className="text-xs font-bold text-slate-900 block">{r.route}</span>
+                  <div className="space-y-0.5 min-w-0">
+                    <span className="text-xs font-extrabold text-slate-900 block truncate">
+                      {r.route}
+                    </span>
                     <span className="text-[11px] text-slate-500 block">
                       {r.tripsCount} viagem(ns) • Bruto: {formatBRL(r.gross)}
                     </span>
                   </div>
-                  <div className="text-right">
+                  <div className="text-right shrink-0">
                     <span
-                      className={`text-sm font-bold block ${
+                      className={`text-sm font-extrabold block ${
                         isProfit ? 'text-emerald-600' : 'text-rose-600'
                       }`}
                     >
                       {formatBRL(r.net)}
                     </span>
                     <span
-                      className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                      className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${
                         r.margin >= 30
                           ? 'bg-emerald-100 text-emerald-800'
                           : r.margin >= 10
@@ -711,53 +1300,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
         </div>
       )}
-
-      {/* Gráfico 3: Preço do Diesel nos Postos */}
-      <div className="bg-white p-5 rounded-2xl shadow-sm ring-1 ring-slate-200">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 gap-2">
-          <div>
-            <h3 className="text-base font-bold text-slate-900">
-              Evolução do Preço do Diesel S10 (R$/Litro)
-            </h3>
-            <p className="text-xs text-slate-500">
-              Variação histórica abastecida pelos motoristas nos postos de rodovia
-            </p>
-          </div>
-          {metrics.dieselPriceTrend.length > 0 && (
-            <div className="text-xs font-semibold text-slate-600 bg-slate-100 px-3 py-1.5 rounded-lg">
-              Último valor registrado: {formatBRL(metrics.dieselPriceTrend.at(-1)?.price ?? 0)}
-            </div>
-          )}
-        </div>
-
-        <div className="h-60 w-full">
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={metrics.dieselPriceTrend} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-              <XAxis dataKey="date" tick={{ fontSize: 12, fill: '#64748b' }} />
-              <YAxis
-                domain={['auto', 'auto']}
-                tick={{ fontSize: 12, fill: '#64748b' }}
-                tickFormatter={(v) => `R$ ${Number(v).toFixed(2)}`}
-              />
-              <Tooltip
-                formatter={(val: any, _name: any, item: any) => [
-                  `R$ ${Number(val).toFixed(2)} / L (${item?.payload?.station || 'Posto'})`,
-                  'Diesel S10',
-                ]}
-              />
-              <Line
-                type="monotone"
-                dataKey="price"
-                stroke="#10b981"
-                strokeWidth={3}
-                dot={{ r: 4, fill: '#10b981' }}
-                activeDot={{ r: 6 }}
-              />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
     </div>
   );
 };

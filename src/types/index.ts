@@ -156,6 +156,28 @@ export interface CargoSchedule {
   notes?: string;
 }
 
+export type ExpenseCategoryType =
+  | 'ALIMENTACAO'
+  | 'ESTACIONAMENTO'
+  | 'BORRACHARIA'
+  | 'CHAPA'
+  | 'PEDAGIO'
+  | 'HOSPEDAGEM'
+  | 'OUTROS';
+
+export interface TravelExpenseRecord {
+  id: string;
+  tripId?: string | null;
+  truckId?: string | null;
+  driverId: string;
+  date: string;
+  category: ExpenseCategoryType;
+  amount: number;
+  description: string;
+  receiptPhotoUrl?: string | null;
+  createdAt?: string;
+}
+
 
 export interface ConsumptionResult {
   logId: string;

@@ -9,7 +9,15 @@ const Body = z.object({
   tripId: z.string().uuid().optional().nullable(),
   truckId: z.string().uuid().optional().nullable(),
   date: z.string().min(8),
-  category: z.enum(['ALIMENTACAO', 'ESTACIONAMENTO', 'BORRACHARIA', 'CHAPA', 'PEDAGIO', 'HOSPEDAGEM', 'OUTROS']),
+  category: z.enum([
+    'ALIMENTACAO',
+    'ESTACIONAMENTO',
+    'BORRACHARIA',
+    'CHAPA',
+    'PEDAGIO',
+    'HOSPEDAGEM',
+    'OUTROS',
+  ]),
   amount: z.number().positive().max(100000),
   description: z.string().trim().max(300).default(''),
   receiptPhotoUrl: z.string().optional().nullable(),
@@ -44,7 +52,9 @@ export async function POST(req: Request) {
       },
     });
     if (existingDuplicate) {
-      return NextResponse.json(serialize({ ...existingDuplicate, deduplicated: true }), { status: 200 });
+      return NextResponse.json(serialize({ ...existingDuplicate, deduplicated: true }), {
+        status: 200,
+      });
     }
 
     // Se tripId foi informado, valida; se não, tenta achar um frete ativo do motorista/caminhão
@@ -65,7 +75,7 @@ export async function POST(req: Request) {
         where: {
           driverId: profile.driverId,
           ...(resolvedTruckId ? { truckId: resolvedTruckId } : {}),
-          status: { in: ['PLANEJADO', 'EM_VIAGEM'] },
+          status: { in: ['EM_VIAGEM', 'PLANEJADO'] },
         },
         orderBy: { startDate: 'desc' },
         select: { id: true, truckId: true },
@@ -90,6 +100,38 @@ export async function POST(req: Request) {
       },
     });
 
+    // 3. Integra automaticamente a despesa diária na carga/viagem vinculada (FreightTrip)
+    if (resolvedTripId) {
+      const trip = await prisma.freightTrip.findUnique({ where: { id: resolvedTripId } });
+      if (trip) {
+        const gross = Number(trip.grossFreightValue) || 0;
+        let tolls = Number(trip.tollCosts) || 0;
+        let loading = Number(trip.loadingUnloadingCosts) || 0;
+        let other = Number(trip.otherExpenses) || 0;
+
+        if (body.category === 'PEDAGIO') {
+          tolls += body.amount;
+        } else if (body.category === 'CHAPA') {
+          loading += body.amount;
+        } else {
+          other += body.amount;
+        }
+
+        const net = Number((gross - tolls - loading - other).toFixed(2));
+        await prisma.freightTrip
+          .update({
+            where: { id: trip.id },
+            data: {
+              tollCosts: tolls,
+              loadingUnloadingCosts: loading,
+              otherExpenses: other,
+              netFreightValue: net,
+            },
+          })
+          .catch(() => {});
+      }
+    }
+
     if (resolvedTruckId) {
       await prisma.userProfile
         .update({ where: { id: profile.id }, data: { truckId: resolvedTruckId } })
@@ -98,9 +140,13 @@ export async function POST(req: Request) {
 
     return NextResponse.json(serialize(row), { status: 201 });
   } catch (e) {
-    if (e instanceof ZodError)
-      return NextResponse.json({ error: e.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ') }, { status: 400 });
+    if (e instanceof ZodError) {
+      return NextResponse.json(
+        { error: e.issues.map((i) => i.message).join('; ') },
+        { status: 400 }
+      );
+    }
     console.error(e);
-    return NextResponse.json({ error: 'Erro ao registrar despesa.' }, { status: 500 });
+    return NextResponse.json({ error: 'Erro ao salvar despesa.' }, { status: 500 });
   }
 }

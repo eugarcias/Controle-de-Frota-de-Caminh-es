@@ -13,6 +13,7 @@ export async function GET() {
       fuelLogs: fleet.fuelLogs,
       maintenanceLogs: fleet.maintenanceLogs,
       trips: (fleet.trips as FreightTrip[]).filter((t) => t.status !== 'CANCELADO'),
+      travelExpenses: fleet.travelExpenses,
     });
     return NextResponse.json(metrics);
   } catch (error) {

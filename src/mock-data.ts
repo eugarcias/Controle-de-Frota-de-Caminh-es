@@ -1,4 +1,4 @@
-import { Truck, Driver, FuelLog, MaintenanceLog, FreightTrip, DashboardMetrics, MaintenanceAlert } from './types';
+import { Truck, Driver, FuelLog, MaintenanceLog, FreightTrip, DashboardMetrics, MaintenanceAlert, TravelExpenseRecord } from './types';
 import {
   calculateCumulativeFuelStats,
   calculateTruckMonthlyHistory,
@@ -445,6 +445,7 @@ export interface MetricsInput {
   fuelLogs: FuelLog[];
   maintenanceLogs: MaintenanceLog[];
   trips: FreightTrip[];
+  travelExpenses?: TravelExpenseRecord[];
 }
 
 export function computeDashboardMetrics(data: MetricsInput): DashboardMetrics {
@@ -453,17 +454,27 @@ export function computeDashboardMetrics(data: MetricsInput): DashboardMetrics {
     fuelLogs: inputFuelLogs,
     maintenanceLogs: inputMaintenanceLogs,
     trips: inputTrips,
+    travelExpenses: inputTravelExpenses = [],
   } = data;
+
+  // Despesas avulsas lançadas pelos motoristas que não estão vinculadas a um tripId (as vinculadas já somam no FreightTrip)
+  const standaloneExpenses = inputTravelExpenses.filter((e) => !e.tripId);
+  const standaloneTolls = standaloneExpenses
+    .filter((e) => e.category === 'PEDAGIO')
+    .reduce((acc, e) => acc + Number(e.amount || 0), 0);
+  const standaloneOther = standaloneExpenses
+    .filter((e) => e.category !== 'PEDAGIO')
+    .reduce((acc, e) => acc + Number(e.amount || 0), 0);
 
   const totalRevenue = inputTrips.reduce((acc, t) => acc + t.grossFreightValue, 0);
   const totalFuelCost = inputFuelLogs.reduce((acc, f) => acc + f.totalAmount, 0);
   const totalArlaCost = inputFuelLogs.reduce((acc, f) => acc + f.arlaAmount, 0);
   const totalMaintenanceCost = inputMaintenanceLogs.reduce((acc, m) => acc + m.totalCost, 0);
-  const totalTollCosts = inputTrips.reduce((acc, t) => acc + t.tollCosts, 0);
-  const totalOtherCosts = inputTrips.reduce(
-    (acc, t) => acc + t.loadingUnloadingCosts + t.otherExpenses,
-    0
-  );
+  const totalTollCosts =
+    inputTrips.reduce((acc, t) => acc + t.tollCosts, 0) + standaloneTolls;
+  const totalOtherCosts =
+    inputTrips.reduce((acc, t) => acc + t.loadingUnloadingCosts + t.otherExpenses, 0) +
+    standaloneOther;
 
   const totalExpenses =
     totalFuelCost + totalArlaCost + totalMaintenanceCost + totalTollCosts + totalOtherCosts;
@@ -478,14 +489,16 @@ export function computeDashboardMetrics(data: MetricsInput): DashboardMetrics {
     const truckFuel = inputFuelLogs.filter((f) => f.truckId === truck.id);
     const truckMaint = inputMaintenanceLogs.filter((m) => m.truckId === truck.id);
     const truckTrips = inputTrips.filter((t) => t.truckId === truck.id);
+    const truckStandaloneExp = standaloneExpenses.filter((e) => e.truckId === truck.id);
 
     const dieselOnlyCost = truckFuel.reduce((sum, f) => sum + f.totalAmount, 0);
     const fCost = truckFuel.reduce((sum, f) => sum + f.totalAmount + f.arlaAmount, 0);
     const mCost = truckMaint.reduce((sum, m) => sum + m.totalCost, 0);
-    const tCost = truckTrips.reduce(
-      (sum, t) => sum + t.tollCosts + t.loadingUnloadingCosts + t.otherExpenses,
-      0
-    );
+    const tCost =
+      truckTrips.reduce(
+        (sum, t) => sum + t.tollCosts + t.loadingUnloadingCosts + t.otherExpenses,
+        0
+      ) + truckStandaloneExp.reduce((sum, e) => sum + Number(e.amount || 0), 0);
     const expTotal = fCost + mCost + tCost;
 
     // Histórico mensal acumulado deste caminhão

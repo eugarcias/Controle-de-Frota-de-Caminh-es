@@ -232,12 +232,18 @@ export async function deleteResource(slug: string, id: string) {
 }
 
 /** Carrega todas as coleções, no formato esperado pelo front-end (FleetData). */
-export async function loadFleet() {
-  const entries = await Promise.all(
-    Object.values(resources).map(async (cfg) => [
-      cfg.clientKey,
-      serialize(await delegate(cfg).findMany({ orderBy: cfg.orderBy })),
-    ])
-  );
-  return Object.fromEntries(entries) as Record<string, any[]>;
+export async function loadFleet(): Promise<Record<string, any[]>> {
+  const [entries, travelExpenses] = await Promise.all([
+    Promise.all(
+      Object.values(resources).map(async (cfg) => [
+        cfg.clientKey,
+        serialize(await delegate(cfg).findMany({ orderBy: cfg.orderBy })),
+      ])
+    ),
+    prisma.travelExpense.findMany({ orderBy: { date: 'desc' }, take: 250 }),
+  ]);
+  return {
+    ...(Object.fromEntries(entries) as Record<string, any[]>),
+    travelExpenses: serialize(travelExpenses) as any[],
+  };
 }

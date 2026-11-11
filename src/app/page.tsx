@@ -26,8 +26,9 @@ export default function Home() {
         fuelLogs: data.fuelLogs,
         maintenanceLogs: data.maintenanceLogs,
         trips: data.trips.filter((t) => t.status !== 'CANCELADO'),
+        travelExpenses: data.travelExpenses,
       }),
-    [data.trucks, data.fuelLogs, data.maintenanceLogs, data.trips]
+    [data.trucks, data.fuelLogs, data.maintenanceLogs, data.trips, data.travelExpenses]
   );
 
   const lastDieselPrice = metrics.dieselPriceTrend.at(-1)?.price ?? 6;
@@ -117,6 +118,8 @@ export default function Home() {
             fuelLogs={data.fuelLogs}
             maintenanceLogs={data.maintenanceLogs}
             trips={data.trips}
+            travelExpenses={data.travelExpenses}
+            schedules={data.schedules}
             onOpenQuickEntry={() => setActiveTab('quick-entry')}
           />
         )}

@@ -47,6 +47,9 @@ export function buildFingerprint(url: string, body: Record<string, unknown>): st
   if (url.includes('/odometer')) {
     return `odo:${body.truckId}:${body.odometer}`;
   }
+  if (url.includes('/cargo')) {
+    return `cargo:${body.truckId}:${body.cargoDescription}:${body.origin}:${body.destination}`;
+  }
   return `${url}:${JSON.stringify(body)}`;
 }
 

@@ -10,6 +10,7 @@ import {
   MaintenanceLog,
   FreightTrip,
   CargoSchedule,
+  TravelExpenseRecord,
 } from '@/types';
 
 export interface FleetData {
@@ -21,6 +22,7 @@ export interface FleetData {
   maintenanceLogs: MaintenanceLog[];
   trips: FreightTrip[];
   schedules: CargoSchedule[];
+  travelExpenses: TravelExpenseRecord[];
 }
 
 const emptyData: FleetData = {
@@ -32,6 +34,7 @@ const emptyData: FleetData = {
   maintenanceLogs: [],
   trips: [],
   schedules: [],
+  travelExpenses: [],
 };
 
 const FLEET_CACHE_KEY = 'vsm.admin.fleetCache.v1';
@@ -45,6 +48,7 @@ const PATHS: Record<keyof FleetData, string> = {
   maintenanceLogs: '/api/maintenance-logs',
   trips: '/api/freight-trips',
   schedules: '/api/cargo-schedules',
+  travelExpenses: '/api/driver/expense',
 };
 
 type ItemOf<K extends keyof FleetData> = FleetData[K][number];
