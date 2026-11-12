@@ -300,13 +300,13 @@ export const CargoScheduleView: React.FC<Props> = ({
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white dark:bg-[#111926] p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
         <div>
-          <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
-            <CalendarClock className="w-5 h-5 text-sky-600" />
+          <h2 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
+            <CalendarClock className="w-5 h-5 text-emerald-500" />
             Agenda de Cargas
           </h2>
-          <p className="text-xs text-slate-500 mt-0.5">
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
             Programe coletas futuras e converta em frete quando o caminhão sair.
           </p>
         </div>
@@ -315,7 +315,7 @@ export const CargoScheduleView: React.FC<Props> = ({
             aria-label="Filtro da agenda"
             value={filter}
             onChange={(e) => setFilter(e.target.value as 'ATIVAS' | 'TODAS')}
-            className="min-h-11 sm:min-h-10 text-xs font-semibold px-2.5 bg-slate-50 border border-slate-300 rounded-xl"
+            className="min-h-11 sm:min-h-10 text-xs font-semibold px-2.5 bg-slate-50 dark:bg-[#0b111a] text-slate-900 dark:text-slate-100 border border-slate-300 dark:border-slate-700 rounded-xl"
           >
             <option value="ATIVAS">Somente ativas</option>
             <option value="TODAS">Todas</option>
@@ -331,33 +331,33 @@ export const CargoScheduleView: React.FC<Props> = ({
 
       <div className="grid grid-cols-1 gap-4">
         {list.map((s) => (
-          <div key={s.id} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-3">
+          <div key={s.id} className="bg-white dark:bg-[#111926] p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-3">
             <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2">
               <div className="space-y-1">
                 <div className="flex flex-wrap items-center gap-2">
                   <Badge tone="dark">{fmtDateTime(s.pickupDate)}</Badge>
                   <Badge tone={statusTone[s.status]}>{statusLabel[s.status]}</Badge>
-                  <span className="text-xs font-semibold text-sky-800">{name.customer(s.customerId)}</span>
+                  <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-400">{name.customer(s.customerId)}</span>
                 </div>
-                <div className="text-base font-bold text-slate-900 flex flex-wrap items-center gap-2">
-                  {s.origin} <ArrowRight className="w-4 h-4 text-slate-400" /> {s.destination}
+                <div className="text-base font-bold text-slate-900 dark:text-white flex flex-wrap items-center gap-2">
+                  {s.origin} <ArrowRight className="w-4 h-4 text-emerald-500" /> {s.destination}
                 </div>
-                <div className="text-xs text-slate-600 flex flex-wrap items-center gap-3">
+                <div className="text-xs text-slate-600 dark:text-slate-400 flex flex-wrap items-center gap-3">
                   <span className="flex items-center gap-1">
-                    <Package className="w-3.5 h-3.5 text-sky-600" />
+                    <Package className="w-3.5 h-3.5 text-emerald-500" />
                     {s.cargoDescription} • {s.cargoWeightKg.toLocaleString('pt-BR')} kg
                   </span>
                   <span className="flex items-center gap-1">
-                    <Route className="w-3.5 h-3.5 text-sky-600" />
+                    <Route className="w-3.5 h-3.5 text-emerald-500" />
                     {s.distanceKm.toLocaleString('pt-BR')} km
                   </span>
                 </div>
               </div>
               <div className="sm:text-right">
-                <span className="text-xs text-slate-500 block">Frete</span>
-                <span className="text-xl font-bold text-sky-700">{formatBRL(s.freightValue)}</span>
+                <span className="text-xs text-slate-500 dark:text-slate-400 block">Frete</span>
+                <span className="text-xl font-bold text-slate-900 dark:text-white">{formatBRL(s.freightValue)}</span>
                 {s.driverCommission !== null && s.driverCommission !== undefined && (
-                  <span className="text-xs font-bold text-emerald-700 block">
+                  <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 block">
                     Comissão motorista: {formatBRL(Number(s.driverCommission))}
                   </span>
                 )}
@@ -365,10 +365,10 @@ export const CargoScheduleView: React.FC<Props> = ({
             </div>
 
             {s.notes && (
-              <div className="flex items-start gap-2.5 text-xs bg-amber-50 border border-amber-200 text-amber-950 p-3 rounded-xl">
-                <MessageSquare className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+              <div className="flex items-start gap-2.5 text-xs bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 text-amber-950 dark:text-amber-100 p-3 rounded-xl">
+                <MessageSquare className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
                 <div>
-                  <span className="font-extrabold uppercase tracking-wider text-[10px] text-amber-800 block">
+                  <span className="font-extrabold uppercase tracking-wider text-[10px] text-amber-800 dark:text-amber-400 block">
                     Instrução / Observação do Admin para o Motorista
                   </span>
                   <span className="font-semibold">{s.notes}</span>
@@ -376,14 +376,14 @@ export const CargoScheduleView: React.FC<Props> = ({
               </div>
             )}
 
-            <div className="flex flex-wrap items-center justify-between gap-3 text-xs bg-slate-50 border border-slate-100 rounded-xl p-3">
+            <div className="flex flex-wrap items-center justify-between gap-3 text-xs bg-slate-50 dark:bg-[#0b111a] border border-slate-100 dark:border-slate-800 text-slate-700 dark:text-slate-300 rounded-xl p-3">
               <div className="flex flex-wrap items-center gap-2">
                 <span>
                   Caminhão: <strong>{name.truck(s.truckId)}</strong> • Motorista: <strong>{name.driver(s.driverId)}</strong>
                 </span>
                 {s.status === 'AGENDADA' && (
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold text-[11px]">
-                    <BellRing className="w-3 h-3 text-emerald-600" />
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border border-emerald-500/30 font-bold text-[11px]">
+                    <BellRing className="w-3 h-3 text-emerald-500" />
                     Notificado no App do Motorista
                   </span>
                 )}
@@ -395,7 +395,7 @@ export const CargoScheduleView: React.FC<Props> = ({
                     disabled={!s.truckId || !s.driverId}
                     title={!s.truckId || !s.driverId ? 'Defina caminhão e motorista ao agendar' : 'Gerar frete a partir desta carga'}
                     onClick={() => onConvert(s)}
-                    className="inline-flex items-center gap-1 bg-slate-900 text-sky-300 font-bold px-3 py-1.5 rounded-lg disabled:opacity-40"
+                    className="inline-flex items-center gap-1 bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 font-bold px-3 py-1.5 rounded-lg disabled:opacity-40"
                   >
                     <Play className="w-3.5 h-3.5" /> Iniciar viagem
                   </button>
@@ -403,7 +403,7 @@ export const CargoScheduleView: React.FC<Props> = ({
                 <button
                   type="button"
                   onClick={() => openEditModal(s)}
-                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-sky-50 hover:bg-sky-100 text-sky-800 border border-sky-200 font-bold"
+                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-700/60 font-bold"
                 >
                   <Pencil className="w-3.5 h-3.5" />
                   Editar
@@ -412,7 +412,7 @@ export const CargoScheduleView: React.FC<Props> = ({
                   aria-label="Alterar status"
                   value={s.status}
                   onChange={(e) => onUpdate(s.id, { status: e.target.value as ScheduleStatus })}
-                  className="p-1.5 border border-slate-300 rounded-lg bg-white font-semibold"
+                  className="p-1.5 border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-[#111926] text-slate-900 dark:text-slate-100 font-semibold"
                 >
                   {(Object.keys(statusLabel) as ScheduleStatus[]).map((k) => (
                     <option key={k} value={k}>
@@ -424,7 +424,7 @@ export const CargoScheduleView: React.FC<Props> = ({
                   type="button"
                   aria-label="Excluir agendamento"
                   onClick={() => confirm('Excluir este agendamento?') && onRemove(s.id)}
-                  className="p-1.5 text-rose-600 hover:bg-rose-50 rounded-lg"
+                  className="p-1.5 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/50 rounded-lg"
                 >
                   <Trash2 className="w-4 h-4" />
                 </button>

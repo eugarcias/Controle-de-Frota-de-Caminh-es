@@ -14,10 +14,10 @@ export interface ComboOption {
 }
 
 const triggerCls =
-  'flex min-h-11 w-full items-center justify-between gap-2 rounded-xl bg-white px-3 text-left text-base shadow-sm ring-1 ring-slate-200 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 sm:min-h-10 sm:text-sm';
+  'flex min-h-11 w-full items-center justify-between gap-2 rounded-xl bg-white dark:bg-[#0f1722] px-3 text-left text-base shadow-sm ring-1 ring-slate-200 dark:ring-slate-700 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 sm:min-h-10 sm:text-sm';
 
 const itemCls =
-  'flex cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2.5 text-sm text-slate-700 data-[selected=true]:bg-sky-50 data-[selected=true]:text-slate-900 sm:py-2';
+  'flex cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2.5 text-sm text-slate-700 dark:text-slate-200 data-[selected=true]:bg-emerald-50 dark:data-[selected=true]:bg-emerald-950/60 data-[selected=true]:text-slate-900 dark:data-[selected=true]:text-emerald-300 sm:py-2';
 
 function List({
   options,
@@ -45,10 +45,10 @@ function List({
         value={search}
         onValueChange={setSearch}
         placeholder={searchPlaceholder}
-        className="h-11 w-full border-0 border-b border-slate-100 bg-transparent px-3 text-base outline-none placeholder:text-slate-400 sm:h-10 sm:text-sm"
+        className="h-11 w-full border-0 border-b border-slate-100 dark:border-slate-800 bg-transparent px-3 text-base text-slate-900 dark:text-slate-100 outline-none placeholder:text-slate-400 sm:h-10 sm:text-sm"
       />
       <Command.List className="max-h-56 overflow-y-auto p-1">
-        <Command.Empty className="px-3 py-4 text-center text-sm text-slate-500">{emptyText}</Command.Empty>
+        <Command.Empty className="px-3 py-4 text-center text-sm text-slate-500 dark:text-slate-400">{emptyText}</Command.Empty>
         {options.map((o) => (
           <Command.Item
             key={o.value}
@@ -56,7 +56,7 @@ function List({
             onSelect={() => onSelect(o.value)}
             className={itemCls}
           >
-            <Check className={cn('h-4 w-4 shrink-0 text-sky-600', isSelected(o.value) ? 'opacity-100' : 'opacity-0')} />
+            <Check className={cn('h-4 w-4 shrink-0 text-emerald-500', isSelected(o.value) ? 'opacity-100' : 'opacity-0')} />
             <span className="flex-1 truncate font-medium">{o.label}</span>
             {o.hint && <span className="truncate text-xs text-slate-400">{o.hint}</span>}
           </Command.Item>
@@ -69,11 +69,11 @@ function List({
             closePopover();
             onCreate(search.trim());
           }}
-          className="flex min-h-11 items-center gap-2 border-t border-slate-100 px-3 text-sm font-semibold text-sky-700 hover:bg-sky-50 sm:min-h-10"
+          className="flex min-h-11 items-center gap-2 border-t border-slate-100 dark:border-slate-800 px-3 text-sm font-semibold text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/50 sm:min-h-10"
         >
           <Plus className="h-4 w-4" />
           {createLabel ?? 'Novo'}
-          {search.trim() ? <span className="truncate font-normal text-slate-500">“{search.trim()}”</span> : null}
+          {search.trim() ? <span className="truncate font-normal text-slate-500 dark:text-slate-400">“{search.trim()}”</span> : null}
         </button>
       )}
     </Command>
@@ -123,7 +123,7 @@ export function Combobox({
           <span className={cn('truncate', !selected && 'text-slate-400')}>
             {selected ? (
               <>
-                <span className="font-medium text-slate-900">{selected.label}</span>
+                <span className="font-medium text-slate-900 dark:text-slate-100">{selected.label}</span>
                 {selected.hint && <span className="ml-2 text-xs text-slate-400">{selected.hint}</span>}
               </>
             ) : (
@@ -177,7 +177,7 @@ export function MultiSelect({ options, value, onChange, allLabel, searchPlacehol
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <button type="button" role="combobox" aria-expanded={open} aria-label={rest['aria-label']} className={triggerCls}>
-          <span className={cn('truncate', value.length === 0 ? 'text-slate-500' : 'font-medium text-slate-900')}>{summary}</span>
+          <span className={cn('truncate', value.length === 0 ? 'text-slate-500 dark:text-slate-400' : 'font-medium text-slate-900 dark:text-slate-100')}>{summary}</span>
           <span className="flex items-center gap-1">
             {value.length > 0 && (
               <span

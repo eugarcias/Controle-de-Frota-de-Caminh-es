@@ -18,7 +18,7 @@ const PopoverContent = React.forwardRef<
       sideOffset={sideOffset}
       // z acima do Dialog (z-[61]) para funcionar dentro de modais
       className={cn(
-        'z-[80] w-[var(--radix-popover-trigger-width)] min-w-[220px] rounded-xl bg-white p-0 shadow-lg ring-1 ring-slate-200 outline-none',
+        'z-[80] w-[var(--radix-popover-trigger-width)] min-w-[220px] rounded-xl bg-white dark:bg-[#111926] p-0 shadow-lg ring-1 ring-slate-200 dark:ring-slate-700 outline-none',
         className
       )}
       {...props}

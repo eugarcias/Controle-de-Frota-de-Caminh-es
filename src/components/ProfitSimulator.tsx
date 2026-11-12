@@ -68,20 +68,20 @@ export const ProfitSimulator: React.FC<Props> = ({ trucks, fuelLogs, fleetKmL, f
         : { label: 'RECUSAR', tone: 'rose', Icon: XCircle, text: `Margem insuficiente. O frete mínimo para não ter prejuízo é ${formatBRL(result.breakEvenFreight)}.` };
 
   const toneCls: Record<string, string> = {
-    emerald: 'bg-emerald-50 text-emerald-800 ring-emerald-200',
-    amber: 'bg-amber-50 text-amber-800 ring-amber-200',
-    rose: 'bg-rose-50 text-rose-800 ring-rose-200',
+    emerald: 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-800 dark:text-emerald-300 ring-emerald-200 dark:ring-emerald-800/60',
+    amber: 'bg-amber-50 dark:bg-amber-950/50 text-amber-800 dark:text-amber-300 ring-amber-200 dark:ring-amber-800/60',
+    rose: 'bg-rose-50 dark:bg-rose-950/50 text-rose-800 dark:text-rose-300 ring-rose-200 dark:ring-rose-800/60',
   };
 
   return (
-    <section className="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200 p-4 sm:p-5 space-y-4" aria-label="Simulador de rentabilidade">
+    <section className="bg-white dark:bg-[#111926] rounded-2xl shadow-sm ring-1 ring-slate-200 dark:ring-slate-800 p-4 sm:p-5 space-y-4" aria-label="Simulador de rentabilidade">
       <header className="flex items-start gap-3">
-        <span className="p-2 bg-emerald-50 text-emerald-600 rounded-xl">
+        <span className="p-2 bg-emerald-50 dark:bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 rounded-xl border border-emerald-500/20">
           <Calculator className="w-5 h-5" />
         </span>
         <div>
-          <h3 className="text-base font-bold text-slate-900">Simulador de Rentabilidade</h3>
-          <p className="text-xs text-slate-500">
+          <h3 className="text-base font-bold text-slate-900 dark:text-white">Simulador de Rentabilidade</h3>
+          <p className="text-xs text-slate-500 dark:text-slate-400">
             Projeta o lucro com o consumo real do caminhão escolhido, antes de aceitar a carga.
           </p>
         </div>
@@ -115,9 +115,9 @@ export const ProfitSimulator: React.FC<Props> = ({ trucks, fuelLogs, fleetKmL, f
       </div>
 
       {/* Base de cálculo: de onde veio o km/L */}
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-600 bg-slate-50 rounded-xl px-3 py-2.5">
-        <span className="inline-flex items-center gap-1.5 font-semibold text-slate-800">
-          <Fuel className="w-3.5 h-3.5 text-emerald-600" />
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-[#0b111a] border border-slate-100 dark:border-slate-800 rounded-xl px-3 py-2.5">
+        <span className="inline-flex items-center gap-1.5 font-semibold text-slate-800 dark:text-slate-200">
+          <Fuel className="w-3.5 h-3.5 text-emerald-500" />
           {efficiency.kmPerLiter.toFixed(2)} km/L
         </span>
         <span>
@@ -160,8 +160,8 @@ export const ProfitSimulator: React.FC<Props> = ({ trucks, fuelLogs, fleetKmL, f
           </div>
         </div>
       ) : (
-        <p className="flex items-center gap-2 text-xs text-slate-500">
-          <Info className="w-4 h-4" />
+        <p className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+          <Info className="w-4 h-4 text-emerald-500" />
           Informe veículo, distância e valor do frete para ver a projeção.
         </p>
       )}
@@ -184,12 +184,12 @@ function Metric({
   negative?: boolean;
   highlight?: boolean;
 }) {
-  const color = positive ? 'text-emerald-600' : negative ? 'text-rose-600' : 'text-slate-900';
+  const color = positive ? 'text-emerald-600 dark:text-emerald-400' : negative ? 'text-rose-600 dark:text-rose-400' : 'text-slate-900 dark:text-white';
   return (
-    <div className={`rounded-xl p-3.5 ${highlight ? 'bg-slate-900' : 'bg-slate-50'}`}>
-      <span className={`block text-[11px] font-semibold uppercase tracking-wide ${highlight ? 'text-slate-400' : 'text-slate-500'}`}>{label}</span>
+    <div className={`rounded-xl p-3.5 ${highlight ? 'bg-slate-900 dark:bg-emerald-950/40 border border-emerald-500/30' : 'bg-slate-50 dark:bg-[#0b111a] border border-slate-100 dark:border-slate-800'}`}>
+      <span className={`block text-[11px] font-semibold uppercase tracking-wide ${highlight ? 'text-slate-400 dark:text-emerald-300' : 'text-slate-500 dark:text-slate-400'}`}>{label}</span>
       <strong className={`block text-lg sm:text-xl font-bold mt-0.5 ${highlight ? (positive ? 'text-emerald-400' : 'text-rose-400') : color}`}>{value}</strong>
-      {sub && <span className={`block text-[11px] mt-0.5 ${highlight ? 'text-slate-400' : 'text-slate-500'}`}>{sub}</span>}
+      {sub && <span className={`block text-[11px] mt-0.5 ${highlight ? 'text-slate-400' : 'text-slate-500 dark:text-slate-400'}`}>{sub}</span>}
     </div>
   );
 }

@@ -875,10 +875,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
       {/* Alertas Ativos de Manutenção */}
       {metrics.activeAlerts.length > 0 && (
-        <div className="bg-amber-50/90 border border-amber-200 rounded-3xl p-5 shadow-sm">
+        <div className="bg-amber-50/90 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-500/30 rounded-3xl p-5 shadow-sm">
           <div className="flex items-center gap-2 mb-3">
-            <AlertTriangle className="w-5 h-5 text-amber-600" />
-            <h2 className="text-base font-extrabold text-amber-950">
+            <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+            <h2 className="text-base font-extrabold text-amber-950 dark:text-amber-200">
               Alertas Preditivos de Manutenção ({metrics.activeAlerts.length})
             </h2>
           </div>
@@ -888,24 +888,24 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 key={idx}
                 className={`flex items-start gap-3 p-3.5 rounded-2xl border ${
                   alert.severity === 'CRITICAL'
-                    ? 'bg-rose-50 border-rose-200 text-rose-900'
-                    : 'bg-white border-amber-200 text-amber-900'
+                    ? 'bg-rose-50 dark:bg-rose-950/40 border-rose-200 dark:border-rose-500/40 text-rose-900 dark:text-rose-200'
+                    : 'bg-white dark:bg-[#111926] border-amber-200 dark:border-amber-500/30 text-amber-900 dark:text-amber-200'
                 }`}
               >
                 {alert.severity === 'CRITICAL' ? (
-                  <AlertCircle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+                  <AlertCircle className="w-5 h-5 text-rose-600 dark:text-rose-400 shrink-0 mt-0.5" />
                 ) : (
-                  <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                  <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
                 )}
                 <div className="text-xs space-y-1">
                   <div className="font-bold flex items-center gap-2">
-                    <span className="bg-slate-900 text-white px-2 py-0.5 rounded text-[11px]">
+                    <span className="bg-slate-900 dark:bg-slate-800 text-white px-2 py-0.5 rounded text-[11px]">
                       {alert.truckPlate}
                     </span>
                     <span>{alert.truckModel}</span>
                   </div>
                   <p>{alert.message}</p>
-                  <p className="text-[11px] text-slate-500">
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
                     Hodômetro Atual: {alert.currentOdometer.toLocaleString('pt-BR')} km • Revisão:{' '}
                     {alert.nextServiceOdometer.toLocaleString('pt-BR')} km
                   </p>
@@ -918,18 +918,18 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
       {/* 5. GRÁFICO PRINCIPAL: TELEMETRIA E DESEMPENHO POR CAMINHÃO + DONUT DE CUSTOS */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 bg-white p-5 sm:p-6 rounded-3xl shadow-sm border border-slate-200/90 flex flex-col justify-between space-y-5">
+        <div className="lg:col-span-2 bg-white dark:bg-[#111926] p-5 sm:p-6 rounded-3xl shadow-sm border border-slate-200/90 dark:border-slate-800 flex flex-col justify-between space-y-5 transition-colors">
           <div>
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-5">
               <div className="flex items-center gap-2.5">
-                <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-600">
+                <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
                   <Activity className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="text-base sm:text-lg font-extrabold text-slate-900">
+                  <h3 className="text-base sm:text-lg font-extrabold text-slate-900 dark:text-white">
                     Performance Operacional por Caminhão
                   </h3>
-                  <p className="text-xs text-slate-500">
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
                     Comparativo de Quilometragem Rodada, Custo de Combustível e Eficiência (km/L)
                   </p>
                 </div>
@@ -940,7 +940,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   aria-label="Selecionar mês de referência"
                   value={selectedPeriodKey}
                   onChange={(e) => setSelectedPeriodKey(e.target.value)}
-                  className="text-xs font-bold bg-slate-100 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 focus:ring-2 focus:ring-slate-900 focus:outline-none"
+                  className="text-xs font-bold bg-slate-100 dark:bg-[#0b111a] border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
                 >
                   <option value="ALL">
                     Período Acumulado ({metrics.truckMetrics.length} veículos)
@@ -970,10 +970,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                       <stop offset="100%" stopColor="#0284c7" stopOpacity={0.65} />
                     </linearGradient>
                   </defs>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#334155" strokeOpacity={0.35} />
                   <XAxis
                     dataKey="plate"
-                    tick={{ fontSize: 12, fontWeight: 700, fill: '#0f172a' }}
+                    tick={{ fontSize: 12, fontWeight: 700, fill: '#94a3b8' }}
                     axisLine={false}
                     tickLine={false}
                   />
@@ -1045,44 +1045,44 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
 
           {/* Cards de Telemetria Individual de cada Caminhão */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5 pt-4 border-t border-slate-100">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5 pt-4 border-t border-slate-100 dark:border-slate-800">
             {truckCardsData.map((t) => (
               <div
                 key={t.truckId}
                 className={`p-4 rounded-2xl border flex flex-col justify-between gap-3 transition ${
                   t.isAnomalous
-                    ? 'bg-amber-50/70 border-amber-300'
-                    : 'bg-slate-50/90 border-slate-200/90 hover:border-slate-300'
+                    ? 'bg-amber-50/70 dark:bg-amber-950/30 border-amber-300 dark:border-amber-500/40'
+                    : 'bg-slate-50/90 dark:bg-[#0b111a]/80 border-slate-200/90 dark:border-slate-800 hover:border-emerald-500/40'
                 }`}
               >
                 <div className="space-y-1">
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-sm font-extrabold text-slate-900 bg-white px-2.5 py-0.5 rounded-lg border border-slate-200">
+                    <span className="text-sm font-extrabold text-slate-900 dark:text-emerald-300 bg-white dark:bg-slate-800 px-2.5 py-0.5 rounded-lg border border-slate-200 dark:border-slate-700">
                       {t.plate}
                     </span>
-                    <span className="text-[11px] font-bold text-slate-600">
+                    <span className="text-[11px] font-bold text-slate-600 dark:text-slate-400">
                       {t.kmTraveled.toLocaleString('pt-BR')} km
                     </span>
                   </div>
-                  <span className="text-xs font-semibold text-slate-500 block truncate pt-0.5">
+                  <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 block truncate pt-0.5">
                     {t.model} • {Math.round(t.totalLiters).toLocaleString('pt-BR')} L
                   </span>
                 </div>
 
-                <div className="bg-white rounded-xl p-3 border border-slate-200/80 space-y-1.5">
+                <div className="bg-white dark:bg-[#111926] rounded-xl p-3 border border-slate-200/80 dark:border-slate-800 space-y-1.5">
                   <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-semibold text-slate-500">Consumo:</span>
+                    <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Consumo:</span>
                     <span
                       className={`text-sm font-extrabold ${
-                        t.isAnomalous ? 'text-rose-600' : 'text-emerald-600'
+                        t.isAnomalous ? 'text-rose-600 dark:text-rose-400' : 'text-emerald-600 dark:text-emerald-400'
                       }`}
                     >
                       {fmtKmL(t.monthlyAvgKmL)} km/L
                     </span>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-semibold text-slate-500">Custo Diesel:</span>
-                    <span className="text-xs font-extrabold text-slate-900">
+                    <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Custo Diesel:</span>
+                    <span className="text-xs font-extrabold text-slate-900 dark:text-white">
                       R$ {fmtCpk(t.fuelCpk)} / km
                     </span>
                   </div>
@@ -1091,11 +1091,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 {t.isAnomalous && (
                   <div
                     role="alert"
-                    className="flex items-start gap-2 rounded-xl bg-rose-100 text-rose-950 border border-rose-300 px-3 py-2 text-[11px]"
+                    className="flex items-start gap-2 rounded-xl bg-rose-100 dark:bg-rose-950/50 text-rose-950 dark:text-rose-200 border border-rose-300 dark:border-rose-500/40 px-3 py-2 text-[11px]"
                   >
-                    <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                    <AlertTriangle className="w-4 h-4 text-rose-600 dark:text-rose-400 shrink-0 mt-0.5" />
                     <div>
-                      <strong className="block font-bold uppercase tracking-wide text-rose-800">
+                      <strong className="block font-bold uppercase tracking-wide text-rose-800 dark:text-rose-300">
                         Alerta {t.anomalyPeriodLabel ? `(${t.anomalyPeriodLabel})` : ''}
                       </strong>
                       <span>
@@ -1110,17 +1110,17 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
 
         {/* Gráfico 2: Donut de Composição de Custos com Barras de Proporção */}
-        <div className="bg-white p-5 sm:p-6 rounded-3xl shadow-sm border border-slate-200/90 flex flex-col justify-between">
+        <div className="bg-white dark:bg-[#111926] p-5 sm:p-6 rounded-3xl shadow-sm border border-slate-200/90 dark:border-slate-800 flex flex-col justify-between transition-colors">
           <div>
             <div className="flex items-center gap-2.5 mb-1">
-              <div className="p-2 rounded-xl bg-sky-500/10 text-sky-600">
+              <div className="p-2 rounded-xl bg-sky-500/10 text-sky-600 dark:text-sky-400">
                 <Layers className="w-5 h-5" />
               </div>
               <div>
-                <h3 className="text-base sm:text-lg font-extrabold text-slate-900">
+                <h3 className="text-base sm:text-lg font-extrabold text-slate-900 dark:text-white">
                   Distribuição de Custos
                 </h3>
-                <p className="text-xs text-slate-500">
+                <p className="text-xs text-slate-500 dark:text-slate-400">
                   Peso de cada centro de custo na operação
                 </p>
               </div>
@@ -1159,14 +1159,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
                   Gasto Total
                 </span>
-                <span className="text-sm font-extrabold text-slate-900 mt-0.5">
+                <span className="text-sm font-extrabold text-slate-900 dark:text-white mt-0.5">
                   {formatBRL(metrics.totalExpenses)}
                 </span>
               </div>
             </div>
           </div>
 
-          <div className="space-y-2.5 border-t border-slate-100 pt-3.5">
+          <div className="space-y-2.5 border-t border-slate-100 dark:border-slate-800 pt-3.5">
             {coloredCostBreakdown.map((item, idx) => (
               <div key={idx} className="space-y-1">
                 <div className="flex items-center justify-between text-xs">
@@ -1175,14 +1175,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                       className="w-3 h-3 rounded-md shrink-0"
                       style={{ backgroundColor: item.color }}
                     />
-                    <span className="font-semibold text-slate-700">{item.name}</span>
+                    <span className="font-semibold text-slate-700 dark:text-slate-300">{item.name}</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="text-[11px] font-bold text-slate-400">{item.pct}%</span>
-                    <span className="font-extrabold text-slate-900">{formatBRL(item.value)}</span>
+                    <span className="font-extrabold text-slate-900 dark:text-white">{formatBRL(item.value)}</span>
                   </div>
                 </div>
-                <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
+                <div className="w-full bg-slate-100 dark:bg-slate-800 h-1.5 rounded-full overflow-hidden">
                   <div
                     className="h-full rounded-full"
                     style={{
@@ -1199,17 +1199,17 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
       {/* 6. EVOLUÇÃO MENSAL DE CONSUMO E CPK (AREA + LINE COM GRADIENTE) */}
       {metrics.monthlyFuelSeries.length > 0 && (
-        <div className="bg-white p-5 sm:p-6 rounded-3xl shadow-sm border border-slate-200/90 space-y-5">
+        <div className="bg-white dark:bg-[#111926] p-5 sm:p-6 rounded-3xl shadow-sm border border-slate-200/90 dark:border-slate-800 space-y-5 transition-colors">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <div>
-              <h3 className="text-base sm:text-lg font-extrabold text-slate-900">
+              <h3 className="text-base sm:text-lg font-extrabold text-slate-900 dark:text-white">
                 Curva de Evolução Mensal (Média km/L vs Custo por KM)
               </h3>
-              <p className="text-xs text-slate-500">
+              <p className="text-xs text-slate-500 dark:text-slate-400">
                 Histórico consolidado de rendimento energético mês a mês
               </p>
             </div>
-            <span className="text-xs font-extrabold text-slate-700 bg-slate-100 px-3 py-1.5 rounded-xl">
+            <span className="text-xs font-extrabold text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 px-3 py-1.5 rounded-xl">
               {metrics.monthlyFuelSeries.length} período(s) analisado(s)
             </span>
           </div>
@@ -1226,10 +1226,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                     <stop offset="95%" stopColor="#10b981" stopOpacity={0.02} />
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#334155" strokeOpacity={0.35} />
                 <XAxis
                   dataKey="periodLabel"
-                  tick={{ fontSize: 12, fontWeight: 700, fill: '#334155' }}
+                  tick={{ fontSize: 12, fontWeight: 700, fill: '#94a3b8' }}
                   axisLine={false}
                   tickLine={false}
                 />
@@ -1293,22 +1293,22 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       {/* 7. SEÇÃO DUPLA: DESPESAS DIÁRIAS DOS MOTORISTAS + CURVA DO PREÇO DO DIESEL */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Painel de Despesas Diárias Integradas do Motorista */}
-        <div className="bg-white p-5 sm:p-6 rounded-3xl shadow-sm border border-slate-200/90 flex flex-col justify-between space-y-4">
-          <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-3">
+        <div className="bg-white dark:bg-[#111926] p-5 sm:p-6 rounded-3xl shadow-sm border border-slate-200/90 dark:border-slate-800 flex flex-col justify-between space-y-4 transition-colors">
+          <div className="flex items-center justify-between gap-2 border-b border-slate-100 dark:border-slate-800 pb-3">
             <div className="flex items-center gap-2.5">
-              <div className="p-2 rounded-xl bg-amber-500/10 text-amber-600">
+              <div className="p-2 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400">
                 <Receipt className="w-5 h-5" />
               </div>
               <div>
-                <h3 className="text-base font-extrabold text-slate-900">
+                <h3 className="text-base font-extrabold text-slate-900 dark:text-white">
                   Despesas Diárias dos Motoristas
                 </h3>
-                <p className="text-xs text-slate-500">
+                <p className="text-xs text-slate-500 dark:text-slate-400">
                   Gastos lançados em tempo real pelo aplicativo na estrada
                 </p>
               </div>
             </div>
-            <span className="text-xs font-extrabold bg-slate-900 text-white px-3 py-1.5 rounded-xl">
+            <span className="text-xs font-extrabold bg-slate-900 dark:bg-emerald-500/20 text-white dark:text-emerald-300 border border-transparent dark:border-emerald-500/30 px-3 py-1.5 rounded-xl">
               {formatBRL(totalDriverDailyExpenses)}
             </span>
           </div>
@@ -1318,7 +1318,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               Nenhuma despesa diária registrada pelos motoristas no período selecionado.
             </div>
           ) : (
-            <div className="divide-y divide-slate-100 max-h-72 overflow-y-auto pr-1">
+            <div className="divide-y divide-slate-100 dark:divide-slate-800 max-h-72 overflow-y-auto pr-1">
               {filteredTravelExpenses.slice(0, 10).map((exp) => {
                 const drv = drivers.find((d) => d.id === exp.driverId);
                 const trk = trucks.find((t) => t.id === exp.truckId);
@@ -1330,22 +1330,22 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   >
                     <div className="min-w-0 space-y-0.5">
                       <div className="flex items-center gap-2">
-                        <span className="font-extrabold text-slate-900">
+                        <span className="font-extrabold text-slate-900 dark:text-white">
                           {EXPENSE_CATEGORY_LABELS[exp.category] ?? exp.category}
                         </span>
                         {trk && (
-                          <span className="px-1.5 py-0.5 rounded bg-slate-100 text-slate-800 font-bold text-[10px]">
+                          <span className="px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-emerald-300 font-bold text-[10px]">
                             {trk.plate}
                           </span>
                         )}
                       </div>
-                      <p className="text-[11px] text-slate-500 truncate">
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
                         {drv?.name ?? 'Motorista'} • {formatDate(exp.date)}
                         {exp.description ? ` • ${exp.description}` : ''}
                         {trp ? ` • Carga: ${trp.origin} → ${trp.destination}` : ''}
                       </p>
                     </div>
-                    <span className="text-sm font-extrabold text-slate-900 shrink-0">
+                    <span className="text-sm font-extrabold text-slate-900 dark:text-amber-300 shrink-0">
                       {formatBRL(exp.amount)}
                     </span>
                   </div>
@@ -1356,23 +1356,23 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
 
         {/* Gráfico: Variação do Preço do Diesel S10 nos Postos */}
-        <div className="bg-white p-5 sm:p-6 rounded-3xl shadow-sm border border-slate-200/90 flex flex-col justify-between space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
+        <div className="bg-white dark:bg-[#111926] p-5 sm:p-6 rounded-3xl shadow-sm border border-slate-200/90 dark:border-slate-800 flex flex-col justify-between space-y-4 transition-colors">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 dark:border-slate-800 pb-3">
             <div className="flex items-center gap-2.5">
-              <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-600">
+              <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
                 <Fuel className="w-5 h-5" />
               </div>
               <div>
-                <h3 className="text-base font-extrabold text-slate-900">
+                <h3 className="text-base font-extrabold text-slate-900 dark:text-white">
                   Curva do Preço do Diesel S10 (R$/L)
                 </h3>
-                <p className="text-xs text-slate-500">
+                <p className="text-xs text-slate-500 dark:text-slate-400">
                   Monitoramento dos valores pagos nos postos
                 </p>
               </div>
             </div>
             {metrics.dieselPriceTrend.length > 0 && (
-              <span className="text-xs font-extrabold text-emerald-800 bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-xl">
+              <span className="text-xs font-extrabold text-emerald-800 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-500/15 border border-emerald-200 dark:border-emerald-500/30 px-3 py-1.5 rounded-xl">
                 Último: R$ {(metrics.dieselPriceTrend.at(-1)?.price ?? 0).toFixed(2).replace('.', ',')}/L
               </span>
             )}
@@ -1390,7 +1390,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                     <stop offset="95%" stopColor="#10b981" stopOpacity={0.0} />
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#334155" strokeOpacity={0.35} />
                 <XAxis
                   dataKey="date"
                   tick={{ fontSize: 11, fill: '#64748b' }}
@@ -1436,18 +1436,18 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
       {/* 8. RANKING DE RENTABILIDADE POR ROTA */}
       {routeList.length > 0 && (
-        <div className="bg-white p-5 sm:p-6 rounded-3xl shadow-sm border border-slate-200/90 space-y-4">
+        <div className="bg-white dark:bg-[#111926] p-5 sm:p-6 rounded-3xl shadow-sm border border-slate-200/90 dark:border-slate-800 space-y-4 transition-colors">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
             <div>
-              <h3 className="text-base sm:text-lg font-extrabold text-slate-900 flex items-center gap-2">
-                <MapPin className="w-5 h-5 text-emerald-600" />
+              <h3 className="text-base sm:text-lg font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
+                <MapPin className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
                 Rentabilidade por Rota de Destino
               </h3>
-              <p className="text-xs text-slate-500">
+              <p className="text-xs text-slate-500 dark:text-slate-400">
                 Comparativo de margem líquida real entre os trajetos operados
               </p>
             </div>
-            <span className="text-xs font-bold text-slate-500">
+            <span className="text-xs font-bold text-slate-500 dark:text-slate-400">
               {routeList.length} rota(s) apurada(s)
             </span>
           </div>
@@ -1458,20 +1458,20 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               return (
                 <div
                   key={idx}
-                  className="bg-slate-50/90 p-4 rounded-2xl border border-slate-200/90 flex items-center justify-between gap-3"
+                  className="bg-slate-50/90 dark:bg-[#0b111a]/80 p-4 rounded-2xl border border-slate-200/90 dark:border-slate-800 flex items-center justify-between gap-3"
                 >
                   <div className="space-y-0.5 min-w-0">
-                    <span className="text-xs font-extrabold text-slate-900 block truncate">
+                    <span className="text-xs font-extrabold text-slate-900 dark:text-white block truncate">
                       {r.route}
                     </span>
-                    <span className="text-[11px] text-slate-500 block">
+                    <span className="text-[11px] text-slate-500 dark:text-slate-400 block">
                       {r.tripsCount} viagem(ns) • Bruto: {formatBRL(r.gross)}
                     </span>
                   </div>
                   <div className="text-right shrink-0">
                     <span
                       className={`text-sm font-extrabold block ${
-                        isProfit ? 'text-emerald-600' : 'text-rose-600'
+                        isProfit ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'
                       }`}
                     >
                       {formatBRL(r.net)}
@@ -1479,10 +1479,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                     <span
                       className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${
                         r.margin >= 30
-                          ? 'bg-emerald-100 text-emerald-800'
+                          ? 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300'
                           : r.margin >= 10
-                          ? 'bg-amber-100 text-amber-800'
-                          : 'bg-rose-100 text-rose-800'
+                          ? 'bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300'
+                          : 'bg-rose-100 dark:bg-rose-950/60 text-rose-800 dark:text-rose-300'
                       }`}
                     >
                       {r.margin.toFixed(1)}% margem

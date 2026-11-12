@@ -230,15 +230,15 @@ export const QuickEntryView: React.FC<QuickEntryViewProps> = ({
       </div>
 
       {/* Foto do Recibo + Leitura Inteligente (OCR) */}
-      <div className="bg-white p-5 rounded-2xl shadow-sm ring-1 ring-slate-200 space-y-3">
+      <div className="bg-white dark:bg-[#111926] p-5 rounded-2xl shadow-sm ring-1 ring-slate-200 dark:ring-slate-800 space-y-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Sparkles className="w-5 h-5 text-sky-600" />
-            <h3 className="text-sm font-bold text-slate-900">
+            <Sparkles className="w-5 h-5 text-emerald-500" />
+            <h3 className="text-sm font-bold text-slate-900 dark:text-white">
               Foto do Recibo (Leitura Inteligente IA)
             </h3>
           </div>
-          <span className="text-[11px] text-slate-500">Gemini / GPT-4o</span>
+          <span className="text-[11px] text-slate-500 dark:text-slate-400">Gemini / GPT-4o</span>
         </div>
 
         <input
@@ -256,47 +256,47 @@ export const QuickEntryView: React.FC<QuickEntryViewProps> = ({
         {!receiptImage ? (
           <div
             onClick={() => fileInputRef.current?.click()}
-            className="border-2 border-dashed border-slate-300 hover:border-sky-500 bg-slate-50/60 hover:bg-sky-50/30 p-6 rounded-2xl text-center cursor-pointer transition-all flex flex-col items-center justify-center gap-2 group"
+            className="border-2 border-dashed border-slate-300 dark:border-slate-700 hover:border-emerald-500 bg-slate-50/60 dark:bg-[#0b111a]/60 hover:bg-emerald-50/30 dark:hover:bg-emerald-950/20 p-6 rounded-2xl text-center cursor-pointer transition-all flex flex-col items-center justify-center gap-2 group"
           >
             {ocrLoading ? (
-              <div className="py-4 flex flex-col items-center gap-2 text-sky-700">
+              <div className="py-4 flex flex-col items-center gap-2 text-emerald-600 dark:text-emerald-400">
                 <Loader2 className="w-8 h-8 animate-spin" />
                 <span className="text-sm font-semibold">
                   Analisando recibo com Inteligência Artificial...
                 </span>
-                <span className="text-xs text-slate-500">
+                <span className="text-xs text-slate-500 dark:text-slate-400">
                   Extraindo valor total, litros e data/hora
                 </span>
               </div>
             ) : (
               <>
-                <div className="p-3 bg-white rounded-full shadow-sm text-sky-600 group-hover:scale-110 transition-transform">
+                <div className="p-3 bg-white dark:bg-[#111926] rounded-full shadow-sm text-emerald-500 group-hover:scale-110 transition-transform">
                   <UploadCloud className="w-6 h-6" />
                 </div>
-                <div className="text-sm font-semibold text-slate-800">
+                <div className="text-sm font-semibold text-slate-800 dark:text-slate-200">
                   Clique para tirar foto ou anexar o recibo
                 </div>
-                <p className="text-xs text-slate-500 max-w-sm">
+                <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm">
                   Anexe a foto do cupom fiscal para comprovação e preenchimento automático de Litros e Valor Total.
                 </p>
               </>
             )}
           </div>
         ) : (
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-3 bg-slate-50 rounded-xl ring-1 ring-slate-200">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-3 bg-slate-50 dark:bg-[#0b111a] rounded-xl ring-1 ring-slate-200 dark:ring-slate-800">
             <div className="flex items-center gap-3 w-full sm:w-auto">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={receiptImage}
                 alt="Recibo"
-                className="w-16 h-16 object-cover rounded-lg ring-1 ring-slate-300"
+                className="w-16 h-16 object-cover rounded-lg ring-1 ring-slate-300 dark:ring-slate-700"
               />
               <div className="text-xs space-y-0.5">
-                <span className="font-bold text-slate-900 flex items-center gap-1">
-                  <FileText className="w-3.5 h-3.5 text-emerald-600" />
+                <span className="font-bold text-slate-900 dark:text-white flex items-center gap-1">
+                  <FileText className="w-3.5 h-3.5 text-emerald-500" />
                   Foto do Recibo Anexada
                 </span>
-                <span className="text-slate-500 block">Dados sincronizados com o formulário</span>
+                <span className="text-slate-500 dark:text-slate-400 block">Dados sincronizados com o formulário</span>
               </div>
             </div>
 
@@ -305,7 +305,7 @@ export const QuickEntryView: React.FC<QuickEntryViewProps> = ({
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
                 disabled={ocrLoading}
-                className="text-xs font-semibold px-3 py-2 bg-white ring-1 ring-slate-200 rounded-lg hover:bg-slate-100 flex items-center gap-1.5"
+                className="text-xs font-semibold px-3 py-2 bg-white dark:bg-[#111926] text-slate-800 dark:text-slate-200 ring-1 ring-slate-200 dark:ring-slate-700 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center gap-1.5"
               >
                 <Camera className="w-3.5 h-3.5" />
                 Trocar Foto
@@ -326,8 +326,8 @@ export const QuickEntryView: React.FC<QuickEntryViewProps> = ({
         )}
 
         {ocrSuccessMsg && (
-          <div className="flex items-start gap-2 p-3 bg-emerald-50 text-emerald-900 rounded-xl text-xs">
-            <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+          <div className="flex items-start gap-2 p-3 bg-emerald-50 dark:bg-emerald-950/50 text-emerald-900 dark:text-emerald-200 rounded-xl text-xs">
+            <CheckCircle className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
             <span>{ocrSuccessMsg}</span>
           </div>
         )}
@@ -337,38 +337,38 @@ export const QuickEntryView: React.FC<QuickEntryViewProps> = ({
         <div
           className={`p-4 rounded-2xl ring-1 ${
             feedback.type === 'success'
-              ? 'bg-emerald-50 ring-emerald-200 text-emerald-900'
-              : 'bg-rose-50 ring-rose-200 text-rose-900'
+              ? 'bg-emerald-50 dark:bg-emerald-950/50 ring-emerald-200 dark:ring-emerald-800 text-emerald-900 dark:text-emerald-200'
+              : 'bg-rose-50 dark:bg-rose-950/50 ring-rose-200 dark:ring-rose-800 text-rose-900 dark:text-rose-200'
           }`}
         >
           <div className="flex items-center gap-2 font-bold text-sm">
             {feedback.type === 'success' ? (
-              <CheckCircle className="w-5 h-5 text-emerald-600" />
+              <CheckCircle className="w-5 h-5 text-emerald-500" />
             ) : (
-              <AlertTriangle className="w-5 h-5 text-rose-600" />
+              <AlertTriangle className="w-5 h-5 text-rose-500" />
             )}
             <span>{feedback.message}</span>
           </div>
           {feedback.monthlyPerf && (
-            <div className="mt-2 text-xs bg-white/80 p-3 rounded-xl border border-emerald-100 space-y-1">
-              <span className="font-semibold block text-slate-700">
+            <div className="mt-2 text-xs bg-white/80 dark:bg-[#0b111a] p-3 rounded-xl border border-emerald-100 dark:border-emerald-800/50 space-y-1">
+              <span className="font-semibold block text-slate-700 dark:text-slate-300">
                 Desempenho Acumulado ({feedback.monthlyPerf.periodLabel}):
               </span>
               <p>
                 Média Mensal:{' '}
-                <strong className="text-emerald-700 text-sm">
+                <strong className="text-emerald-700 dark:text-emerald-400 text-sm">
                   {feedback.monthlyPerf.monthlyAvgKmL > 0
                     ? `${feedback.monthlyPerf.monthlyAvgKmL.toFixed(1).replace('.', ',')} km/L`
                     : '0,0 km/L (primeiro registro do mês)'}
                 </strong>
                 {' • '}
                 Custo de Diesel por KM:{' '}
-                <strong className="text-slate-900 text-sm">
+                <strong className="text-slate-900 dark:text-white text-sm">
                   R$ {feedback.monthlyPerf.fuelCpk.toFixed(2).replace('.', ',')}
                 </strong>
               </p>
               {feedback.monthlyPerf.isAnomalous && feedback.monthlyPerf.anomalyMessage && (
-                <p className="text-amber-800 bg-amber-50 border border-amber-200 p-2 rounded-lg font-semibold mt-1">
+                <p className="text-amber-800 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/50 border border-amber-200 dark:border-amber-800 p-2 rounded-lg font-semibold mt-1">
                   ⚠️ {feedback.monthlyPerf.anomalyMessage}
                 </p>
               )}
@@ -380,17 +380,17 @@ export const QuickEntryView: React.FC<QuickEntryViewProps> = ({
       {/* Formulário Simplificado (Sem is_full_tank) */}
       <form
         onSubmit={handleSubmit}
-        className="bg-white p-6 rounded-2xl shadow-sm ring-1 ring-slate-200 space-y-4"
+        className="bg-white dark:bg-[#111926] p-6 rounded-2xl shadow-sm ring-1 ring-slate-200 dark:ring-slate-800 space-y-4"
       >
         {/* 1. Caminhão (Placa) */}
         <div>
-          <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+          <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase mb-1">
             Caminhão (Placa)
           </label>
           <select
             value={truckId}
             onChange={(e) => handleTruckChange(e.target.value)}
-            className="w-full text-base font-semibold p-3.5 bg-slate-50 rounded-xl ring-1 ring-slate-200 focus:ring-2 focus:ring-sky-500 focus:outline-none"
+            className="w-full text-base font-semibold p-3.5 bg-slate-50 dark:bg-[#0b111a] text-slate-900 dark:text-slate-100 rounded-xl ring-1 ring-slate-200 dark:ring-slate-700 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
           >
             {trucks.map((t) => (
               <option key={t.id} value={t.id}>
@@ -403,13 +403,13 @@ export const QuickEntryView: React.FC<QuickEntryViewProps> = ({
         {/* Motorista e 2. Data/Hora */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
-            <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase mb-1">
               Motorista
             </label>
             <select
               value={driverId}
               onChange={(e) => setDriverId(e.target.value)}
-              className="w-full text-sm font-medium p-3 bg-slate-50 rounded-xl ring-1 ring-slate-200 focus:ring-2 focus:ring-sky-500 focus:outline-none"
+              className="w-full text-sm font-medium p-3 bg-slate-50 dark:bg-[#0b111a] text-slate-900 dark:text-slate-100 rounded-xl ring-1 ring-slate-200 dark:ring-slate-700 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
             >
               {drivers.map((d) => (
                 <option key={d.id} value={d.id}>
@@ -419,7 +419,7 @@ export const QuickEntryView: React.FC<QuickEntryViewProps> = ({
             </select>
           </div>
           <div>
-            <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase mb-1">
               Data / Hora
             </label>
             <input
@@ -427,14 +427,14 @@ export const QuickEntryView: React.FC<QuickEntryViewProps> = ({
               required
               value={logDateTime}
               onChange={(e) => setLogDateTime(e.target.value)}
-              className="w-full text-sm p-3 bg-slate-50 rounded-xl ring-1 ring-slate-200 focus:ring-2 focus:ring-sky-500 focus:outline-none"
+              className="w-full text-sm p-3 bg-slate-50 dark:bg-[#0b111a] text-slate-900 dark:text-slate-100 rounded-xl ring-1 ring-slate-200 dark:ring-slate-700 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
             />
           </div>
         </div>
 
         {/* 3. Odômetro Atual (km) */}
         <div>
-          <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+          <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase mb-1">
             Odômetro Atual (km)
           </label>
           <input
@@ -443,7 +443,7 @@ export const QuickEntryView: React.FC<QuickEntryViewProps> = ({
             required
             value={odometer}
             onChange={(e) => setOdometer(Number(e.target.value))}
-            className="w-full text-xl font-bold p-3.5 bg-sky-50/40 rounded-xl ring-1 ring-sky-200 text-sky-950 focus:ring-2 focus:ring-sky-500 focus:outline-none"
+            className="w-full text-xl font-bold p-3.5 bg-emerald-50/40 dark:bg-emerald-950/30 rounded-xl ring-1 ring-emerald-200 dark:ring-emerald-800/60 text-emerald-950 dark:text-emerald-200 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
             placeholder="Ex: 228500"
           />
         </div>
@@ -451,7 +451,7 @@ export const QuickEntryView: React.FC<QuickEntryViewProps> = ({
         {/* 4. Litros Abastecidos & 5. Valor Total (R$) */}
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase mb-1">
               Litros Abastecidos
             </label>
             <input
@@ -462,12 +462,12 @@ export const QuickEntryView: React.FC<QuickEntryViewProps> = ({
               required
               value={liters}
               onChange={(e) => setLiters(Number(e.target.value))}
-              className="w-full text-base font-bold p-3 bg-slate-50 rounded-xl ring-1 ring-slate-200 focus:ring-2 focus:ring-sky-500 focus:outline-none"
+              className="w-full text-base font-bold p-3 bg-slate-50 dark:bg-[#0b111a] text-slate-900 dark:text-slate-100 rounded-xl ring-1 ring-slate-200 dark:ring-slate-700 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
               placeholder="Ex: 550"
             />
           </div>
           <div>
-            <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase mb-1">
               Valor Total (R$)
             </label>
             <input
@@ -478,14 +478,14 @@ export const QuickEntryView: React.FC<QuickEntryViewProps> = ({
               required
               value={totalAmount}
               onChange={(e) => setTotalAmount(Number(e.target.value))}
-              className="w-full text-base font-bold p-3 bg-slate-50 rounded-xl ring-1 ring-slate-200 focus:ring-2 focus:ring-sky-500 focus:outline-none"
+              className="w-full text-base font-bold p-3 bg-slate-50 dark:bg-[#0b111a] text-slate-900 dark:text-slate-100 rounded-xl ring-1 ring-slate-200 dark:ring-slate-700 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
               placeholder="Ex: 3272.50"
             />
           </div>
         </div>
 
         {/* Card de Total e Preço Médio por Litro Derivado */}
-        <div className="bg-slate-900 text-white p-4 rounded-xl flex items-center justify-between">
+        <div className="bg-slate-900 dark:bg-[#0b111a] border border-emerald-500/20 text-white p-4 rounded-xl flex items-center justify-between">
           <div>
             <span className="text-xs text-slate-400 block">Valor Total do Abastecimento</span>
             <span className="text-xs text-slate-400">
@@ -498,7 +498,7 @@ export const QuickEntryView: React.FC<QuickEntryViewProps> = ({
         <button
           type="submit"
           disabled={submitting || ocrLoading}
-          className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-base p-4 rounded-xl shadow-lg shadow-emerald-600/25 transition-all flex items-center justify-center gap-2 active:scale-98 disabled:opacity-50"
+          className="w-full bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-extrabold text-base p-4 rounded-xl shadow-lg shadow-emerald-500/25 transition-all flex items-center justify-center gap-2 active:scale-98 disabled:opacity-50"
         >
           {submitting ? (
             <span>Salvando dados no banco...</span>
@@ -513,11 +513,11 @@ export const QuickEntryView: React.FC<QuickEntryViewProps> = ({
 
       {/* Histórico Recente de Abastecimentos para conferência rápida */}
       {fuelLogs.length > 0 && (
-        <div className="bg-white p-5 rounded-2xl shadow-sm ring-1 ring-slate-200 space-y-3">
-          <h3 className="text-sm font-bold text-slate-900">
+        <div className="bg-white dark:bg-[#111926] p-5 rounded-2xl shadow-sm ring-1 ring-slate-200 dark:ring-slate-800 space-y-3">
+          <h3 className="text-sm font-bold text-slate-900 dark:text-white">
             Últimos Abastecimentos Registrados ({fuelLogs.length})
           </h3>
-          <div className="divide-y divide-slate-100">
+          <div className="divide-y divide-slate-100 dark:divide-slate-800">
             {fuelLogs.slice(0, 15).map((log) => {
               const t = trucks.find((x) => x.id === log.truckId);
               const d = drivers.find((x) => x.id === log.driverId);
@@ -527,19 +527,19 @@ export const QuickEntryView: React.FC<QuickEntryViewProps> = ({
                   className="py-3 flex flex-wrap items-center justify-between gap-2 text-xs"
                 >
                   <div className="space-y-0.5">
-                    <div className="flex items-center gap-2 font-bold text-slate-900">
-                      <span className="bg-slate-900 text-white px-2 py-0.5 rounded">
+                    <div className="flex items-center gap-2 font-bold text-slate-900 dark:text-slate-100">
+                      <span className="bg-slate-900 dark:bg-emerald-500/20 text-white dark:text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded">
                         {t?.plate ?? 'Caminhão'}
                       </span>
                       <span>{log.liters.toLocaleString('pt-BR')} L</span>
                       <span>• {log.odometer.toLocaleString('pt-BR')} km</span>
                     </div>
-                    <div className="text-slate-500">
+                    <div className="text-slate-500 dark:text-slate-400">
                       {formatDate(log.date)} • Motorista: {d?.name ?? '—'} • {log.gasStationName}
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
-                    <strong className="text-sm text-emerald-700">
+                    <strong className="text-sm text-emerald-700 dark:text-emerald-400">
                       {formatBRL(log.totalAmount)}
                     </strong>
                     {onRemoveLog && (
@@ -549,7 +549,7 @@ export const QuickEntryView: React.FC<QuickEntryViewProps> = ({
                           confirm('Excluir este lançamento de abastecimento?') &&
                           onRemoveLog(log.id)
                         }
-                        className="p-1.5 text-rose-600 hover:bg-rose-50 rounded-lg"
+                        className="p-1.5 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/50 rounded-lg"
                         title="Excluir abastecimento"
                       >
                         <Trash2 className="w-4 h-4" />

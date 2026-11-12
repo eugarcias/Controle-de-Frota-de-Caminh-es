@@ -397,13 +397,13 @@ export const FreightTripsView: React.FC<FreightTripsViewProps> = ({
   return (
     <div className="space-y-6">
       {/* Header com Filtros e botão */}
-      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 bg-white p-5 rounded-2xl shadow-sm ring-1 ring-slate-200">
+      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 bg-white dark:bg-[#111926] p-5 rounded-2xl shadow-sm ring-1 ring-slate-200 dark:ring-slate-800">
         <div>
-          <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
-            <Navigation className="w-5 h-5 text-emerald-600" />
+          <h2 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
+            <Navigation className="w-5 h-5 text-emerald-500" />
             Gestão de Fretes e Viagens
           </h2>
-          <p className="text-xs text-slate-500 mt-0.5">
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
             Mapeamento de rotas, rentabilidade por destino e custos operacionais por frete.
           </p>
         </div>
@@ -413,7 +413,7 @@ export const FreightTripsView: React.FC<FreightTripsViewProps> = ({
             aria-label="Filtrar por caminhão"
             value={selectedTruck}
             onChange={(e) => setSelectedTruck(e.target.value)}
-            className="text-xs font-semibold p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-sky-500 focus:outline-none"
+            className="text-xs font-semibold p-2.5 bg-slate-50 dark:bg-[#0b111a] text-slate-900 dark:text-slate-100 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none"
           >
             <option value="ALL">Todos os caminhões ({trucks.length})</option>
             {trucks.map((t) => (
@@ -454,44 +454,44 @@ export const FreightTripsView: React.FC<FreightTripsViewProps> = ({
           return (
             <div
               key={trip.id}
-              className="bg-white p-5 rounded-2xl shadow-sm ring-1 ring-slate-200 hover:ring-sky-400 transition-all space-y-4"
+              className="bg-white dark:bg-[#111926] p-5 rounded-2xl shadow-sm ring-1 ring-slate-200 dark:ring-slate-800 hover:ring-emerald-500/60 transition-all space-y-4"
             >
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800 pb-3">
                 <div className="space-y-1.5">
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="bg-slate-900 text-sky-300 text-xs font-bold px-2.5 py-0.5 rounded-lg">
+                    <span className="bg-slate-900 dark:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-xs font-bold px-2.5 py-0.5 rounded-lg">
                       {getTruckPlate(trip.truckId)}
                     </span>
-                    <span className="text-xs font-semibold text-slate-800 bg-slate-100 px-2.5 py-0.5 rounded-lg">
+                    <span className="text-xs font-semibold text-slate-800 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 px-2.5 py-0.5 rounded-lg">
                       {trip.customerName}
                     </span>
                     <Badge tone={statusTone[status]}>{statusLabel[status]}</Badge>
                     {trip.destinationState && (
-                      <span className="inline-flex items-center gap-1 text-[11px] font-bold text-sky-800 bg-sky-50 px-2 py-0.5 rounded-md">
-                        <MapPin className="w-3 h-3 text-sky-600" />
+                      <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-800 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800/50 px-2 py-0.5 rounded-md">
+                        <MapPin className="w-3 h-3 text-emerald-500" />
                         {trip.destinationCity ? `${trip.destinationCity}/${trip.destinationState}` : trip.destinationState}
                       </span>
                     )}
                   </div>
-                  <div className="text-base font-bold text-slate-900 flex flex-wrap items-center gap-2">
+                  <div className="text-base font-bold text-slate-900 dark:text-white flex flex-wrap items-center gap-2">
                     <span>{trip.origin}</span>
-                    <ArrowRight className="w-4 h-4 text-slate-400" />
+                    <ArrowRight className="w-4 h-4 text-emerald-500" />
                     <span>{trip.destination}</span>
                   </div>
                   {trip.cargoDescription && (
-                    <div className="text-xs text-slate-600 flex items-center gap-1.5">
-                      <Package className="w-3.5 h-3.5 text-sky-600" />
+                    <div className="text-xs text-slate-600 dark:text-slate-400 flex items-center gap-1.5">
+                      <Package className="w-3.5 h-3.5 text-emerald-500" />
                       {trip.cargoDescription}
                       {trip.cargoWeightKg ? ` • ${trip.cargoWeightKg.toLocaleString('pt-BR')} kg` : ''}
                     </div>
                   )}
                 </div>
 
-                <div className="text-left sm:text-right bg-slate-50 sm:bg-transparent p-3 sm:p-0 rounded-xl">
-                  <span className="text-xs text-slate-500 block">Frete bruto</span>
-                  <span className="text-xl font-bold text-slate-900">{formatBRL(trip.grossFreightValue)}</span>
+                <div className="text-left sm:text-right bg-slate-50 dark:bg-[#0b111a] sm:bg-transparent p-3 sm:p-0 rounded-xl">
+                  <span className="text-xs text-slate-500 dark:text-slate-400 block">Frete bruto</span>
+                  <span className="text-xl font-bold text-slate-900 dark:text-white">{formatBRL(trip.grossFreightValue)}</span>
                   {kmDistance > 0 && (
-                    <span className="text-[11px] text-slate-500 block">
+                    <span className="text-[11px] text-slate-500 dark:text-slate-400 block">
                       {formatBRL(trip.grossFreightValue / kmDistance)} / km
                     </span>
                   )}
@@ -499,58 +499,58 @@ export const FreightTripsView: React.FC<FreightTripsViewProps> = ({
               </div>
 
               {/* Grid de detalhes com suporte a Mobile */}
-              <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 text-xs bg-slate-50 p-3.5 rounded-xl">
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 text-xs bg-slate-50 dark:bg-[#0b111a] border border-slate-100 dark:border-slate-800/80 p-3.5 rounded-xl">
                 <div>
                   <span className="text-slate-400 block">Motorista</span>
-                  <span className="font-semibold text-slate-800">{getDriverName(trip.driverId)}</span>
+                  <span className="font-semibold text-slate-800 dark:text-slate-200">{getDriverName(trip.driverId)}</span>
                 </div>
                 <div>
                   <span className="text-slate-400 block">Distância</span>
-                  <span className="font-semibold text-slate-800 flex items-center gap-1">
-                    <Route className="w-3.5 h-3.5 text-sky-600" />
+                  <span className="font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-1">
+                    <Route className="w-3.5 h-3.5 text-emerald-500" />
                     {kmDistance > 0 ? `${kmDistance.toLocaleString('pt-BR')} km` : '—'}
                   </span>
                 </div>
                 <div>
                   <span className="text-slate-400 block">Período</span>
-                  <span className="font-semibold text-slate-800">
+                  <span className="font-semibold text-slate-800 dark:text-slate-200">
                     {formatDate(trip.startDate)} → {formatDate(trip.endDate)}
                   </span>
                 </div>
                 <div>
                   <span className="text-slate-400 block">Pedágios</span>
-                  <span className="font-semibold text-rose-600">{formatBRL(trip.tollCosts)}</span>
+                  <span className="font-semibold text-rose-600 dark:text-rose-400">{formatBRL(trip.tollCosts)}</span>
                 </div>
                 <div>
                   <span className="text-slate-400 block">Chapa / Outros</span>
-                  <span className="font-semibold text-rose-600">
+                  <span className="font-semibold text-rose-600 dark:text-rose-400">
                     {formatBRL(trip.loadingUnloadingCosts + trip.otherExpenses)}
                   </span>
                 </div>
               </div>
 
               {trip.notes && (
-                <div className="flex items-start gap-2 text-xs text-amber-900 bg-amber-50 border border-amber-200 px-3.5 py-2.5 rounded-xl">
-                  <MessageSquare className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                <div className="flex items-start gap-2 text-xs text-amber-900 dark:text-amber-200 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 px-3.5 py-2.5 rounded-xl">
+                  <MessageSquare className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
                   <div>
-                    <span className="font-bold block text-[11px] uppercase tracking-wider text-amber-800">
+                    <span className="font-bold block text-[11px] uppercase tracking-wider text-amber-800 dark:text-amber-400">
                       Observação do Frete / Motorista
                     </span>
-                    <span className="font-medium text-amber-950">{trip.notes}</span>
+                    <span className="font-medium text-amber-950 dark:text-amber-100">{trip.notes}</span>
                   </div>
                 </div>
               )}
 
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
-                <div className="flex flex-wrap items-center gap-2 text-xs text-slate-600">
+                <div className="flex flex-wrap items-center gap-2 text-xs text-slate-600 dark:text-slate-400">
                   <span>
-                    Custos deduzidos: <strong className="text-rose-600">{formatBRL(costsTotal)}</strong>
+                    Custos deduzidos: <strong className="text-rose-600 dark:text-rose-400">{formatBRL(costsTotal)}</strong>
                   </span>
                   {trip.paymentTerms && <span>• Pagamento: {trip.paymentTerms}</span>}
                   <button
                     type="button"
                     onClick={() => openEditModal(trip)}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-sky-50 hover:bg-sky-100 text-sky-800 border border-sky-200 font-bold text-xs transition"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-700/60 font-bold text-xs transition"
                     title="Corrigir ou editar informações deste frete"
                   >
                     <Pencil className="w-3.5 h-3.5" />
@@ -560,7 +560,7 @@ export const FreightTripsView: React.FC<FreightTripsViewProps> = ({
                     aria-label="Alterar status do frete"
                     value={status}
                     onChange={(e) => onUpdate(trip.id, { status: e.target.value as TripStatus })}
-                    className="text-xs p-1.5 border border-slate-200 rounded-lg bg-white focus:outline-none font-semibold"
+                    className="text-xs p-1.5 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-[#0b111a] text-slate-900 dark:text-slate-100 focus:outline-none font-semibold"
                   >
                     {(Object.keys(statusLabel) as TripStatus[]).map((s) => (
                       <option key={s} value={s}>
@@ -572,7 +572,7 @@ export const FreightTripsView: React.FC<FreightTripsViewProps> = ({
                     <button
                       type="button"
                       onClick={() => confirm('Excluir este frete?') && onRemove(trip.id)}
-                      className="p-1.5 text-rose-600 hover:bg-rose-50 rounded-lg"
+                      className="p-1.5 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/50 rounded-lg"
                       title="Excluir frete"
                     >
                       <Trash2 className="w-4 h-4" />
@@ -583,7 +583,9 @@ export const FreightTripsView: React.FC<FreightTripsViewProps> = ({
                 <div className="flex items-center justify-between sm:justify-end gap-3">
                   <span
                     className={`text-xs px-2.5 py-1 rounded-md font-bold ${
-                      isPositive ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'
+                      isPositive
+                        ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/50'
+                        : 'bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800/50'
                     }`}
                   >
                     Margem: {margin}%
@@ -592,7 +594,7 @@ export const FreightTripsView: React.FC<FreightTripsViewProps> = ({
                     <span className="text-[11px] text-slate-400 block">Lucro líquido</span>
                     <span
                       className={`text-base font-bold ${
-                        isPositive ? 'text-emerald-600' : 'text-rose-600'
+                        isPositive ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'
                       }`}
                     >
                       {formatBRL(trip.netFreightValue)}

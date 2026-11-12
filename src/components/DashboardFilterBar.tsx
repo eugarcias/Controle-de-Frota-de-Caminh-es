@@ -23,7 +23,7 @@ interface DashboardFilterBarProps {
 }
 
 const labelCls =
-  'flex items-center gap-1 text-[11px] font-bold text-slate-500 uppercase mb-1';
+  'flex items-center gap-1 text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase mb-1';
 
 export function DashboardFilterBar({
   trucks,
@@ -58,7 +58,7 @@ export function DashboardFilterBar({
   return (
     <section
       aria-label="Filtros globais do dashboard"
-      className="sticky top-0 z-30 -mx-4 sm:mx-0 bg-white/95 backdrop-blur sm:rounded-2xl shadow-sm ring-1 ring-slate-200"
+      className="sticky top-0 z-30 -mx-4 sm:mx-0 bg-white/95 dark:bg-[#111926]/95 backdrop-blur sm:rounded-2xl shadow-sm ring-1 ring-slate-200 dark:ring-slate-800 transition-colors"
     >
       {/* Cabeçalho (toggle no mobile) */}
       <div className="flex items-center justify-between gap-2 px-4 py-3">
@@ -67,9 +67,9 @@ export function DashboardFilterBar({
           onClick={() => setOpen((o) => !o)}
           aria-expanded={open}
           aria-controls="dashboard-filter-fields"
-          className="flex items-center gap-2 text-xs font-bold text-slate-800 uppercase tracking-wider lg:cursor-default"
+          className="flex items-center gap-2 text-xs font-bold text-slate-800 dark:text-slate-100 uppercase tracking-wider lg:cursor-default"
         >
-          <Filter className="w-4 h-4 text-emerald-600" />
+          <Filter className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
           Filtros
           {activeCount > 0 && (
             <span className="bg-emerald-600 text-white rounded-full px-1.5 min-w-5 h-5 inline-flex items-center justify-center text-[11px]">
@@ -83,7 +83,7 @@ export function DashboardFilterBar({
 
         <div className="flex items-center gap-3">
           {typeof resultCount === 'number' && (
-            <span className="text-[11px] text-slate-500 hidden sm:inline">
+            <span className="text-[11px] text-slate-500 dark:text-slate-400 hidden sm:inline">
               {resultCount} registro(s) no escopo
             </span>
           )}
@@ -91,7 +91,7 @@ export function DashboardFilterBar({
             <button
               type="button"
               onClick={() => onChange(defaultDashboardFilters)}
-              className="text-xs font-semibold text-rose-600 hover:text-rose-700 flex items-center gap-1 min-h-8"
+              className="text-xs font-semibold text-rose-600 dark:text-rose-400 hover:text-rose-700 flex items-center gap-1 min-h-8"
             >
               <RefreshCw className="w-3.5 h-3.5" />
               Limpar
@@ -114,7 +114,7 @@ export function DashboardFilterBar({
               id="flt-period"
               value={value.period}
               onChange={(e) => set({ period: e.target.value as PeriodPreset })}
-              className={cn(inputCls, 'bg-slate-50 font-medium')}
+              className={cn(inputCls, 'bg-slate-50 dark:bg-[#0b111a] font-medium')}
             >
               {(Object.keys(periodLabels) as PeriodPreset[]).map((p) => (
                 <option key={p} value={p}>

@@ -72,13 +72,13 @@ export const MaintenanceView: React.FC<MaintenanceViewProps> = ({
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white dark:bg-[#111926] p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
         <div>
-          <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
-            <Wrench className="w-5 h-5 text-sky-600" />
+          <h2 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
+            <Wrench className="w-5 h-5 text-emerald-500" />
             Controle de Oficina e Manutenção
           </h2>
-          <p className="text-xs text-slate-500 mt-0.5">
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
             Histórico de revisões, trocas de óleo, custos de oficina e alertas por KM.
           </p>
         </div>
@@ -88,7 +88,7 @@ export const MaintenanceView: React.FC<MaintenanceViewProps> = ({
             aria-label="Filtrar caminhão"
             value={selectedTruck}
             onChange={(e) => setSelectedTruck(e.target.value)}
-            className="text-xs font-semibold p-2.5 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-sky-500 focus:outline-none"
+            className="text-xs font-semibold p-2.5 bg-slate-50 dark:bg-[#0b111a] text-slate-900 dark:text-slate-100 border border-slate-300 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none"
           >
             <option value="ALL">Todos os Caminhões ({trucks.length})</option>
             {trucks.map((t) => (
@@ -128,22 +128,22 @@ export const MaintenanceView: React.FC<MaintenanceViewProps> = ({
           return (
             <div
               key={t.id}
-              className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-3"
+              className="bg-white dark:bg-[#111926] p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-3"
             >
               <div className="flex items-center justify-between">
                 <div>
-                  <span className="text-base font-extrabold text-slate-900 block">{t.plate}</span>
-                  <span className="text-xs text-slate-500">
+                  <span className="text-base font-extrabold text-slate-900 dark:text-white block">{t.plate}</span>
+                  <span className="text-xs text-slate-500 dark:text-slate-400">
                     {t.brand} {t.model}
                   </span>
                 </div>
                 <span
                   className={`text-xs px-2.5 py-0.5 rounded-full font-bold ${
                     t.status === 'ATIVO'
-                      ? 'bg-emerald-100 text-emerald-800'
+                      ? 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border border-emerald-500/30'
                       : t.status === 'MANUTENCAO'
-                      ? 'bg-rose-100 text-rose-800'
-                      : 'bg-slate-100 text-slate-800'
+                      ? 'bg-rose-100 dark:bg-rose-950/60 text-rose-800 dark:text-rose-300 border border-rose-500/30'
+                      : 'bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-300'
                   }`}
                 >
                   {t.status === 'ATIVO'
@@ -154,16 +154,16 @@ export const MaintenanceView: React.FC<MaintenanceViewProps> = ({
                 </span>
               </div>
 
-              <div className="text-xs bg-slate-50 p-3 rounded-xl border border-slate-100 space-y-1.5">
+              <div className="text-xs bg-slate-50 dark:bg-[#0b111a] p-3 rounded-xl border border-slate-100 dark:border-slate-800 space-y-1.5">
                 <div className="flex justify-between">
-                  <span className="text-slate-500">Hodômetro Atual:</span>
-                  <span className="font-bold text-slate-800">
+                  <span className="text-slate-500 dark:text-slate-400">Hodômetro Atual:</span>
+                  <span className="font-bold text-slate-800 dark:text-slate-200">
                     {t.currentOdometer.toLocaleString('pt-BR')} km
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-slate-500">Próxima Troca de Óleo:</span>
-                  <span className="font-bold text-slate-800">
+                  <span className="text-slate-500 dark:text-slate-400">Próxima Troca de Óleo:</span>
+                  <span className="font-bold text-slate-800 dark:text-slate-200">
                     {lastOil?.nextServiceOdometerAlert
                       ? `${lastOil.nextServiceOdometerAlert.toLocaleString('pt-BR')} km`
                       : 'Não programada'}
@@ -174,17 +174,17 @@ export const MaintenanceView: React.FC<MaintenanceViewProps> = ({
               {kmRemaining !== null && (
                 <div>
                   {kmRemaining <= 0 ? (
-                    <div className="flex items-center gap-1.5 text-xs font-bold text-rose-600 bg-rose-50 p-2.5 rounded-xl border border-rose-200">
+                    <div className="flex items-center gap-1.5 text-xs font-bold text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/50 p-2.5 rounded-xl border border-rose-200 dark:border-rose-800">
                       <AlertCircle className="w-4 h-4 shrink-0" />
                       <span>REVISÃO ATRASADA EM {Math.abs(kmRemaining).toLocaleString('pt-BR')} KM!</span>
                     </div>
                   ) : kmRemaining <= 1000 ? (
-                    <div className="flex items-center gap-1.5 text-xs font-bold text-amber-700 bg-amber-50 p-2.5 rounded-xl border border-amber-200">
+                    <div className="flex items-center gap-1.5 text-xs font-bold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/50 p-2.5 rounded-xl border border-amber-200 dark:border-amber-800">
                       <ShieldAlert className="w-4 h-4 shrink-0" />
                       <span>ATENÇÃO: Faltam {kmRemaining.toLocaleString('pt-BR')} km para a troca.</span>
                     </div>
                   ) : (
-                    <div className="flex items-center gap-1.5 text-xs font-semibold text-emerald-700 bg-emerald-50 p-2.5 rounded-xl border border-emerald-200">
+                    <div className="flex items-center gap-1.5 text-xs font-semibold text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/50 p-2.5 rounded-xl border border-emerald-200 dark:border-emerald-800/60">
                       <CheckCircle2 className="w-4 h-4 shrink-0" />
                       <span>Em dia (faltam {kmRemaining.toLocaleString('pt-BR')} km)</span>
                     </div>
@@ -197,9 +197,9 @@ export const MaintenanceView: React.FC<MaintenanceViewProps> = ({
       </div>
 
       {/* Histórico Detalhado de Manutenções */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="p-4 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
-          <h3 className="text-sm font-bold text-slate-800">
+      <div className="bg-white dark:bg-[#111926] rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+        <div className="p-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-[#0b111a] flex items-center justify-between">
+          <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200">
             Histórico de Manutenções e Serviços ({filteredLogs.length})
           </h3>
         </div>
@@ -209,34 +209,34 @@ export const MaintenanceView: React.FC<MaintenanceViewProps> = ({
             <EmptyState text="Nenhuma manutenção registrada até o momento." />
           </div>
         ) : (
-          <div className="divide-y divide-slate-100">
+          <div className="divide-y divide-slate-100 dark:divide-slate-800">
             {filteredLogs.map((log) => {
               const truck = getTruck(log.truckId);
               return (
-                <div key={log.id} className="p-5 hover:bg-slate-50/70 transition-colors space-y-2.5">
+                <div key={log.id} className="p-5 hover:bg-slate-50/70 dark:hover:bg-slate-800/30 transition-colors space-y-2.5">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="bg-slate-900 text-white text-xs font-bold px-2.5 py-0.5 rounded-lg">
+                      <span className="bg-slate-900 dark:bg-emerald-500/20 text-white dark:text-emerald-300 border border-emerald-500/30 text-xs font-bold px-2.5 py-0.5 rounded-lg">
                         {truck?.plate ?? 'Caminhão'}
                       </span>
                       <span
                         className={`text-xs font-bold px-2.5 py-0.5 rounded-lg ${
                           log.type === 'PREVENTIVA'
-                            ? 'bg-sky-100 text-sky-800'
-                            : 'bg-rose-100 text-rose-800'
+                            ? 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300'
+                            : 'bg-rose-100 dark:bg-rose-950/60 text-rose-800 dark:text-rose-300'
                         }`}
                       >
                         {log.type === 'PREVENTIVA' ? 'Preventiva' : 'Corretiva'}
                       </span>
-                      <span className="text-xs font-bold text-slate-700">
+                      <span className="text-xs font-bold text-slate-700 dark:text-slate-200">
                         {formatCategory(log.category)}
                       </span>
-                      <span className="text-xs text-slate-500">• {formatDate(log.date)}</span>
+                      <span className="text-xs text-slate-500 dark:text-slate-400">• {formatDate(log.date)}</span>
                     </div>
                     <div className="flex items-center justify-between sm:justify-end gap-3">
                       <div className="text-right">
                         <span className="text-xs text-slate-400 block">Custo Total</span>
-                        <span className="text-base font-extrabold text-slate-900">
+                        <span className="text-base font-extrabold text-slate-900 dark:text-white">
                           {formatBRL(log.totalCost)}
                         </span>
                       </div>
@@ -249,7 +249,7 @@ export const MaintenanceView: React.FC<MaintenanceViewProps> = ({
                                 setEditing(log);
                                 setModalOpen(true);
                               }}
-                              className="p-2 text-slate-600 hover:bg-slate-100 rounded-lg"
+                              className="p-2 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg"
                               title="Editar manutenção"
                             >
                               <Pencil className="w-4 h-4" />
@@ -262,7 +262,7 @@ export const MaintenanceView: React.FC<MaintenanceViewProps> = ({
                                 confirm('Excluir este registro de manutenção?') &&
                                 onRemove(log.id)
                               }
-                              className="p-2 text-rose-600 hover:bg-rose-50 rounded-lg"
+                              className="p-2 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/50 rounded-lg"
                               title="Excluir manutenção"
                             >
                               <Trash2 className="w-4 h-4" />
@@ -273,33 +273,33 @@ export const MaintenanceView: React.FC<MaintenanceViewProps> = ({
                     </div>
                   </div>
 
-                  <p className="text-xs text-slate-700 bg-slate-50 p-3 rounded-xl border border-slate-100">
+                  <p className="text-xs text-slate-700 dark:text-slate-300 bg-slate-50 dark:bg-[#0b111a] p-3 rounded-xl border border-slate-100 dark:border-slate-800">
                     {log.description}
                   </p>
 
-                  <div className="flex flex-wrap items-center justify-between text-xs text-slate-500 pt-1 gap-2">
+                  <div className="flex flex-wrap items-center justify-between text-xs text-slate-500 dark:text-slate-400 pt-1 gap-2">
                     <div>
                       Oficina / Fornecedor:{' '}
-                      <strong className="text-slate-700">{log.supplierName}</strong>
+                      <strong className="text-slate-700 dark:text-slate-200">{log.supplierName}</strong>
                     </div>
                     <div>
                       KM na revisão:{' '}
-                      <strong className="text-slate-700">
+                      <strong className="text-slate-700 dark:text-slate-200">
                         {log.odometerAtService.toLocaleString('pt-BR')} km
                       </strong>
                       {log.nextServiceOdometerAlert ? (
                         <span>
                           {' '}
                           • Próxima troca:{' '}
-                          <strong className="text-sky-700">
+                          <strong className="text-emerald-700 dark:text-emerald-400">
                             {log.nextServiceOdometerAlert.toLocaleString('pt-BR')} km
                           </strong>
                         </span>
                       ) : null}
                     </div>
                     <div>
-                      Peças: <strong className="text-slate-700">{formatBRL(log.partsCost)}</strong> • Mão
-                      de Obra: <strong className="text-slate-700">{formatBRL(log.laborCost)}</strong>
+                      Peças: <strong className="text-slate-700 dark:text-slate-200">{formatBRL(log.partsCost)}</strong> • Mão
+                      de Obra: <strong className="text-slate-700 dark:text-slate-200">{formatBRL(log.laborCost)}</strong>
                     </div>
                   </div>
                 </div>

@@ -253,7 +253,7 @@ export const DriverProductionView: React.FC<DriverProductionViewProps> = ({
   return (
     <div className="space-y-6">
       {/* Cabeçalho e Filtros */}
-      <div className="bg-slate-950 text-white p-6 rounded-3xl shadow-xl border border-slate-800 flex flex-col lg:flex-row lg:items-center justify-between gap-5">
+      <div className="bg-gradient-to-br from-[#0b111a] via-[#111926] to-[#0b111a] text-white p-6 rounded-3xl shadow-xl border border-emerald-500/30 flex flex-col lg:flex-row lg:items-center justify-between gap-5">
         <div className="space-y-1.5">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-xs font-bold uppercase tracking-wider">
             <Award className="w-3.5 h-3.5" />
@@ -270,7 +270,7 @@ export const DriverProductionView: React.FC<DriverProductionViewProps> = ({
 
         <div className="flex flex-wrap items-center gap-3">
           {/* Filtro de Mês */}
-          <div className="flex items-center gap-2 bg-slate-900 border border-slate-800 rounded-2xl px-3.5 py-2">
+          <div className="flex items-center gap-2 bg-[#0b111a] border border-slate-800 rounded-2xl px-3.5 py-2">
             <Calendar className="w-4 h-4 text-emerald-400 shrink-0" />
             <select
               aria-label="Filtrar por período"
@@ -290,7 +290,7 @@ export const DriverProductionView: React.FC<DriverProductionViewProps> = ({
           </div>
 
           {/* Base de cálculo da comissão */}
-          <div className="flex items-center bg-slate-900 border border-slate-800 rounded-2xl p-1 text-xs font-bold">
+          <div className="flex items-center bg-[#0b111a] border border-slate-800 rounded-2xl p-1 text-xs font-bold">
             <button
               type="button"
               onClick={() => setCalcBase('GROSS')}
@@ -316,7 +316,7 @@ export const DriverProductionView: React.FC<DriverProductionViewProps> = ({
           </div>
 
           {/* Toggle Somente Concluídas */}
-          <label className="flex items-center gap-2 bg-slate-900 border border-slate-800 rounded-2xl px-3.5 py-2 text-xs font-bold text-slate-200 cursor-pointer select-none">
+          <label className="flex items-center gap-2 bg-[#0b111a] border border-slate-800 rounded-2xl px-3.5 py-2 text-xs font-bold text-slate-200 cursor-pointer select-none">
             <input
               type="checkbox"
               checked={onlyCompleted}
@@ -330,68 +330,68 @@ export const DriverProductionView: React.FC<DriverProductionViewProps> = ({
 
       {/* Cards de Resumo Geral */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm">
+        <div className="bg-white dark:bg-[#111926] p-5 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm transition-colors">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-extrabold text-slate-500 uppercase tracking-wider">
+            <span className="text-xs font-extrabold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
               Total de Cargas
             </span>
-            <div className="p-2.5 rounded-2xl bg-sky-500/10 text-sky-600">
+            <div className="p-2.5 rounded-2xl bg-sky-500/10 text-sky-600 dark:text-sky-400">
               <Package className="w-5 h-5" />
             </div>
           </div>
-          <div className="text-3xl font-extrabold text-slate-900 mt-3">{totals.loads}</div>
-          <p className="text-xs text-slate-500 font-semibold mt-1">
+          <div className="text-3xl font-extrabold text-slate-900 dark:text-white mt-3">{totals.loads}</div>
+          <p className="text-xs text-slate-500 dark:text-slate-400 font-semibold mt-1">
             {totals.completed} concluída(s) • {totals.active} em viagem
           </p>
         </div>
 
-        <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm">
+        <div className="bg-white dark:bg-[#111926] p-5 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm transition-colors">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-extrabold text-slate-500 uppercase tracking-wider">
+            <span className="text-xs font-extrabold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
               Faturamento Produzido
             </span>
-            <div className="p-2.5 rounded-2xl bg-emerald-500/10 text-emerald-600">
+            <div className="p-2.5 rounded-2xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
               <TrendingUp className="w-5 h-5" />
             </div>
           </div>
-          <div className="text-2xl sm:text-3xl font-extrabold text-slate-900 mt-3">
+          <div className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white mt-3">
             {formatBRL(totals.gross)}
           </div>
-          <p className="text-xs text-slate-500 font-semibold mt-1">
+          <p className="text-xs text-slate-500 dark:text-slate-400 font-semibold mt-1">
             {totals.km.toLocaleString('pt-BR')} km rodados em fretes
           </p>
         </div>
 
-        <div className="bg-white p-5 rounded-3xl border border-emerald-200 bg-gradient-to-br from-emerald-50/60 to-white shadow-sm">
+        <div className="bg-white dark:bg-[#111926] p-5 rounded-3xl border border-emerald-200 dark:border-emerald-500/30 bg-gradient-to-br from-emerald-50/60 to-white dark:from-emerald-950/30 dark:to-[#111926] shadow-sm transition-colors">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-extrabold text-emerald-900 uppercase tracking-wider">
+            <span className="text-xs font-extrabold text-emerald-900 dark:text-emerald-300 uppercase tracking-wider">
               Total de Comissões
             </span>
             <div className="p-2.5 rounded-2xl bg-emerald-500 text-slate-950">
               <DollarSign className="w-5 h-5" />
             </div>
           </div>
-          <div className="text-2xl sm:text-3xl font-extrabold text-emerald-700 mt-3">
+          <div className="text-2xl sm:text-3xl font-extrabold text-emerald-700 dark:text-emerald-400 mt-3">
             {formatBRL(totals.commission)}
           </div>
-          <p className="text-xs text-emerald-800 font-semibold mt-1">
+          <p className="text-xs text-emerald-800 dark:text-emerald-300/80 font-semibold mt-1">
             Base: {calcBase === 'GROSS' ? 'Frete Bruto' : 'Frete Líquido'}
           </p>
         </div>
 
-        <div className="bg-white p-5 rounded-3xl border border-amber-200 bg-gradient-to-br from-amber-50/50 to-white shadow-sm">
+        <div className="bg-white dark:bg-[#111926] p-5 rounded-3xl border border-amber-200 dark:border-amber-500/30 bg-gradient-to-br from-amber-50/50 to-white dark:from-amber-950/30 dark:to-[#111926] shadow-sm transition-colors">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-extrabold text-amber-900 uppercase tracking-wider">
+            <span className="text-xs font-extrabold text-amber-900 dark:text-amber-300 uppercase tracking-wider">
               Diárias Lançadas
             </span>
-            <div className="p-2.5 rounded-2xl bg-amber-500/15 text-amber-700">
+            <div className="p-2.5 rounded-2xl bg-amber-500/15 text-amber-700 dark:text-amber-400">
               <Receipt className="w-5 h-5" />
             </div>
           </div>
-          <div className="text-2xl sm:text-3xl font-extrabold text-slate-900 mt-3">
+          <div className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white mt-3">
             {formatBRL(totals.dailyExpenses)}
           </div>
-          <p className="text-xs text-slate-600 font-semibold mt-1">
+          <p className="text-xs text-slate-600 dark:text-slate-400 font-semibold mt-1">
             Despesas registradas pelos motoristas
           </p>
         </div>
@@ -399,13 +399,13 @@ export const DriverProductionView: React.FC<DriverProductionViewProps> = ({
 
       {/* Gráfico Comparativo de Produção */}
       {chartData.length > 0 && (
-        <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
+        <div className="bg-white dark:bg-[#111926] p-6 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm transition-colors">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
             <div>
-              <h2 className="text-base font-extrabold text-slate-900">
+              <h2 className="text-base font-extrabold text-slate-900 dark:text-white">
                 Ranking de Produção e Comissão por Motorista
               </h2>
-              <p className="text-xs text-slate-500">
+              <p className="text-xs text-slate-500 dark:text-slate-400">
                 Comparativo entre o faturamento transportado e a comissão acumulada
               </p>
             </div>
@@ -413,8 +413,8 @@ export const DriverProductionView: React.FC<DriverProductionViewProps> = ({
           <div className="h-64 w-full">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={chartData} margin={{ top: 10, right: 15, left: 0, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
-                <XAxis dataKey="name" tick={{ fontSize: 12, fontWeight: 700, fill: '#334155' }} />
+                <CartesianGrid strokeDasharray="3 3" stroke="#334155" strokeOpacity={0.35} vertical={false} />
+                <XAxis dataKey="name" tick={{ fontSize: 12, fontWeight: 700, fill: '#94a3b8' }} />
                 <YAxis
                   tickFormatter={(v) => `R$ ${(v / 1000).toFixed(0)}k`}
                   tick={{ fontSize: 11, fill: '#64748b' }}
@@ -450,28 +450,28 @@ export const DriverProductionView: React.FC<DriverProductionViewProps> = ({
             return (
               <div
                 key={item.driver.id}
-                className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden transition-all"
+                className="bg-white dark:bg-[#111926] rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden transition-all"
               >
                 <div className="p-5 sm:p-6 space-y-5">
                   <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
                     {/* Identificação do Motorista */}
                     <div className="flex items-start gap-3.5">
-                      <div className="w-12 h-12 rounded-2xl bg-slate-900 text-emerald-400 flex items-center justify-center font-extrabold text-lg shrink-0">
+                      <div className="w-12 h-12 rounded-2xl bg-[#0b111a] border border-emerald-500/30 text-emerald-400 flex items-center justify-center font-extrabold text-lg shrink-0">
                         {item.driver.name.slice(0, 2).toUpperCase()}
                       </div>
                       <div>
                         <div className="flex flex-wrap items-center gap-2">
-                          <h3 className="text-lg font-extrabold text-slate-900">
+                          <h3 className="text-lg font-extrabold text-slate-900 dark:text-white">
                             {item.driver.name}
                           </h3>
                           <Badge tone={item.activeLoads > 0 ? 'green' : 'slate'}>
                             {item.activeLoads > 0 ? 'Em Viagem' : item.driver.status}
                           </Badge>
                         </div>
-                        <div className="text-xs text-slate-500 flex flex-wrap items-center gap-3 mt-1">
+                        <div className="text-xs text-slate-500 dark:text-slate-400 flex flex-wrap items-center gap-3 mt-1">
                           {item.driver.phone && <span>Tel: {item.driver.phone}</span>}
                           <span>•</span>
-                          <span className="font-bold text-slate-700">
+                          <span className="font-bold text-slate-700 dark:text-slate-300">
                             {item.totalLoads} carga(s) no período ({item.completedLoads} concluída
                             {item.completedLoads === 1 ? '' : 's'})
                           </span>
@@ -480,9 +480,9 @@ export const DriverProductionView: React.FC<DriverProductionViewProps> = ({
                     </div>
 
                     {/* Configuração Rápida de Comissão + Valor a Receber */}
-                    <div className="flex flex-wrap sm:flex-nowrap items-center gap-3 bg-slate-50 p-3.5 rounded-2xl border border-slate-200/80">
+                    <div className="flex flex-wrap sm:flex-nowrap items-center gap-3 bg-slate-50 dark:bg-[#0b111a]/80 p-3.5 rounded-2xl border border-slate-200/80 dark:border-slate-800">
                       <div className="w-28">
-                        <label className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 block mb-1">
+                        <label className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400 block mb-1">
                           Comissão (%)
                         </label>
                         <div className="relative">
@@ -497,14 +497,14 @@ export const DriverProductionView: React.FC<DriverProductionViewProps> = ({
                                 percent: Math.max(0, Number(e.target.value) || 0),
                               })
                             }
-                            className="w-full px-3 py-1.5 pr-7 rounded-xl border border-slate-300 bg-white text-sm font-extrabold text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                            className="w-full px-3 py-1.5 pr-7 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-[#111926] text-sm font-extrabold text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none"
                           />
                           <Percent className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2" />
                         </div>
                       </div>
 
                       <div className="w-32">
-                        <label className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 block mb-1">
+                        <label className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400 block mb-1">
                           Fixo / Carga (R$)
                         </label>
                         <input
@@ -518,15 +518,15 @@ export const DriverProductionView: React.FC<DriverProductionViewProps> = ({
                               fixedPerLoad: Math.max(0, Number(e.target.value) || 0),
                             })
                           }
-                          className="w-full px-3 py-1.5 rounded-xl border border-slate-300 bg-white text-sm font-extrabold text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                          className="w-full px-3 py-1.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-[#111926] text-sm font-extrabold text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none"
                         />
                       </div>
 
-                      <div className="pl-2 sm:border-l border-slate-200 min-w-[140px]">
-                        <span className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-700 block">
+                      <div className="pl-2 sm:border-l border-slate-200 dark:border-slate-800 min-w-[140px]">
+                        <span className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-700 dark:text-emerald-400 block">
                           Comissão a Receber
                         </span>
-                        <span className="text-xl sm:text-2xl font-extrabold text-emerald-600 block">
+                        <span className="text-xl sm:text-2xl font-extrabold text-emerald-600 dark:text-emerald-400 block">
                           {formatBRL(item.totalCommission)}
                         </span>
                       </div>
@@ -534,36 +534,36 @@ export const DriverProductionView: React.FC<DriverProductionViewProps> = ({
                   </div>
 
                   {/* Métricas do Motorista */}
-                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 text-xs bg-slate-50/70 p-3.5 rounded-2xl border border-slate-100">
+                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 text-xs bg-slate-50/70 dark:bg-[#0b111a]/60 p-3.5 rounded-2xl border border-slate-100 dark:border-slate-800">
                     <div>
                       <span className="text-slate-400 block">Cargas Realizadas</span>
-                      <strong className="text-sm font-extrabold text-slate-900 flex items-center gap-1 mt-0.5">
-                        <Package className="w-4 h-4 text-sky-600" />
+                      <strong className="text-sm font-extrabold text-slate-900 dark:text-white flex items-center gap-1 mt-0.5">
+                        <Package className="w-4 h-4 text-emerald-500" />
                         {item.totalLoads} carga(s)
                       </strong>
                     </div>
                     <div>
                       <span className="text-slate-400 block">Distância Total</span>
-                      <strong className="text-sm font-extrabold text-slate-900 flex items-center gap-1 mt-0.5">
-                        <Route className="w-4 h-4 text-sky-600" />
+                      <strong className="text-sm font-extrabold text-slate-900 dark:text-white flex items-center gap-1 mt-0.5">
+                        <Route className="w-4 h-4 text-sky-500" />
                         {item.totalKm.toLocaleString('pt-BR')} km
                       </strong>
                     </div>
                     <div>
                       <span className="text-slate-400 block">Frete Bruto Produzido</span>
-                      <strong className="text-sm font-extrabold text-slate-900 mt-0.5 block">
+                      <strong className="text-sm font-extrabold text-slate-900 dark:text-white mt-0.5 block">
                         {formatBRL(item.grossRevenue)}
                       </strong>
                     </div>
                     <div>
                       <span className="text-slate-400 block">Frete Líquido</span>
-                      <strong className="text-sm font-extrabold text-slate-800 mt-0.5 block">
+                      <strong className="text-sm font-extrabold text-slate-800 dark:text-slate-200 mt-0.5 block">
                         {formatBRL(item.netRevenue)}
                       </strong>
                     </div>
                     <div>
                       <span className="text-slate-400 block">Diárias / Despesas</span>
-                      <strong className="text-sm font-extrabold text-amber-700 mt-0.5 block">
+                      <strong className="text-sm font-extrabold text-amber-700 dark:text-amber-400 mt-0.5 block">
                         {formatBRL(item.totalDailyExpenses)}
                       </strong>
                     </div>
@@ -571,7 +571,7 @@ export const DriverProductionView: React.FC<DriverProductionViewProps> = ({
 
                   {/* Botão de expandir extrato de cargas */}
                   <div className="flex items-center justify-between pt-1">
-                    <span className="text-xs text-slate-500">
+                    <span className="text-xs text-slate-500 dark:text-slate-400">
                       Cálculo: {item.rule.percent}% sobre{' '}
                       {calcBase === 'GROSS' ? 'Frete Bruto' : 'Frete Líquido'}
                       {item.rule.fixedPerLoad > 0
@@ -583,7 +583,7 @@ export const DriverProductionView: React.FC<DriverProductionViewProps> = ({
                       onClick={() =>
                         setExpandedDriverId(isExpanded ? null : item.driver.id)
                       }
-                      className="inline-flex items-center gap-1.5 text-xs font-extrabold text-sky-700 hover:text-sky-900 bg-sky-50 hover:bg-sky-100 px-3.5 py-2 rounded-xl transition"
+                      className="inline-flex items-center gap-1.5 text-xs font-extrabold text-emerald-700 dark:text-emerald-300 hover:text-emerald-900 bg-emerald-50 dark:bg-emerald-500/15 hover:bg-emerald-100 dark:hover:bg-emerald-500/25 border border-transparent dark:border-emerald-500/30 px-3.5 py-2 rounded-xl transition"
                     >
                       <span>
                         {isExpanded
