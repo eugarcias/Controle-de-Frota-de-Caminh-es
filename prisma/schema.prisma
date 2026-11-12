@@ -216,6 +216,7 @@ model Truck {
 }
 
 model Driver {
+  avatarUrl    String?      @map("avatar_url")
   id           String       @id @default(uuid()) @db.Uuid
   name         String
   // CNH opcional no cadastro rápido (NULL não conflita com @unique)
@@ -976,6 +977,8 @@ enum UserRole {
 }
 
 model UserProfile {
+  avatarUrl String?  @map("avatar_url")
+  canChangeTruck Boolean @default(true) @map("can_change_truck")
   id        String   @id @db.Uuid
   email     String   @unique
   name      String

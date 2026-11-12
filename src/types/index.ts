@@ -29,6 +29,7 @@ export interface Truck {
 export interface Driver {
   id: string;
   name: string;
+  avatarUrl?: string | null;
   cnhNumber?: string | null;
   cnhCategory: string;
   phone: string;

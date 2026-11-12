@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import { ServiceWorkerRegister } from '@/components/ServiceWorkerRegister';
 import { InstallAppBanner } from '@/components/InstallAppBanner';
+import { ThemeProvider } from '@/components/ThemeProvider';
 
 export const metadata: Metadata = {
   title: 'VSM Garcia | Gestão de Frota',
@@ -27,11 +28,13 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="pt-BR">
-      <body className="antialiased text-slate-800">
-        <InstallAppBanner />
-        {children}
-        <ServiceWorkerRegister />
+    <html lang="pt-BR" suppressHydrationWarning>
+      <body className="antialiased bg-slate-50 text-slate-800 dark:bg-zinc-950 dark:text-zinc-100 transition-colors">
+        <ThemeProvider>
+          <InstallAppBanner />
+          {children}
+          <ServiceWorkerRegister />
+        </ThemeProvider>
       </body>
     </html>
   );

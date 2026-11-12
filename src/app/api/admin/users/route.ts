@@ -15,6 +15,8 @@ const CreateUserSchema = z.object({
   role: z.enum(['ADMIN', 'DRIVER']).default('DRIVER'),
   driverId: z.string().uuid().optional().nullable(),
   truckId: z.string().uuid().optional().nullable(),
+  avatarUrl: z.string().optional().nullable(),
+  canChangeTruck: z.boolean().optional().default(true),
 });
 
 export async function GET() {
@@ -123,6 +125,8 @@ export async function POST(req: Request) {
         active: true,
         driverId: body.driverId || null,
         truckId: body.truckId || null,
+        avatarUrl: body.avatarUrl || null,
+        canChangeTruck: body.canChangeTruck ?? true,
       },
       update: {
         email,
@@ -131,6 +135,8 @@ export async function POST(req: Request) {
         active: true,
         driverId: body.driverId !== undefined ? body.driverId || null : undefined,
         truckId: body.truckId !== undefined ? body.truckId || null : undefined,
+        avatarUrl: body.avatarUrl !== undefined ? body.avatarUrl || null : undefined,
+        canChangeTruck: body.canChangeTruck !== undefined ? body.canChangeTruck : undefined,
       },
     });
 

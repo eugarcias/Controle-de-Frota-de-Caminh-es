@@ -41,6 +41,8 @@ interface UserAccount {
   active: boolean;
   driverId: string | null;
   truckId: string | null;
+  canChangeTruck?: boolean;
+  avatarUrl?: string | null;
 }
 
 interface Props {
@@ -640,6 +642,9 @@ function UserAccessModal({
   const [truckId, setTruckId] = useState<string>(
     initialUser?.truckId ?? trucks[0]?.id ?? ''
   );
+  const [canChangeTruck, setCanChangeTruck] = useState<boolean>(
+    initialUser?.canChangeTruck ?? true
+  );
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -665,6 +670,7 @@ function UserAccessModal({
           role,
           driverId: role === 'DRIVER' ? driverId || null : null,
           truckId: role === 'DRIVER' ? truckId || null : null,
+          canChangeTruck: role === 'DRIVER' ? canChangeTruck : true,
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -767,6 +773,26 @@ function UserAccessModal({
                   ))}
                 </select>
               </Field>
+
+              <div className="sm:col-span-2 p-3 rounded-xl bg-slate-50 dark:bg-zinc-800/60 border border-slate-200 dark:border-zinc-700 flex items-center justify-between gap-3">
+                <div className="space-y-0.5">
+                  <p className="text-xs font-bold text-slate-900 dark:text-zinc-100">
+                    Permitir troca de caminhão no app
+                  </p>
+                  <p className="text-[11px] text-slate-500 dark:text-zinc-400">
+                    Se desmarcado, o motorista só poderá operar o caminhão designado pela administração.
+                  </p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                  <input
+                    type="checkbox"
+                    className="sr-only peer"
+                    checked={canChangeTruck}
+                    onChange={(e) => setCanChangeTruck(e.target.checked)}
+                  />
+                  <div className="w-11 h-6 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>
+                </label>
+              </div>
             </>
           )}
         </div>
@@ -1163,6 +1189,13 @@ export const RegistrationsView: React.FC<Props> = (p) => {
                         <>
                           Motorista: <strong>{drv?.name ?? 'Automático'}</strong>
                           {trk ? ` • Caminhão preferido: ${trk}` : ''}
+                          <span className={`inline-block ml-2 px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                            u.canChangeTruck === false
+                              ? 'bg-amber-100 text-amber-900 border border-amber-300'
+                              : 'bg-emerald-100 text-emerald-900 border border-emerald-300'
+                          }`}>
+                            {u.canChangeTruck === false ? 'Troca de caminhão bloqueada' : 'Troca de caminhão livre'}
+                          </span>
                         </>
                       ) : (
                         'Acesso completo a relatórios, fretes, manutenções e cadastros'

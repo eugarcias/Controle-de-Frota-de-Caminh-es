@@ -14,8 +14,13 @@ import {
   Loader2,
   Smartphone,
   Award,
+  Sun,
+  Moon,
+  User,
 } from 'lucide-react';
 import { createSupabaseBrowser } from '@/lib/supabase/browser';
+import { useTheme } from '@/components/ThemeProvider';
+import { ProfileModal } from '@/components/ProfileModal';
 
 interface NavbarProps {
   activeTab: string;
@@ -24,6 +29,18 @@ interface NavbarProps {
 
 export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab }) => {
   const [leaving, setLeaving] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [myProfile, setMyProfile] = useState<any>(null);
+  const { theme, toggleTheme } = useTheme();
+
+  React.useEffect(() => {
+    fetch('/api/profile')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (data) setMyProfile(data);
+      })
+      .catch(() => null);
+  }, []);
 
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', short: 'Início', icon: LayoutDashboard },
@@ -101,6 +118,44 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab }) => {
             </nav>
 
             <div className="flex items-center gap-2 shrink-0">
+              {/* Botão de Modo Escuro / Claro */}
+              <button
+                type="button"
+                onClick={toggleTheme}
+                aria-label={theme === 'dark' ? 'Ativar modo claro' : 'Ativar modo escuro'}
+                title={theme === 'dark' ? 'Modo Claro' : 'Modo Escuro'}
+                className="p-2 rounded-xl text-zinc-300 hover:text-white hover:bg-zinc-900 border border-zinc-800 transition"
+              >
+                {theme === 'dark' ? (
+                  <Sun className="w-4 h-4 text-amber-400" />
+                ) : (
+                  <Moon className="w-4 h-4 text-zinc-300" />
+                )}
+              </button>
+
+              {/* Botão de Perfil do Usuário */}
+              <button
+                type="button"
+                onClick={() => setProfileOpen(true)}
+                title="Meu Perfil"
+                className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-white text-xs font-bold transition"
+              >
+                <div className="w-6 h-6 rounded-full overflow-hidden bg-zinc-700 flex items-center justify-center shrink-0 border border-emerald-500">
+                  {myProfile?.avatarUrl ? (
+                    <img
+                      src={myProfile.avatarUrl}
+                      alt={myProfile.name || 'Perfil'}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <User className="w-3.5 h-3.5 text-zinc-300" />
+                  )}
+                </div>
+                <span className="hidden sm:inline truncate max-w-[100px]">
+                  {myProfile?.name?.split(' ')[0] || 'Perfil'}
+                </span>
+              </button>
+
               <Link
                 href="/app/driver"
                 title="Abrir App do Motorista"
@@ -158,6 +213,14 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab }) => {
           })}
         </div>
       </nav>
+
+      {/* Modal de Perfil */}
+      <ProfileModal
+        isOpen={profileOpen}
+        onClose={() => setProfileOpen(false)}
+        initialProfile={myProfile}
+        onProfileUpdated={(updated) => setMyProfile(updated)}
+      />
     </>
   );
 };

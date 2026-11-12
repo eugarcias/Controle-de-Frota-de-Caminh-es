@@ -25,6 +25,7 @@ export const TruckSchema = z.object({
 
 export const DriverSchema = z.object({
   name: z.string().min(2),
+  avatarUrl: optionalText,
   cnhNumber: nullableTrimmed,
   cnhCategory: z.string().default('E'),
   phone: z.string().min(8),

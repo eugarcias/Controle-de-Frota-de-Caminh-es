@@ -15,6 +15,8 @@ const PatchUserSchema = z.object({
   active: z.boolean().optional(),
   driverId: z.string().uuid().optional().nullable(),
   truckId: z.string().uuid().optional().nullable(),
+  avatarUrl: z.string().optional().nullable(),
+  canChangeTruck: z.boolean().optional(),
 });
 
 export async function PATCH(req: Request, { params }: { params: { id: string } }) {
@@ -76,6 +78,8 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
         active: body.active ?? existing.active,
         driverId: body.driverId !== undefined ? body.driverId : existing.driverId,
         truckId: body.truckId !== undefined ? body.truckId : existing.truckId,
+        avatarUrl: body.avatarUrl !== undefined ? body.avatarUrl : existing.avatarUrl,
+        canChangeTruck: body.canChangeTruck !== undefined ? body.canChangeTruck : existing.canChangeTruck,
       },
     });
 

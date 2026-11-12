@@ -36,7 +36,17 @@ import {
   Pencil,
   MessageSquare,
   Clock,
+  Sun,
+  Moon,
+  Award,
+  FileText,
+  Printer,
+  ChevronRight,
+  TrendingUp,
 } from 'lucide-react';
+import { useTheme } from '@/components/ThemeProvider';
+import { ProfileModal } from '@/components/ProfileModal';
+import { getDriverRank, DRIVER_RANKS } from '@/lib/gamification';
 import { createSupabaseBrowser } from '@/lib/supabase/browser';
 import { formatBRL, formatDate } from '@/components/ui';
 import {
@@ -121,12 +131,15 @@ interface DriverFuelItem {
 
 interface Ctx {
   userName: string;
+  avatarUrl?: string | null;
+  canChangeTruck?: boolean;
   role?: 'ADMIN' | 'DRIVER';
   driver: {
     id: string;
     name: string;
     cnhExpiry: string | null;
     commissionPercent?: number;
+    avatarUrl?: string | null;
   } | null;
   preferredTruckId?: string | null;
   trucks: DriverTruck[];
@@ -202,6 +215,7 @@ async function postDriverAction(
 type Tab = 'home' | 'cargo' | 'agenda' | 'expense' | 'fuel' | 'odometer';
 
 export default function DriverPage() {
+  const { theme, toggleTheme } = useTheme();
   const [ctx, setCtx] = useState<Ctx | null>(null);
   const [selectedTruckId, setSelectedTruckId] = useState<string>('');
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -210,6 +224,7 @@ export default function DriverPage() {
   const [online, setOnline] = useState(true);
   const [pending, setPending] = useState(0);
   const [seenScheduleIds, setSeenScheduleIds] = useState<string[]>([]);
+  const [profileOpen, setProfileOpen] = useState(false);
 
   useEffect(() => {
     try {
@@ -445,7 +460,7 @@ export default function DriverPage() {
   }, [ctx?.expenses, activeTrip]);
 
   return (
-    <div className="min-h-[100dvh] bg-zinc-100 text-zinc-900 pb-[calc(5.25rem+env(safe-area-inset-bottom))]">
+    <div className="min-h-[100dvh] bg-zinc-100 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 pb-[calc(5.25rem+env(safe-area-inset-bottom))] transition-colors">
       {/* Header com contraste máximo */}
       <header className="sticky top-0 z-30 bg-black text-white px-4 py-3 flex items-center justify-between border-b border-zinc-800 pt-[env(safe-area-inset-top)]">
         <div className="flex items-center gap-3 min-w-0">
@@ -476,6 +491,46 @@ export default function DriverPage() {
         </div>
 
         <div className="flex items-center gap-1.5 shrink-0">
+          {/* Alternar Tema Escuro / Claro */}
+          <button
+            type="button"
+            onClick={toggleTheme}
+            aria-label="Alternar tema"
+            title={theme === 'dark' ? 'Mudar para tema claro' : 'Mudar para tema escuro'}
+            className="p-2 rounded-lg text-zinc-300 hover:text-white hover:bg-zinc-900 transition"
+          >
+            {theme === 'dark' ? (
+              <Sun className="w-4 h-4 text-amber-400" />
+            ) : (
+              <Moon className="w-4 h-4 text-zinc-400" />
+            )}
+          </button>
+
+          {/* Botão de Perfil do Motorista com Avatar */}
+          <button
+            type="button"
+            onClick={() => setProfileOpen(true)}
+            aria-label="Perfil do Motorista"
+            title="Meu Perfil e Foto"
+            className="p-1 rounded-full text-zinc-300 hover:text-white hover:bg-zinc-900 transition relative"
+          >
+            {ctx?.avatarUrl || ctx?.driver?.avatarUrl ? (
+              <div className="w-7 h-7 rounded-full overflow-hidden border border-emerald-500/60 shrink-0">
+                <Image
+                  src={ctx.avatarUrl || ctx.driver?.avatarUrl || ''}
+                  alt={ctx.userName}
+                  width={28}
+                  height={28}
+                  className="w-full h-full object-cover"
+                />
+              </div>
+            ) : (
+              <div className="w-7 h-7 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center text-xs font-bold text-zinc-200">
+                {(ctx?.userName || 'M').slice(0, 1).toUpperCase()}
+              </div>
+            )}
+          </button>
+
           {ctx?.role === 'ADMIN' && (
             <Link
               href="/"
@@ -495,6 +550,54 @@ export default function DriverPage() {
           </button>
         </div>
       </header>
+
+      {/* Modal de Perfil */}
+      <ProfileModal
+        isOpen={profileOpen}
+        onClose={() => setProfileOpen(false)}
+        initialProfile={
+          ctx
+            ? {
+                id: ctx.driver?.id || 'profile',
+                name: ctx.driver?.name || ctx.userName,
+                email: ctx.userName,
+                role: ctx.role || 'DRIVER',
+                avatarUrl: ctx.avatarUrl || ctx.driver?.avatarUrl,
+                canChangeTruck: ctx.canChangeTruck ?? true,
+                driver: ctx.driver
+                  ? {
+                      id: ctx.driver.id,
+                      name: ctx.driver.name,
+                      phone: '',
+                      avatarUrl: ctx.avatarUrl || ctx.driver.avatarUrl,
+                    }
+                  : null,
+                truck: currentTruck
+                  ? {
+                      plate: currentTruck.plate,
+                      model: currentTruck.model,
+                      brand: currentTruck.brand || '',
+                    }
+                  : null,
+              }
+            : null
+        }
+        onProfileUpdated={(upd) => {
+          setCtx((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  avatarUrl: upd.avatarUrl,
+                  userName: upd.name || prev.userName,
+                  driver: prev.driver
+                    ? { ...prev.driver, name: upd.name || prev.driver.name, avatarUrl: upd.avatarUrl }
+                    : null,
+                }
+              : null
+          );
+          notify(true, 'Perfil e foto atualizados!');
+        }}
+      />
 
       {/* Alerta de confirmação */}
       {toast && (
@@ -649,6 +752,7 @@ export default function DriverPage() {
               selectedTruck={currentTruck}
               activeTrip={activeTrip}
               todayExpenseTotal={expenseSummary.todayTotal}
+              canChangeTruck={ctx.canChangeTruck ?? true}
               onSelectTruck={handleSelectTruck}
               onGoToCargo={() => setTab('cargo')}
               onGoToExpense={() => setTab('expense')}
@@ -737,9 +841,9 @@ export default function DriverPage() {
         )}
       </main>
 
-      {/* Navegação inferior (5 abas diretas e claras) */}
+      {/* Navegação inferior (6 abas diretas e claras) */}
       <nav
-        className="fixed bottom-0 inset-x-0 z-30 bg-white border-t border-zinc-200 grid grid-cols-6 pb-[env(safe-area-inset-bottom)]"
+        className="fixed bottom-0 inset-x-0 z-30 bg-white dark:bg-zinc-900 border-t border-zinc-200 dark:border-zinc-800 grid grid-cols-6 pb-[env(safe-area-inset-bottom)] transition-colors"
         aria-label="Ações do motorista"
       >
         {tabs.map(({ id, label: l, icon: Icon, badge }) => {
@@ -751,8 +855,8 @@ export default function DriverPage() {
               aria-current={active ? 'page' : undefined}
               className={`relative flex flex-col items-center justify-center gap-1 min-h-[58px] py-2 text-[10px] sm:text-[11px] font-bold transition ${
                 active
-                  ? 'text-black bg-zinc-100 border-t-2 border-black'
-                  : 'text-zinc-500 active:bg-zinc-50'
+                  ? 'text-black dark:text-emerald-400 bg-zinc-100 dark:bg-zinc-800/80 border-t-2 border-black dark:border-emerald-400'
+                  : 'text-zinc-500 dark:text-zinc-400 active:bg-zinc-50 dark:active:bg-zinc-800/50'
               }`}
             >
               <div className="relative">
@@ -779,6 +883,7 @@ function TruckAndStatusHeader({
   selectedTruck,
   activeTrip,
   todayExpenseTotal,
+  canChangeTruck = true,
   onSelectTruck,
   onGoToCargo,
   onGoToExpense,
@@ -787,6 +892,7 @@ function TruckAndStatusHeader({
   selectedTruck: DriverTruck;
   activeTrip: DriverTrip | null;
   todayExpenseTotal: number;
+  canChangeTruck?: boolean;
   onSelectTruck: (id: string) => void;
   onGoToCargo: () => void;
   onGoToExpense: () => void;
@@ -794,31 +900,38 @@ function TruckAndStatusHeader({
   const [open, setOpen] = useState(false);
 
   return (
-    <div className="bg-white rounded-xl border border-zinc-200 shadow-sm overflow-hidden">
+    <div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-sm overflow-hidden transition-colors">
       {/* Linha do Caminhão */}
       <div className="p-3.5 flex items-center justify-between gap-2">
         <div className="flex items-center gap-3 min-w-0">
-          <div className="p-2.5 rounded-xl bg-black text-white shrink-0">
+          <div className="p-2.5 rounded-xl bg-black dark:bg-emerald-500 text-white dark:text-black shrink-0">
             <TruckIcon className="w-5 h-5" />
           </div>
           <div className="min-w-0">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">
-              Caminhão Atual
-            </p>
-            <p className="text-base font-extrabold text-black truncate">
+            <div className="flex items-center gap-2">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+                Caminhão Atual
+              </p>
+              {!canChangeTruck && (
+                <span className="text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-zinc-200 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300">
+                  Fixo pelo Admin
+                </span>
+              )}
+            </div>
+            <p className="text-base font-extrabold text-black dark:text-white truncate">
               {selectedTruck.plate} — {selectedTruck.model}
             </p>
-            <p className="text-xs text-zinc-600 font-semibold">
+            <p className="text-xs text-zinc-600 dark:text-zinc-400 font-semibold">
               Painel: {selectedTruck.currentOdometer.toLocaleString('pt-BR')} km
             </p>
           </div>
         </div>
 
-        {trucks.length > 1 && (
+        {trucks.length > 1 && canChangeTruck && (
           <button
             type="button"
             onClick={() => setOpen((o) => !o)}
-            className="px-3 py-2 rounded-lg bg-zinc-100 hover:bg-zinc-200 text-xs font-bold text-black border border-zinc-300 shrink-0"
+            className="px-3 py-2 rounded-lg bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-xs font-bold text-black dark:text-white border border-zinc-300 dark:border-zinc-700 shrink-0 transition"
           >
             {open ? 'Fechar' : 'Trocar'}
           </button>
@@ -826,9 +939,9 @@ function TruckAndStatusHeader({
       </div>
 
       {/* Lista de troca de caminhão */}
-      {open && trucks.length > 1 && (
-        <div className="px-3.5 pb-3.5 pt-2 border-t border-zinc-100 space-y-1.5">
-          <p className="text-xs text-zinc-600 font-medium">
+      {open && trucks.length > 1 && canChangeTruck && (
+        <div className="px-3.5 pb-3.5 pt-2 border-t border-zinc-100 dark:border-zinc-800 space-y-1.5">
+          <p className="text-xs text-zinc-600 dark:text-zinc-400 font-medium">
             Selecione o caminhão que está com você:
           </p>
           <div className="grid grid-cols-1 gap-1.5">
@@ -844,14 +957,14 @@ function TruckAndStatusHeader({
                   }}
                   className={`w-full flex items-center justify-between p-3 rounded-lg text-left text-xs font-bold border transition ${
                     active
-                      ? 'bg-black text-white border-black'
-                      : 'bg-zinc-50 text-black border-zinc-200 hover:bg-zinc-100'
+                      ? 'bg-black text-white border-black dark:bg-emerald-500 dark:text-black dark:border-emerald-500'
+                      : 'bg-zinc-50 dark:bg-zinc-800/60 text-black dark:text-white border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-700'
                   }`}
                 >
                   <span>
                     {t.plate} — {t.model}
                   </span>
-                  <span className={active ? 'text-zinc-300' : 'text-zinc-600'}>
+                  <span className={active ? 'text-zinc-300 dark:text-black font-extrabold' : 'text-zinc-600 dark:text-zinc-400'}>
                     {t.currentOdometer.toLocaleString('pt-BR')} km
                   </span>
                 </button>
@@ -2688,6 +2801,7 @@ function DriverDashboardView({
   const now = new Date();
   const curKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   const [selectedKey, setSelectedKey] = useState(curKey);
+  const [showReportModal, setShowReportModal] = useState(false);
 
   const history = useMemo(() => ctx.tripHistory ?? ctx.recentTrips ?? [], [ctx.tripHistory, ctx.recentTrips]);
   const schedules = useMemo(
@@ -2695,6 +2809,13 @@ function DriverDashboardView({
     [ctx.scheduledLoads]
   );
   const pct = ctx.driver?.commissionPercent ?? 10;
+
+  // Gamificação: Total de cargas entregues no histórico
+  const allDeliveredLoadsCount = useMemo(
+    () => history.filter((t) => t.status === 'CONCLUIDO').length,
+    [history]
+  );
+  const rankInfo = useMemo(() => getDriverRank(allDeliveredLoadsCount), [allDeliveredLoadsCount]);
 
   const monthKeyOf = (iso?: string | null) => (iso ? iso.slice(0, 7) : '');
 
@@ -2760,8 +2881,70 @@ function DriverDashboardView({
 
   return (
     <div className="space-y-3.5">
+      {/* CARD DE GAMIFICAÇÃO: NÍVEL DO MOTORISTA NO TRANSPORTE */}
+      <div className="rounded-2xl bg-gradient-to-r from-zinc-900 via-zinc-950 to-zinc-900 border border-zinc-800 p-4 text-white shadow-md relative overflow-hidden">
+        <div className="flex items-center justify-between gap-3 relative z-10">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-12 h-12 rounded-2xl bg-zinc-800/90 border border-zinc-700/80 flex items-center justify-center text-2xl shadow-inner shrink-0">
+              {rankInfo.currentRank.badge}
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-extrabold uppercase tracking-wider text-amber-400">
+                  Nível {rankInfo.currentRank.level} • Carreira
+                </span>
+                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                  {Math.round((rankInfo.currentRank.bonusMultiplier - 1) * 100)}% bônus
+                </span>
+              </div>
+              <h2 className="text-base font-extrabold truncate text-white">
+                {rankInfo.currentRank.title}
+              </h2>
+              <p className="text-[11px] text-zinc-400 truncate">
+                {allDeliveredLoadsCount} cargas entregues no histórico
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setShowReportModal(true)}
+            className="px-3 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-extrabold text-xs shrink-0 flex items-center gap-1.5 shadow-sm transition active:scale-95"
+          >
+            <FileText className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Relatório</span>
+            <span className="sm:hidden">Desempenho</span>
+          </button>
+        </div>
+
+        {/* Barra de Progresso para o próximo nível */}
+        <div className="mt-3.5 pt-3 border-t border-zinc-800/80 relative z-10 space-y-1.5">
+          <div className="flex items-center justify-between text-[11px]">
+            <span className="text-zinc-400 font-medium">
+              {rankInfo.nextRank ? (
+                <>
+                  Próximo nível: <strong className="text-white font-bold">{rankInfo.nextRank.badge} {rankInfo.nextRank.title}</strong>
+                </>
+              ) : (
+                <strong className="text-emerald-400 font-extrabold">🏆 Nível Máximo Alcançado!</strong>
+              )}
+            </span>
+            <span className="font-extrabold text-emerald-400">
+              {rankInfo.nextRank ? `${rankInfo.loadsForNext} carga(s) restante(s)` : 'Elite da Frota'}
+            </span>
+          </div>
+
+          <div className="w-full h-2 rounded-full bg-zinc-800 overflow-hidden">
+            <div
+              className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-emerald-300 transition-all duration-500"
+              style={{ width: `${rankInfo.progressPercent}%` }}
+            />
+          </div>
+        </div>
+      </div>
+
       {/* HERO: Ganhos do mês */}
-      <div className="rounded-2xl bg-black text-white p-4 space-y-3 shadow-md relative overflow-hidden">
+      <div className="rounded-2xl bg-black dark:bg-zinc-900 text-white p-4 space-y-3 shadow-md relative overflow-hidden border border-zinc-800 transition-colors">
         <div
           className="pointer-events-none absolute -top-16 -right-16 w-48 h-48 rounded-full bg-emerald-500/20 blur-3xl"
           aria-hidden="true"
@@ -2784,17 +2967,17 @@ function DriverDashboardView({
         </div>
 
         <div className="relative grid grid-cols-3 gap-2 text-xs">
-          <div className="rounded-xl bg-zinc-900 border border-zinc-800 p-2.5">
+          <div className="rounded-xl bg-zinc-900/90 dark:bg-zinc-950/80 border border-zinc-800 p-2.5">
             <span className="text-[10px] font-bold uppercase text-zinc-400 block">Confirmado</span>
             <span className="font-extrabold text-emerald-400 block">{formatBRL(stats.confirmed)}</span>
             <span className="text-[10px] text-zinc-500">{stats.doneCount} entregue(s)</span>
           </div>
-          <div className="rounded-xl bg-zinc-900 border border-zinc-800 p-2.5">
+          <div className="rounded-xl bg-zinc-900/90 dark:bg-zinc-950/80 border border-zinc-800 p-2.5">
             <span className="text-[10px] font-bold uppercase text-zinc-400 block">Em viagem</span>
             <span className="font-extrabold text-amber-300 block">{formatBRL(stats.inProgress)}</span>
             <span className="text-[10px] text-zinc-500">{stats.runningCount} ativa(s)</span>
           </div>
-          <div className="rounded-xl bg-zinc-900 border border-zinc-800 p-2.5">
+          <div className="rounded-xl bg-zinc-900/90 dark:bg-zinc-950/80 border border-zinc-800 p-2.5">
             <span className="text-[10px] font-bold uppercase text-zinc-400 block">Previsto</span>
             <span className="font-extrabold text-sky-300 block">{formatBRL(forecast)}</span>
             <span className="text-[10px] text-zinc-500">{schedules.length} agendada(s)</span>
@@ -2803,16 +2986,16 @@ function DriverDashboardView({
       </div>
 
       {/* Gráfico: comissão dos últimos 6 meses (toque para filtrar) */}
-      <div className="bg-white rounded-xl border border-zinc-200 p-4 shadow-sm space-y-3">
+      <div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 p-4 shadow-sm space-y-3 transition-colors">
         <div className="flex items-center justify-between">
-          <h3 className="text-xs font-extrabold uppercase tracking-wider text-zinc-800">
+          <h3 className="text-xs font-extrabold uppercase tracking-wider text-zinc-800 dark:text-zinc-200">
             Comissão por mês
           </h3>
           {!isCurrentMonth && (
             <button
               type="button"
               onClick={() => setSelectedKey(curKey)}
-              className="text-[11px] font-bold underline text-zinc-600"
+              className="text-[11px] font-bold underline text-zinc-600 dark:text-zinc-400"
             >
               Voltar ao mês atual
             </button>
@@ -2830,16 +3013,16 @@ function DriverDashboardView({
                 className="flex-1 flex flex-col items-center justify-end gap-1 h-full"
                 aria-label={`${m.label}: ${formatBRL(m.total)}`}
               >
-                <span className={`text-[9px] font-bold ${active ? 'text-black' : 'text-zinc-400'}`}>
+                <span className={`text-[9px] font-bold ${active ? 'text-black dark:text-white' : 'text-zinc-400'}`}>
                   {m.total > 0 ? `${Math.round(m.total / 100) / 10}k` : ''}
                 </span>
                 <div
                   className={`w-full rounded-t-lg transition-all ${
-                    active ? 'bg-emerald-500' : 'bg-zinc-200'
+                    active ? 'bg-emerald-500' : 'bg-zinc-200 dark:bg-zinc-800'
                   }`}
                   style={{ height: `${h}%` }}
                 />
-                <span className={`text-[11px] font-bold ${active ? 'text-black' : 'text-zinc-500'}`}>
+                <span className={`text-[11px] font-bold ${active ? 'text-black dark:text-white' : 'text-zinc-500'}`}>
                   {m.label}
                 </span>
               </button>
@@ -2853,41 +3036,41 @@ function DriverDashboardView({
         <button
           type="button"
           onClick={() => onGoTo('cargo')}
-          className="bg-white rounded-xl border border-zinc-200 p-3 text-left shadow-sm"
+          className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 p-3 text-left shadow-sm transition-colors"
         >
-          <span className="text-[10px] font-bold uppercase text-zinc-500 flex items-center gap-1">
+          <span className="text-[10px] font-bold uppercase text-zinc-500 dark:text-zinc-400 flex items-center gap-1">
             <Package className="w-3.5 h-3.5" /> Carga atual
           </span>
           {activeTrip ? (
             <>
-              <span className="text-sm font-extrabold text-black block truncate mt-1">
+              <span className="text-sm font-extrabold text-black dark:text-white block truncate mt-1">
                 {activeTrip.cargoDescription || 'Em viagem'}
               </span>
-              <span className="text-[11px] text-zinc-600 block truncate">
+              <span className="text-[11px] text-zinc-600 dark:text-zinc-400 block truncate">
                 → {activeTrip.destination}
               </span>
               {Number(activeTrip.commission) > 0 && (
-                <span className="text-xs font-extrabold text-emerald-700 block mt-0.5">
+                <span className="text-xs font-extrabold text-emerald-700 dark:text-emerald-400 block mt-0.5">
                   {formatBRL(Number(activeTrip.commission))}
                 </span>
               )}
             </>
           ) : (
-            <span className="text-sm font-bold text-zinc-700 block mt-1">Nenhuma ativa</span>
+            <span className="text-sm font-bold text-zinc-700 dark:text-zinc-300 block mt-1">Nenhuma ativa</span>
           )}
         </button>
 
         <button
           type="button"
           onClick={() => onGoTo('agenda')}
-          className="bg-white rounded-xl border border-zinc-200 p-3 text-left shadow-sm"
+          className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 p-3 text-left shadow-sm transition-colors"
         >
-          <span className="text-[10px] font-bold uppercase text-zinc-500 flex items-center gap-1">
+          <span className="text-[10px] font-bold uppercase text-zinc-500 dark:text-zinc-400 flex items-center gap-1">
             <CalendarClock className="w-3.5 h-3.5" /> Próxima carga
           </span>
           {nextSchedule ? (
             <>
-              <span className="text-sm font-extrabold text-black block mt-1">
+              <span className="text-sm font-extrabold text-black dark:text-white block mt-1">
                 {new Date(nextSchedule.pickupDate).toLocaleString('pt-BR', {
                   timeZone: 'UTC',
                   day: '2-digit',
@@ -2896,60 +3079,60 @@ function DriverDashboardView({
                   minute: '2-digit',
                 })}
               </span>
-              <span className="text-[11px] text-zinc-600 block truncate">
+              <span className="text-[11px] text-zinc-600 dark:text-zinc-400 block truncate">
                 → {nextSchedule.destination}
               </span>
               {Number(nextSchedule.commission) > 0 && (
-                <span className="text-xs font-extrabold text-emerald-700 block mt-0.5">
+                <span className="text-xs font-extrabold text-emerald-700 dark:text-emerald-400 block mt-0.5">
                   {formatBRL(Number(nextSchedule.commission))}
                 </span>
               )}
             </>
           ) : (
-            <span className="text-sm font-bold text-zinc-700 block mt-1">Sem agendamentos</span>
+            <span className="text-sm font-bold text-zinc-700 dark:text-zinc-300 block mt-1">Sem agendamentos</span>
           )}
         </button>
 
         <button
           type="button"
           onClick={() => onGoTo('expense')}
-          className="bg-white rounded-xl border border-zinc-200 p-3 text-left shadow-sm"
+          className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 p-3 text-left shadow-sm transition-colors"
         >
-          <span className="text-[10px] font-bold uppercase text-zinc-500 flex items-center gap-1">
+          <span className="text-[10px] font-bold uppercase text-zinc-500 dark:text-zinc-400 flex items-center gap-1">
             <Receipt className="w-3.5 h-3.5" /> Despesas do mês
           </span>
-          <span className="text-base font-extrabold text-black block mt-1">
+          <span className="text-base font-extrabold text-black dark:text-white block mt-1">
             {formatBRL(monthExpenseTotal)}
           </span>
-          <span className="text-[11px] text-zinc-500">Lançadas por você</span>
+          <span className="text-[11px] text-zinc-500 dark:text-zinc-400">Lançadas por você</span>
         </button>
 
-        <div className="bg-white rounded-xl border border-zinc-200 p-3 shadow-sm">
-          <span className="text-[10px] font-bold uppercase text-zinc-500 flex items-center gap-1">
+        <div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 p-3 shadow-sm transition-colors">
+          <span className="text-[10px] font-bold uppercase text-zinc-500 dark:text-zinc-400 flex items-center gap-1">
             <Gauge className="w-3.5 h-3.5" /> Média por carga
           </span>
-          <span className="text-base font-extrabold text-black block mt-1">
+          <span className="text-base font-extrabold text-black dark:text-white block mt-1">
             {formatBRL(
               stats.doneCount + stats.runningCount > 0
                 ? stats.total / (stats.doneCount + stats.runningCount)
                 : 0
             )}
           </span>
-          <span className="text-[11px] text-zinc-500">de comissão</span>
+          <span className="text-[11px] text-zinc-500 dark:text-zinc-400">de comissão</span>
         </div>
       </div>
 
       {/* Próximas cargas agendadas com comissão prevista */}
       {schedules.length > 0 && (
-        <div className="bg-white rounded-xl border border-zinc-200 p-4 shadow-sm space-y-2.5">
+        <div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 p-4 shadow-sm space-y-2.5 transition-colors">
           <div className="flex items-center justify-between">
-            <h3 className="text-xs font-extrabold uppercase tracking-wider text-zinc-800">
+            <h3 className="text-xs font-extrabold uppercase tracking-wider text-zinc-800 dark:text-zinc-200">
               Quanto você vai ganhar nas próximas cargas
             </h3>
             <button
               type="button"
               onClick={() => onGoTo('agenda')}
-              className="text-[11px] font-bold underline text-zinc-600"
+              className="text-[11px] font-bold underline text-zinc-600 dark:text-zinc-400"
             >
               Agenda
             </button>
@@ -2957,13 +3140,13 @@ function DriverDashboardView({
           {schedules.slice(0, 4).map((s) => (
             <div
               key={s.id}
-              className="flex items-center justify-between gap-2 p-3 rounded-xl bg-zinc-50 border border-zinc-200"
+              className="flex items-center justify-between gap-2 p-3 rounded-xl bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700"
             >
               <div className="min-w-0">
-                <p className="text-xs font-extrabold text-black truncate">
+                <p className="text-xs font-extrabold text-black dark:text-white truncate">
                   {s.origin} → {s.destination}
                 </p>
-                <p className="text-[11px] text-zinc-600 truncate">
+                <p className="text-[11px] text-zinc-600 dark:text-zinc-400 truncate">
                   {new Date(s.pickupDate).toLocaleString('pt-BR', {
                     timeZone: 'UTC',
                     day: '2-digit',
@@ -2981,43 +3164,43 @@ function DriverDashboardView({
       )}
 
       {/* Extrato de comissão por viagem no mês */}
-      <div className="bg-white rounded-xl border border-zinc-200 p-4 shadow-sm space-y-2.5">
+      <div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 p-4 shadow-sm space-y-2.5 transition-colors">
         <div className="flex items-center justify-between">
-          <h3 className="text-xs font-extrabold uppercase tracking-wider text-zinc-800">
+          <h3 className="text-xs font-extrabold uppercase tracking-wider text-zinc-800 dark:text-zinc-200">
             Comissão por viagem • {selectedLabel}
           </h3>
-          <span className="text-[11px] font-bold text-zinc-500">{monthTrips.length} viagem(ns)</span>
+          <span className="text-[11px] font-bold text-zinc-500 dark:text-zinc-400">{monthTrips.length} viagem(ns)</span>
         </div>
 
         {monthTrips.length === 0 ? (
-          <p className="text-xs text-zinc-500 py-3 text-center">
+          <p className="text-xs text-zinc-500 dark:text-zinc-400 py-3 text-center">
             Nenhuma viagem registrada neste mês.
           </p>
         ) : (
           monthTrips.map((t) => (
             <div
               key={t.id}
-              className="flex items-center justify-between gap-2 p-3 rounded-xl bg-zinc-50 border border-zinc-200"
+              className="flex items-center justify-between gap-2 p-3 rounded-xl bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700"
             >
               <div className="min-w-0">
                 <div className="flex items-center gap-1.5">
                   <span
                     className={`text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded ${
                       t.status === 'EM_VIAGEM'
-                        ? 'bg-amber-100 text-amber-900'
-                        : 'bg-emerald-100 text-emerald-900'
+                        ? 'bg-amber-100 text-amber-900 dark:bg-amber-900/40 dark:text-amber-300'
+                        : 'bg-emerald-100 text-emerald-900 dark:bg-emerald-900/40 dark:text-emerald-300'
                     }`}
                   >
                     {t.status === 'EM_VIAGEM' ? 'Em viagem' : 'Entregue'}
                   </span>
-                  <span className="text-[11px] text-zinc-500">
+                  <span className="text-[11px] text-zinc-500 dark:text-zinc-400">
                     {t.startDate ? formatDate(t.startDate) : ''}
                   </span>
                 </div>
-                <p className="text-xs font-extrabold text-black truncate mt-0.5">
+                <p className="text-xs font-extrabold text-black dark:text-white truncate mt-0.5">
                   {t.origin} → {t.destination}
                 </p>
-                <p className="text-[11px] text-zinc-600 truncate">
+                <p className="text-[11px] text-zinc-600 dark:text-zinc-400 truncate">
                   {t.cargoDescription || 'Carga'} • {t.customerName}
                 </p>
               </div>
@@ -3026,11 +3209,158 @@ function DriverDashboardView({
           ))
         )}
 
-        <p className="text-[10px] text-zinc-500 pt-1">
+        <p className="text-[10px] text-zinc-500 dark:text-zinc-400 pt-1">
           “Sua comissão” = valor definido pela administração no agendamento. “Estimada” = calculada
           pelo seu percentual padrão ({pct}%). Valores finais são confirmados no fechamento.
         </p>
       </div>
+
+      {/* MODAL: RELATÓRIO MENSAL DE DESEMPENHO DO MOTORISTA */}
+      {showReportModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 w-full max-w-lg max-h-[90vh] overflow-y-auto shadow-2xl p-5 space-y-4">
+            <div className="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-emerald-500 text-black">
+                  <Award className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-extrabold text-black dark:text-white">
+                    Relatório de Desempenho
+                  </h3>
+                  <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
+                    {ctx.driver?.name ?? ctx.userName} • {selectedLabel}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowReportModal(false)}
+                className="p-1.5 rounded-lg text-zinc-400 hover:text-black dark:hover:text-white"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Resumo executivo do relatório */}
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              <div className="p-3 rounded-xl bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700">
+                <span className="text-[10px] font-bold uppercase text-zinc-500 dark:text-zinc-400 block">
+                  Cargas Realizadas
+                </span>
+                <span className="text-lg font-extrabold text-black dark:text-white block mt-0.5">
+                  {stats.doneCount + stats.runningCount} viagem(ns)
+                </span>
+                <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold">
+                  {stats.doneCount} entregues • {stats.runningCount} ativas
+                </span>
+              </div>
+
+              <div className="p-3 rounded-xl bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700">
+                <span className="text-[10px] font-bold uppercase text-zinc-500 dark:text-zinc-400 block">
+                  KM Rodado no Mês
+                </span>
+                <span className="text-lg font-extrabold text-black dark:text-white block mt-0.5">
+                  {stats.km.toLocaleString('pt-BR')} km
+                </span>
+                <span className="text-[10px] text-zinc-500 dark:text-zinc-400 font-semibold">
+                  Média: {stats.doneCount + stats.runningCount > 0 ? Math.round(stats.km / (stats.doneCount + stats.runningCount)) : 0} km/viagem
+                </span>
+              </div>
+
+              <div className="p-3 rounded-xl bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700">
+                <span className="text-[10px] font-bold uppercase text-zinc-500 dark:text-zinc-400 block">
+                  Comissão Líquida
+                </span>
+                <span className="text-lg font-extrabold text-emerald-600 dark:text-emerald-400 block mt-0.5">
+                  {formatBRL(stats.total)}
+                </span>
+                <span className="text-[10px] text-zinc-500 dark:text-zinc-400">
+                  {stats.confirmed > 0 ? `${formatBRL(stats.confirmed)} faturado` : 'Aguardando entrega'}
+                </span>
+              </div>
+
+              <div className="p-3 rounded-xl bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700">
+                <span className="text-[10px] font-bold uppercase text-zinc-500 dark:text-zinc-400 block">
+                  Despesas Lançadas
+                </span>
+                <span className="text-lg font-extrabold text-rose-600 dark:text-rose-400 block mt-0.5">
+                  {formatBRL(monthExpenseTotal)}
+                </span>
+                <span className="text-[10px] text-zinc-500 dark:text-zinc-400">
+                  Alimentação, pedágio, etc.
+                </span>
+              </div>
+            </div>
+
+            {/* Destaque da Carreira e Gamificação no Relatório */}
+            <div className="p-3.5 rounded-xl bg-gradient-to-r from-amber-500/10 to-transparent border border-amber-500/30 space-y-1.5">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-extrabold text-amber-500 flex items-center gap-1.5">
+                  <span>{rankInfo.currentRank.badge}</span>
+                  <span>{rankInfo.currentRank.title}</span>
+                </span>
+                <span className="text-[10px] font-extrabold text-zinc-400">
+                  Nível {rankInfo.currentRank.level} de 5
+                </span>
+              </div>
+              <p className="text-xs text-zinc-700 dark:text-zinc-300">
+                {rankInfo.currentRank.description}
+              </p>
+            </div>
+
+            {/* Lista detalhada das viagens do mês no relatório */}
+            <div className="space-y-2">
+              <h4 className="text-xs font-extrabold uppercase tracking-wider text-zinc-800 dark:text-zinc-200">
+                Detalhamento das Viagens
+              </h4>
+              <div className="space-y-1.5 max-h-48 overflow-y-auto">
+                {monthTrips.length === 0 ? (
+                  <p className="text-xs text-zinc-500 text-center py-2">Sem viagens no período selecionado.</p>
+                ) : (
+                  monthTrips.map((t, idx) => (
+                    <div
+                      key={t.id}
+                      className="p-2.5 rounded-lg bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-200 dark:border-zinc-700/60 flex items-center justify-between text-xs"
+                    >
+                      <div className="min-w-0 pr-2">
+                        <p className="font-extrabold text-black dark:text-white truncate">
+                          {idx + 1}. {t.origin} → {t.destination}
+                        </p>
+                        <p className="text-[10px] text-zinc-500 dark:text-zinc-400 truncate">
+                          {t.cargoDescription || 'Carga'} • {t.distanceKm || 0} km
+                        </p>
+                      </div>
+                      <span className="font-extrabold text-emerald-600 dark:text-emerald-400 shrink-0">
+                        {formatBRL(Number(t.commission) || 0)}
+                      </span>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            {/* Botões de Ação do Relatório */}
+            <div className="flex gap-2 pt-2 border-t border-zinc-200 dark:border-zinc-800">
+              <button
+                type="button"
+                onClick={() => window.print()}
+                className="flex-1 h-10 rounded-xl bg-black dark:bg-white text-white dark:text-black font-extrabold text-xs flex items-center justify-center gap-2 hover:opacity-90 transition"
+              >
+                <Printer className="w-4 h-4" />
+                <span>Imprimir / Salvar PDF</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowReportModal(false)}
+                className="px-4 h-10 rounded-xl bg-zinc-100 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 font-bold text-xs hover:bg-zinc-200 dark:hover:bg-zinc-700 transition"
+              >
+                Fechar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

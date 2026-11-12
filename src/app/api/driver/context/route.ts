@@ -18,7 +18,7 @@ export async function GET() {
     await Promise.all([
       prisma.driver.findUnique({
         where: { id: profile.driverId },
-        select: { id: true, name: true, cnhExpiry: true, commissionPercent: true },
+        select: { id: true, name: true, cnhExpiry: true, commissionPercent: true, avatarUrl: true },
       }),
       prisma.truck.findMany({
         where: { id: { in: truckIds } },
@@ -200,8 +200,16 @@ export async function GET() {
       userName: profile.name,
       role: profile.role,
       driver: driver
-        ? { id: driver.id, name: driver.name, cnhExpiry: driver.cnhExpiry, commissionPercent: commissionPct }
+        ? {
+            id: driver.id,
+            name: driver.name,
+            cnhExpiry: driver.cnhExpiry,
+            commissionPercent: commissionPct,
+            avatarUrl: driver.avatarUrl || profile.avatarUrl || null,
+          }
         : null,
+      avatarUrl: profile.avatarUrl || driver?.avatarUrl || null,
+      canChangeTruck: profile.canChangeTruck ?? true,
       preferredTruckId,
       trucks,
       trips: trips.map((t) => ({
@@ -240,6 +248,13 @@ const PatchTruckSchema = z.object({
 export async function PATCH(req: Request) {
   const guard = await requireDriver();
   if (!guard.ok) return guard.response;
+
+  if (guard.profile.canChangeTruck === false) {
+    return NextResponse.json(
+      { error: 'Você não tem permissão do administrador para trocar de caminhão.' },
+      { status: 403 }
+    );
+  }
 
   const parsed = PatchTruckSchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) {

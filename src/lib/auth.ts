@@ -49,6 +49,15 @@ export async function requireAdmin(): Promise<Guard<UserProfile>> {
 }
 
 /**
+ * Qualquer usuário autenticado ativo (seja ADMIN ou DRIVER).
+ */
+export async function requireAuth(): Promise<Guard<UserProfile>> {
+  const profile = await getAuthProfile();
+  if (!profile) return { ok: false, response: NextResponse.json({ error: 'Não autenticado.' }, { status: 401 }) };
+  return { ok: true, profile };
+}
+
+/**
  * Motorista logado e vinculado a um cadastro de motorista.
  * Se o perfil ainda não tiver driverId preenchido, vincula automaticamente pelo nome ou ao 1º motorista ativo.
  */
