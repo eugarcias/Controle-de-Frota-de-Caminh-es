@@ -230,6 +230,8 @@ model Driver {
   pixKey       String?      @map("pix_key")
   bankInfo     String?      @map("bank_info")
   status       DriverStatus @default(ATIVO)
+  // % de comissão padrão do motorista (sugestão ao agendar cargas)
+  commissionPercent Decimal? @default(10) @map("commission_percent") @db.Decimal(5, 2)
 
   fuelLogs       FuelLog[]
   trips          FreightTrip[]
@@ -334,6 +336,8 @@ model FreightTrip {
   otherExpenses         Decimal   @default(0) @map("other_expenses") @db.Decimal(12, 2)
   netFreightValue       Decimal   @default(0) @map("net_freight_value") @db.Decimal(12, 2)
   freightTableId        String?   @map("freight_table_id") @db.Uuid
+  // Comissão do motorista nesta viagem (definida pelo admin no agendamento)
+  driverCommission      Decimal?  @map("driver_commission") @db.Decimal(12, 2)
 
   truck          Truck            @relation(fields: [truckId], references: [id])
   driver         Driver           @relation(fields: [driverId], references: [id])
@@ -516,6 +520,7 @@ model CargoSchedule {
   pickupDate       DateTime  @map("pickup_date")
   deliveryDate     DateTime? @map("delivery_date")
   freightValue     Decimal   @map("freight_value") @db.Decimal(12, 2)
+  driverCommission Decimal?  @map("driver_commission") @db.Decimal(12, 2)
   status           String    @default("AGENDADA")
   notes            String?
 

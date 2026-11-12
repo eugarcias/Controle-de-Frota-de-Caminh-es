@@ -88,6 +88,7 @@ const emptyForm = {
   initialKm: '',
   finalKm: '',
   paymentTerms: '',
+  driverCommission: '',
   notes: '',
   status: 'PLANEJADO' as TripStatus,
 };
@@ -139,6 +140,16 @@ export const FreightTripsView: React.FC<FreightTripsViewProps> = ({
   ) => setForm((f) => ({ ...f, [k]: e.target.value }));
 
   // Pré-visualização financeira em tempo real
+  const selectedDriverPct = useMemo(() => {
+    const d = drivers.find((x) => x.id === form.driverId);
+    return d?.commissionPercent != null ? Number(d.commissionPercent) : 10;
+  }, [drivers, form.driverId]);
+
+  const suggestedCommission = useMemo(
+    () => Number((((Number(form.grossFreightValue) || 0) * selectedDriverPct) / 100).toFixed(2)),
+    [form.grossFreightValue, selectedDriverPct]
+  );
+
   const preview = useMemo(() => {
     const km = Number(form.distanceKm) || 0;
     const gross = Number(form.grossFreightValue) || 0;
@@ -197,6 +208,10 @@ export const FreightTripsView: React.FC<FreightTripsViewProps> = ({
       initialKm: String(trip.initialKm || 0),
       finalKm: trip.finalKm ? String(trip.finalKm) : '',
       paymentTerms: trip.paymentTerms || '',
+      driverCommission:
+        trip.driverCommission !== null && trip.driverCommission !== undefined
+          ? String(trip.driverCommission)
+          : '',
       notes: trip.notes || '',
       status: trip.status || 'EM_VIAGEM',
     });
@@ -289,6 +304,12 @@ export const FreightTripsView: React.FC<FreightTripsViewProps> = ({
     const km = Number(form.distanceKm) || 0;
     const initKm = form.initialKm ? Number(form.initialKm) : truck.currentOdometer;
     const finKm = form.finalKm ? Number(form.finalKm) : null;
+    const commissionVal =
+      form.driverCommission.trim() !== ''
+        ? Math.max(0, Number(form.driverCommission) || 0)
+        : suggestedCommission > 0
+          ? suggestedCommission
+          : null;
 
     if (editingTripId) {
       const existingTrip = trips.find((t) => t.id === editingTripId);
@@ -314,6 +335,7 @@ export const FreightTripsView: React.FC<FreightTripsViewProps> = ({
         otherExpenses: Number(form.otherExpenses) || 0,
         netFreightValue: Number(preview.net.toFixed(2)),
         paymentTerms: form.paymentTerms.trim(),
+        driverCommission: commissionVal,
         notes: form.notes.trim(),
         status: form.status || 'EM_VIAGEM',
       });
@@ -345,6 +367,7 @@ export const FreightTripsView: React.FC<FreightTripsViewProps> = ({
       otherExpenses: Number(form.otherExpenses) || 0,
       netFreightValue: Number(preview.net.toFixed(2)),
       paymentTerms: form.paymentTerms.trim(),
+      driverCommission: commissionVal,
       notes: form.notes.trim(),
       status: form.status || 'PLANEJADO',
     };
@@ -841,12 +864,26 @@ export const FreightTripsView: React.FC<FreightTripsViewProps> = ({
                   placeholder="0,00"
                 />
               </Field>
-              <Field label="Condição de Pagamento" className="col-span-2">
+              <Field label="Condição de Pagamento">
                 <input
                   className={inputCls}
                   value={form.paymentTerms}
                   onChange={set('paymentTerms')}
                   placeholder="Prazo ou condição de pagamento"
+                />
+              </Field>
+              <Field
+                label="Comissão do Motorista (R$)"
+                hint={`Sugestão (${selectedDriverPct}%): ${formatBRL(suggestedCommission)}`}
+              >
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  className={inputCls}
+                  value={form.driverCommission}
+                  onChange={set('driverCommission')}
+                  placeholder={suggestedCommission > 0 ? suggestedCommission.toFixed(2) : '0,00'}
                 />
               </Field>
               <Field label="Observações (Admin / Motorista)" className="col-span-2">

@@ -92,6 +92,7 @@ export async function POST(req: Request) {
     let customerName = body.customerName.trim() || 'À definir (Informado pelo Motorista)';
     let grossFreightValue = 0;
     let distanceKm = 0;
+    let driverCommission: number | null = null;
 
     if (body.scheduleId) {
       const schedule = await prisma.cargoSchedule.findUnique({
@@ -103,6 +104,8 @@ export async function POST(req: Request) {
         customerName = schedule.customer?.name || customerName;
         grossFreightValue = Number(schedule.freightValue) || 0;
         distanceKm = schedule.distanceKm || 0;
+        driverCommission =
+          schedule.driverCommission !== null ? Number(schedule.driverCommission) : null;
         await prisma.cargoSchedule
           .update({
             where: { id: schedule.id },
@@ -141,6 +144,7 @@ export async function POST(req: Request) {
         loadingUnloadingCosts: 0,
         otherExpenses: 0,
         netFreightValue: grossFreightValue,
+        driverCommission,
       },
     });
 

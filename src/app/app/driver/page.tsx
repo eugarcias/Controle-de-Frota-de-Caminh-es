@@ -73,6 +73,11 @@ interface DriverTrip {
   loadingUnloadingCosts?: number;
   otherExpenses?: number;
   notes?: string | null;
+  endDate?: string | null;
+  /** Comissão do motorista na viagem (R$) */
+  commission?: number;
+  /** true = calculada pelo % padrão; false = definida pelo admin */
+  commissionIsEstimate?: boolean;
 }
 
 interface ScheduledLoadItem {
@@ -89,6 +94,8 @@ interface ScheduledLoadItem {
   distanceKm: number;
   status?: string;
   notes?: string | null;
+  commission?: number;
+  commissionIsEstimate?: boolean;
 }
 
 interface DriverExpenseItem {
@@ -115,11 +122,17 @@ interface DriverFuelItem {
 interface Ctx {
   userName: string;
   role?: 'ADMIN' | 'DRIVER';
-  driver: { id: string; name: string; cnhExpiry: string | null } | null;
+  driver: {
+    id: string;
+    name: string;
+    cnhExpiry: string | null;
+    commissionPercent?: number;
+  } | null;
   preferredTruckId?: string | null;
   trucks: DriverTruck[];
   trips: DriverTrip[];
   recentTrips?: DriverTrip[];
+  tripHistory?: DriverTrip[];
   scheduledLoads?: ScheduledLoadItem[];
   expenses: DriverExpenseItem[];
   recentFuelLogs?: DriverFuelItem[];
@@ -186,13 +199,13 @@ async function postDriverAction(
   return data;
 }
 
-type Tab = 'cargo' | 'agenda' | 'expense' | 'fuel' | 'odometer';
+type Tab = 'home' | 'cargo' | 'agenda' | 'expense' | 'fuel' | 'odometer';
 
 export default function DriverPage() {
   const [ctx, setCtx] = useState<Ctx | null>(null);
   const [selectedTruckId, setSelectedTruckId] = useState<string>('');
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [tab, setTab] = useState<Tab>('cargo');
+  const [tab, setTab] = useState<Tab>('home');
   const [toast, setToast] = useState<{ ok: boolean; text: string } | null>(null);
   const [online, setOnline] = useState(true);
   const [pending, setPending] = useState(0);
@@ -376,7 +389,8 @@ export default function DriverPage() {
   );
 
   const tabs: { id: Tab; label: string; icon: React.ElementType; badge?: number }[] = [
-    { id: 'cargo', label: 'Carga Atual', icon: Package },
+    { id: 'home', label: 'Início', icon: LayoutDashboard },
+    { id: 'cargo', label: 'Carga', icon: Package },
     {
       id: 'agenda',
       label: 'Agenda',
@@ -385,7 +399,7 @@ export default function DriverPage() {
     },
     { id: 'expense', label: 'Despesa', icon: Receipt },
     { id: 'fuel', label: 'Abastecer', icon: Fuel },
-    { id: 'odometer', label: 'Hodômetro', icon: Gauge },
+    { id: 'odometer', label: 'KM', icon: Gauge },
   ];
 
   const currentTruck =
@@ -587,9 +601,16 @@ export default function DriverPage() {
                       <p className="text-sm font-extrabold text-white">
                         {s.origin} → {s.destination}
                       </p>
-                      <p className="text-zinc-300">
-                        Carga: <strong className="text-white">{s.cargoDescription}</strong>
-                      </p>
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-zinc-300">
+                          Carga: <strong className="text-white">{s.cargoDescription}</strong>
+                        </p>
+                        {Number(s.commission) > 0 && (
+                          <span className="inline-flex items-center gap-1 rounded-lg bg-emerald-500/20 border border-emerald-400/50 px-2.5 py-1 text-xs font-extrabold text-emerald-300">
+                            Comissão: {formatBRL(Number(s.commission))}
+                          </span>
+                        )}
+                      </div>
                       {s.notes && (
                         <div className="bg-amber-500/20 border border-amber-400/40 text-amber-200 rounded-lg px-2.5 py-1.5 font-bold">
                           ⚠️ Obs. da Administração: {s.notes}
@@ -632,6 +653,15 @@ export default function DriverPage() {
               onGoToCargo={() => setTab('cargo')}
               onGoToExpense={() => setTab('expense')}
             />
+
+            {tab === 'home' && (
+              <DriverDashboardView
+                ctx={ctx}
+                activeTrip={activeTrip}
+                monthExpenseTotal={expenseSummary.monthTotal}
+                onGoTo={(t) => setTab(t)}
+              />
+            )}
 
             {tab === 'cargo' && (
               <CargoTabView
@@ -709,7 +739,7 @@ export default function DriverPage() {
 
       {/* Navegação inferior (5 abas diretas e claras) */}
       <nav
-        className="fixed bottom-0 inset-x-0 z-30 bg-white border-t border-zinc-200 grid grid-cols-5 pb-[env(safe-area-inset-bottom)]"
+        className="fixed bottom-0 inset-x-0 z-30 bg-white border-t border-zinc-200 grid grid-cols-6 pb-[env(safe-area-inset-bottom)]"
         aria-label="Ações do motorista"
       >
         {tabs.map(({ id, label: l, icon: Icon, badge }) => {
@@ -1281,6 +1311,10 @@ function CargoTabView({
               )}
             </div>
             <div className="flex flex-col items-end gap-1.5">
+              <CommissionTag
+                value={activeTrip.commission}
+                isEstimate={activeTrip.commissionIsEstimate}
+              />
               {activeTrip.cargoWeightKg ? (
                 <span className="bg-zinc-100 text-black font-extrabold text-xs px-2.5 py-1 rounded-lg border border-zinc-200">
                   {(activeTrip.cargoWeightKg / 1000).toFixed(1).replace('.', ',')} t
@@ -1834,11 +1868,18 @@ function AgendaTabView({
                   <strong className="text-black">{getTruckLabel(s.truckId)}</strong>
                 </p>
               </div>
-              {s.cargoWeightKg > 0 && (
-                <span className="text-xs font-extrabold bg-zinc-100 border border-zinc-200 px-2.5 py-1 rounded-lg text-black shrink-0">
-                  {(s.cargoWeightKg / 1000).toFixed(1).replace('.', ',')} t
-                </span>
-              )}
+              <div className="flex flex-col items-end gap-1 shrink-0">
+                <CommissionTag
+                  value={s.commission}
+                  isEstimate={s.commissionIsEstimate}
+                  size="lg"
+                />
+                {s.cargoWeightKg > 0 && (
+                  <span className="text-xs font-extrabold bg-zinc-100 border border-zinc-200 px-2.5 py-1 rounded-lg text-black">
+                    {(s.cargoWeightKg / 1000).toFixed(1).replace('.', ',')} t
+                  </span>
+                )}
+              </div>
             </div>
 
             {/* Rota e Carga Prontas */}
@@ -1898,11 +1939,14 @@ function AgendaTabView({
           key={t.id}
           className="bg-white rounded-xl border-2 border-zinc-200 p-4 space-y-3 shadow-sm"
         >
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-extrabold bg-zinc-900 text-white px-2.5 py-1 rounded-lg">
-              Viagem Planejada • {t.startDate ? formatDate(t.startDate) : 'Hoje'}
-            </span>
-            <span className="text-xs font-bold text-zinc-600">{t.customerName}</span>
+          <div className="flex items-center justify-between gap-2">
+            <div>
+              <span className="text-xs font-extrabold bg-zinc-900 text-white px-2.5 py-1 rounded-lg">
+                Viagem Planejada • {t.startDate ? formatDate(t.startDate) : 'Hoje'}
+              </span>
+              <span className="text-xs font-bold text-zinc-600 block mt-1">{t.customerName}</span>
+            </div>
+            <CommissionTag value={t.commission} isEstimate={t.commissionIsEstimate} size="lg" />
           </div>
 
           <div className="bg-zinc-50 rounded-xl p-3 border border-zinc-200 space-y-1">
@@ -2584,5 +2628,409 @@ function OdometerForm({
         <span>{busy ? 'Gravando…' : 'CONFIRMAR KM'}</span>
       </button>
     </form>
+  );
+}
+
+/* ---------------- Selo de comissão (definida pelo admin / estimada / a definir) ---------------- */
+
+function CommissionTag({
+  value,
+  isEstimate,
+  size = 'sm',
+}: {
+  value?: number;
+  isEstimate?: boolean;
+  size?: 'sm' | 'lg';
+}) {
+  const v = Number(value) || 0;
+  if (v <= 0) {
+    return (
+      <span className="inline-flex items-center rounded-lg bg-zinc-100 border border-zinc-200 px-2 py-0.5 text-[11px] font-bold text-zinc-600">
+        Comissão a definir
+      </span>
+    );
+  }
+  return (
+    <span
+      className={`inline-flex flex-col items-end rounded-lg bg-emerald-50 border border-emerald-300 ${
+        size === 'lg' ? 'px-3 py-1.5' : 'px-2 py-0.5'
+      }`}
+    >
+      <span className="text-[9px] font-extrabold uppercase tracking-wider text-emerald-700 leading-tight">
+        {isEstimate ? 'Comissão estimada' : 'Sua comissão'}
+      </span>
+      <span
+        className={`font-extrabold text-emerald-700 leading-tight ${
+          size === 'lg' ? 'text-lg' : 'text-sm'
+        }`}
+      >
+        {formatBRL(v)}
+      </span>
+    </span>
+  );
+}
+
+/* ---------------- ABA INÍCIO: DASHBOARD DO MOTORISTA (ganhos e produção) ---------------- */
+
+const MONTH_SHORT = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+
+function DriverDashboardView({
+  ctx,
+  activeTrip,
+  monthExpenseTotal,
+  onGoTo,
+}: {
+  ctx: Ctx;
+  activeTrip: DriverTrip | null;
+  monthExpenseTotal: number;
+  onGoTo: (t: Tab) => void;
+}) {
+  const now = new Date();
+  const curKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  const [selectedKey, setSelectedKey] = useState(curKey);
+
+  const history = useMemo(() => ctx.tripHistory ?? ctx.recentTrips ?? [], [ctx.tripHistory, ctx.recentTrips]);
+  const schedules = useMemo(
+    () => (ctx.scheduledLoads ?? []).filter((s) => (s.status ?? 'AGENDADA') === 'AGENDADA'),
+    [ctx.scheduledLoads]
+  );
+  const pct = ctx.driver?.commissionPercent ?? 10;
+
+  const monthKeyOf = (iso?: string | null) => (iso ? iso.slice(0, 7) : '');
+
+  // Últimos 6 meses (para gráfico e seletor)
+  const last6 = useMemo(() => {
+    const arr: { key: string; label: string; total: number; loads: number }[] = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      const monthTrips = history.filter((t) => monthKeyOf(t.startDate) === key && t.status !== 'PLANEJADO');
+      arr.push({
+        key,
+        label: MONTH_SHORT[d.getMonth()],
+        total: monthTrips.reduce((a, t) => a + (Number(t.commission) || 0), 0),
+        loads: monthTrips.length,
+      });
+    }
+    return arr;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [history]);
+
+  const maxBar = Math.max(1, ...last6.map((m) => m.total));
+
+  const monthTrips = useMemo(
+    () =>
+      history.filter((t) => monthKeyOf(t.startDate) === selectedKey && t.status !== 'PLANEJADO'),
+    [history, selectedKey]
+  );
+
+  const stats = useMemo(() => {
+    const done = monthTrips.filter((t) => t.status === 'CONCLUIDO');
+    const running = monthTrips.filter((t) => t.status === 'EM_VIAGEM');
+    const confirmed = done.reduce((a, t) => a + (Number(t.commission) || 0), 0);
+    const inProgress = running.reduce((a, t) => a + (Number(t.commission) || 0), 0);
+    const km = monthTrips.reduce((a, t) => {
+      const k =
+        t.distanceKm ??
+        (t.finalKm && t.initialKm ? Math.max(0, t.finalKm - t.initialKm) : 0);
+      return a + (Number(k) || 0);
+    }, 0);
+    return {
+      confirmed,
+      inProgress,
+      total: confirmed + inProgress,
+      doneCount: done.length,
+      runningCount: running.length,
+      km,
+    };
+  }, [monthTrips]);
+
+  const forecast = useMemo(
+    () => schedules.reduce((a, s) => a + (Number(s.commission) || 0), 0),
+    [schedules]
+  );
+
+  const isCurrentMonth = selectedKey === curKey;
+  const selectedLabel = (() => {
+    const [y, m] = selectedKey.split('-').map(Number);
+    return `${MONTH_SHORT[(m || 1) - 1]}/${y}`;
+  })();
+
+  const nextSchedule = schedules[0];
+
+  return (
+    <div className="space-y-3.5">
+      {/* HERO: Ganhos do mês */}
+      <div className="rounded-2xl bg-black text-white p-4 space-y-3 shadow-md relative overflow-hidden">
+        <div
+          className="pointer-events-none absolute -top-16 -right-16 w-48 h-48 rounded-full bg-emerald-500/20 blur-3xl"
+          aria-hidden="true"
+        />
+        <div className="relative flex items-center justify-between gap-2">
+          <span className="text-[11px] font-extrabold uppercase tracking-wider text-emerald-400">
+            Seus ganhos • {selectedLabel}
+          </span>
+          <span className="text-[11px] font-bold bg-zinc-800 text-zinc-200 px-2 py-0.5 rounded-full">
+            Comissão padrão: {pct}%
+          </span>
+        </div>
+
+        <div className="relative">
+          <p className="text-4xl font-extrabold tracking-tight">{formatBRL(stats.total)}</p>
+          <p className="text-xs text-zinc-400 mt-0.5">
+            {stats.doneCount + stats.runningCount} carga(s) no mês •{' '}
+            {stats.km.toLocaleString('pt-BR')} km
+          </p>
+        </div>
+
+        <div className="relative grid grid-cols-3 gap-2 text-xs">
+          <div className="rounded-xl bg-zinc-900 border border-zinc-800 p-2.5">
+            <span className="text-[10px] font-bold uppercase text-zinc-400 block">Confirmado</span>
+            <span className="font-extrabold text-emerald-400 block">{formatBRL(stats.confirmed)}</span>
+            <span className="text-[10px] text-zinc-500">{stats.doneCount} entregue(s)</span>
+          </div>
+          <div className="rounded-xl bg-zinc-900 border border-zinc-800 p-2.5">
+            <span className="text-[10px] font-bold uppercase text-zinc-400 block">Em viagem</span>
+            <span className="font-extrabold text-amber-300 block">{formatBRL(stats.inProgress)}</span>
+            <span className="text-[10px] text-zinc-500">{stats.runningCount} ativa(s)</span>
+          </div>
+          <div className="rounded-xl bg-zinc-900 border border-zinc-800 p-2.5">
+            <span className="text-[10px] font-bold uppercase text-zinc-400 block">Previsto</span>
+            <span className="font-extrabold text-sky-300 block">{formatBRL(forecast)}</span>
+            <span className="text-[10px] text-zinc-500">{schedules.length} agendada(s)</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Gráfico: comissão dos últimos 6 meses (toque para filtrar) */}
+      <div className="bg-white rounded-xl border border-zinc-200 p-4 shadow-sm space-y-3">
+        <div className="flex items-center justify-between">
+          <h3 className="text-xs font-extrabold uppercase tracking-wider text-zinc-800">
+            Comissão por mês
+          </h3>
+          {!isCurrentMonth && (
+            <button
+              type="button"
+              onClick={() => setSelectedKey(curKey)}
+              className="text-[11px] font-bold underline text-zinc-600"
+            >
+              Voltar ao mês atual
+            </button>
+          )}
+        </div>
+        <div className="flex items-end justify-between gap-2 h-32">
+          {last6.map((m) => {
+            const h = Math.max(4, Math.round((m.total / maxBar) * 100));
+            const active = m.key === selectedKey;
+            return (
+              <button
+                key={m.key}
+                type="button"
+                onClick={() => setSelectedKey(m.key)}
+                className="flex-1 flex flex-col items-center justify-end gap-1 h-full"
+                aria-label={`${m.label}: ${formatBRL(m.total)}`}
+              >
+                <span className={`text-[9px] font-bold ${active ? 'text-black' : 'text-zinc-400'}`}>
+                  {m.total > 0 ? `${Math.round(m.total / 100) / 10}k` : ''}
+                </span>
+                <div
+                  className={`w-full rounded-t-lg transition-all ${
+                    active ? 'bg-emerald-500' : 'bg-zinc-200'
+                  }`}
+                  style={{ height: `${h}%` }}
+                />
+                <span className={`text-[11px] font-bold ${active ? 'text-black' : 'text-zinc-500'}`}>
+                  {m.label}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* KPIs rápidos */}
+      <div className="grid grid-cols-2 gap-2.5">
+        <button
+          type="button"
+          onClick={() => onGoTo('cargo')}
+          className="bg-white rounded-xl border border-zinc-200 p-3 text-left shadow-sm"
+        >
+          <span className="text-[10px] font-bold uppercase text-zinc-500 flex items-center gap-1">
+            <Package className="w-3.5 h-3.5" /> Carga atual
+          </span>
+          {activeTrip ? (
+            <>
+              <span className="text-sm font-extrabold text-black block truncate mt-1">
+                {activeTrip.cargoDescription || 'Em viagem'}
+              </span>
+              <span className="text-[11px] text-zinc-600 block truncate">
+                → {activeTrip.destination}
+              </span>
+              {Number(activeTrip.commission) > 0 && (
+                <span className="text-xs font-extrabold text-emerald-700 block mt-0.5">
+                  {formatBRL(Number(activeTrip.commission))}
+                </span>
+              )}
+            </>
+          ) : (
+            <span className="text-sm font-bold text-zinc-700 block mt-1">Nenhuma ativa</span>
+          )}
+        </button>
+
+        <button
+          type="button"
+          onClick={() => onGoTo('agenda')}
+          className="bg-white rounded-xl border border-zinc-200 p-3 text-left shadow-sm"
+        >
+          <span className="text-[10px] font-bold uppercase text-zinc-500 flex items-center gap-1">
+            <CalendarClock className="w-3.5 h-3.5" /> Próxima carga
+          </span>
+          {nextSchedule ? (
+            <>
+              <span className="text-sm font-extrabold text-black block mt-1">
+                {new Date(nextSchedule.pickupDate).toLocaleString('pt-BR', {
+                  timeZone: 'UTC',
+                  day: '2-digit',
+                  month: '2-digit',
+                  hour: '2-digit',
+                  minute: '2-digit',
+                })}
+              </span>
+              <span className="text-[11px] text-zinc-600 block truncate">
+                → {nextSchedule.destination}
+              </span>
+              {Number(nextSchedule.commission) > 0 && (
+                <span className="text-xs font-extrabold text-emerald-700 block mt-0.5">
+                  {formatBRL(Number(nextSchedule.commission))}
+                </span>
+              )}
+            </>
+          ) : (
+            <span className="text-sm font-bold text-zinc-700 block mt-1">Sem agendamentos</span>
+          )}
+        </button>
+
+        <button
+          type="button"
+          onClick={() => onGoTo('expense')}
+          className="bg-white rounded-xl border border-zinc-200 p-3 text-left shadow-sm"
+        >
+          <span className="text-[10px] font-bold uppercase text-zinc-500 flex items-center gap-1">
+            <Receipt className="w-3.5 h-3.5" /> Despesas do mês
+          </span>
+          <span className="text-base font-extrabold text-black block mt-1">
+            {formatBRL(monthExpenseTotal)}
+          </span>
+          <span className="text-[11px] text-zinc-500">Lançadas por você</span>
+        </button>
+
+        <div className="bg-white rounded-xl border border-zinc-200 p-3 shadow-sm">
+          <span className="text-[10px] font-bold uppercase text-zinc-500 flex items-center gap-1">
+            <Gauge className="w-3.5 h-3.5" /> Média por carga
+          </span>
+          <span className="text-base font-extrabold text-black block mt-1">
+            {formatBRL(
+              stats.doneCount + stats.runningCount > 0
+                ? stats.total / (stats.doneCount + stats.runningCount)
+                : 0
+            )}
+          </span>
+          <span className="text-[11px] text-zinc-500">de comissão</span>
+        </div>
+      </div>
+
+      {/* Próximas cargas agendadas com comissão prevista */}
+      {schedules.length > 0 && (
+        <div className="bg-white rounded-xl border border-zinc-200 p-4 shadow-sm space-y-2.5">
+          <div className="flex items-center justify-between">
+            <h3 className="text-xs font-extrabold uppercase tracking-wider text-zinc-800">
+              Quanto você vai ganhar nas próximas cargas
+            </h3>
+            <button
+              type="button"
+              onClick={() => onGoTo('agenda')}
+              className="text-[11px] font-bold underline text-zinc-600"
+            >
+              Agenda
+            </button>
+          </div>
+          {schedules.slice(0, 4).map((s) => (
+            <div
+              key={s.id}
+              className="flex items-center justify-between gap-2 p-3 rounded-xl bg-zinc-50 border border-zinc-200"
+            >
+              <div className="min-w-0">
+                <p className="text-xs font-extrabold text-black truncate">
+                  {s.origin} → {s.destination}
+                </p>
+                <p className="text-[11px] text-zinc-600 truncate">
+                  {new Date(s.pickupDate).toLocaleString('pt-BR', {
+                    timeZone: 'UTC',
+                    day: '2-digit',
+                    month: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })}{' '}
+                  • {s.cargoDescription}
+                </p>
+              </div>
+              <CommissionTag value={s.commission} isEstimate={s.commissionIsEstimate} />
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Extrato de comissão por viagem no mês */}
+      <div className="bg-white rounded-xl border border-zinc-200 p-4 shadow-sm space-y-2.5">
+        <div className="flex items-center justify-between">
+          <h3 className="text-xs font-extrabold uppercase tracking-wider text-zinc-800">
+            Comissão por viagem • {selectedLabel}
+          </h3>
+          <span className="text-[11px] font-bold text-zinc-500">{monthTrips.length} viagem(ns)</span>
+        </div>
+
+        {monthTrips.length === 0 ? (
+          <p className="text-xs text-zinc-500 py-3 text-center">
+            Nenhuma viagem registrada neste mês.
+          </p>
+        ) : (
+          monthTrips.map((t) => (
+            <div
+              key={t.id}
+              className="flex items-center justify-between gap-2 p-3 rounded-xl bg-zinc-50 border border-zinc-200"
+            >
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5">
+                  <span
+                    className={`text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded ${
+                      t.status === 'EM_VIAGEM'
+                        ? 'bg-amber-100 text-amber-900'
+                        : 'bg-emerald-100 text-emerald-900'
+                    }`}
+                  >
+                    {t.status === 'EM_VIAGEM' ? 'Em viagem' : 'Entregue'}
+                  </span>
+                  <span className="text-[11px] text-zinc-500">
+                    {t.startDate ? formatDate(t.startDate) : ''}
+                  </span>
+                </div>
+                <p className="text-xs font-extrabold text-black truncate mt-0.5">
+                  {t.origin} → {t.destination}
+                </p>
+                <p className="text-[11px] text-zinc-600 truncate">
+                  {t.cargoDescription || 'Carga'} • {t.customerName}
+                </p>
+              </div>
+              <CommissionTag value={t.commission} isEstimate={t.commissionIsEstimate} />
+            </div>
+          ))
+        )}
+
+        <p className="text-[10px] text-zinc-500 pt-1">
+          “Sua comissão” = valor definido pela administração no agendamento. “Estimada” = calculada
+          pelo seu percentual padrão ({pct}%). Valores finais são confirmados no fechamento.
+        </p>
+      </div>
+    </div>
   );
 }

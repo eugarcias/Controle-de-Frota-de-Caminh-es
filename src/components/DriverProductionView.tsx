@@ -36,6 +36,7 @@ interface DriverProductionViewProps {
   trips: FreightTrip[];
   trucks: Truck[];
   travelExpenses?: TravelExpenseRecord[];
+  onUpdateDriver?: (id: string, patch: Partial<Driver>) => unknown;
 }
 
 interface DriverCommissionRule {
@@ -45,11 +46,28 @@ interface DriverCommissionRule {
 
 const STORAGE_KEY = 'vsm.driver.commissions.v1';
 
+/** Comissão de uma viagem: valor definido pelo admin (agendamento) ou % + fixo. */
+export function tripCommission(
+  trip: FreightTrip,
+  rule: DriverCommissionRule,
+  base: 'GROSS' | 'NET'
+): number {
+  if (trip.driverCommission !== null && trip.driverCommission !== undefined) {
+    return Number(trip.driverCommission) || 0;
+  }
+  const baseVal =
+    base === 'GROSS'
+      ? Number(trip.grossFreightValue || 0)
+      : Math.max(0, Number(trip.netFreightValue || 0));
+  return (baseVal * (rule.percent || 0)) / 100 + (rule.fixedPerLoad || 0);
+}
+
 export const DriverProductionView: React.FC<DriverProductionViewProps> = ({
   drivers,
   trips,
   trucks,
   travelExpenses = [],
+  onUpdateDriver,
 }) => {
   const [selectedMonth, setSelectedMonth] = useState<string>('ALL');
   const [calcBase, setCalcBase] = useState<'GROSS' | 'NET'>('GROSS');
@@ -68,9 +86,23 @@ export const DriverProductionView: React.FC<DriverProductionViewProps> = ({
     }
   }, []);
 
+  const pctTimers = React.useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+
   const updateDriverRule = (driverId: string, patch: Partial<DriverCommissionRule>) => {
+    // Persiste o % no cadastro do motorista (usado como sugestão no agendamento)
+    if (patch.percent !== undefined && onUpdateDriver) {
+      clearTimeout(pctTimers.current[driverId]);
+      const pct = patch.percent;
+      pctTimers.current[driverId] = setTimeout(() => {
+        onUpdateDriver(driverId, { commissionPercent: pct });
+      }, 700);
+    }
     setRules((prev) => {
-      const current = prev[driverId] ?? { percent: 10, fixedPerLoad: 0 };
+      const drv = drivers.find((d) => d.id === driverId);
+      const current = prev[driverId] ?? {
+        percent: drv?.commissionPercent != null ? Number(drv.commissionPercent) : 10,
+        fixedPerLoad: 0,
+      };
       const next = {
         ...prev,
         [driverId]: {
@@ -135,7 +167,13 @@ export const DriverProductionView: React.FC<DriverProductionViewProps> = ({
   const driverStats = useMemo(() => {
     return drivers
       .map((driver) => {
-        const rule = rules[driver.id] ?? { percent: 10, fixedPerLoad: 0 };
+        const saved = rules[driver.id];
+        const rule: DriverCommissionRule = {
+          percent:
+            saved?.percent ??
+            (driver.commissionPercent != null ? Number(driver.commissionPercent) : 10),
+          fixedPerLoad: saved?.fixedPerLoad ?? 0,
+        };
         const dTrips = validTrips
           .filter((t) => t.driverId === driver.id)
           .sort((a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime());
@@ -156,10 +194,9 @@ export const DriverProductionView: React.FC<DriverProductionViewProps> = ({
         const grossRevenue = dTrips.reduce((acc, t) => acc + Number(t.grossFreightValue || 0), 0);
         const netRevenue = dTrips.reduce((acc, t) => acc + Number(t.netFreightValue || 0), 0);
 
-        const baseAmount = calcBase === 'GROSS' ? grossRevenue : Math.max(0, netRevenue);
-        const commissionFromPercent = (baseAmount * (rule.percent || 0)) / 100;
-        const commissionFromFixed = totalLoads * (rule.fixedPerLoad || 0);
-        const totalCommission = Number((commissionFromPercent + commissionFromFixed).toFixed(2));
+        const totalCommission = Number(
+          dTrips.reduce((acc, t) => acc + tripCommission(t, rule, calcBase), 0).toFixed(2)
+        );
 
         const dExpenses = travelExpenses.filter((e) => {
           if (e.driverId !== driver.id) return false;
@@ -576,13 +613,9 @@ export const DriverProductionView: React.FC<DriverProductionViewProps> = ({
                     ) : (
                       <div className="space-y-2.5">
                         {item.trips.map((trip) => {
-                          const baseVal =
-                            calcBase === 'GROSS'
-                              ? Number(trip.grossFreightValue || 0)
-                              : Math.max(0, Number(trip.netFreightValue || 0));
-                          const tripCommission =
-                            (baseVal * (item.rule.percent || 0)) / 100 +
-                            (item.rule.fixedPerLoad || 0);
+                          const tripComm = tripCommission(trip, item.rule, calcBase);
+                          const isFixedByAdmin =
+                            trip.driverCommission !== null && trip.driverCommission !== undefined;
 
                           return (
                             <div
@@ -646,10 +679,10 @@ export const DriverProductionView: React.FC<DriverProductionViewProps> = ({
                                 </div>
                                 <div className="bg-emerald-500/15 border border-emerald-500/30 px-3 py-1 rounded-xl text-right">
                                   <span className="text-[10px] uppercase tracking-wider text-emerald-300 block">
-                                    Comissão da Carga
+                                    {isFixedByAdmin ? 'Comissão Definida' : 'Comissão da Carga'}
                                   </span>
                                   <strong className="text-sm font-extrabold text-emerald-400">
-                                    {formatBRL(tripCommission)}
+                                    {formatBRL(tripComm)}
                                   </strong>
                                 </div>
                               </div>

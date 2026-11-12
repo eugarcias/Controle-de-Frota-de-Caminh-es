@@ -69,6 +69,7 @@ export default function Home() {
       netFreightValue: Number((s.freightValue - fuel).toFixed(2)),
       paymentTerms: customer ? `${customer.paymentTermsDays} dias` : undefined,
       notes: s.notes,
+      driverCommission: s.driverCommission ?? null,
       status: 'EM_VIAGEM',
     };
     const created = await addItem('trips', trip);
@@ -173,6 +174,7 @@ export default function Home() {
             trips={data.trips}
             trucks={data.trucks}
             travelExpenses={data.travelExpenses}
+            onUpdateDriver={(id, patch) => updateItem('drivers', id, patch)}
           />
         )}
 

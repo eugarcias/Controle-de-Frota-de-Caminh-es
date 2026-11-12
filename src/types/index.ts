@@ -33,6 +33,8 @@ export interface Driver {
   cnhCategory: string;
   phone: string;
   status: DriverStatus;
+  /** % padrão de comissão do motorista */
+  commissionPercent?: number | null;
 }
 
 export interface FuelLog {
@@ -108,6 +110,8 @@ export interface FreightTrip {
   paymentTerms?: string;
   status?: TripStatus;
   notes?: string;
+  /** Comissão do motorista nesta viagem (R$) */
+  driverCommission?: number | null;
 }
 
 export type TripStatus = 'PLANEJADO' | 'EM_VIAGEM' | 'CONCLUIDO' | 'CANCELADO';
@@ -152,6 +156,8 @@ export interface CargoSchedule {
   pickupDate: string; // ISO (data/hora da coleta)
   deliveryDate?: string | null; // previsão de entrega
   freightValue: number;
+  /** Comissão sugerida pelo admin ao motorista (R$) */
+  driverCommission?: number | null;
   status: ScheduleStatus;
   notes?: string;
 }

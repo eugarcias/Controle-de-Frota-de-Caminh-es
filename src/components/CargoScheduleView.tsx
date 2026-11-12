@@ -61,6 +61,7 @@ const emptyForm = {
   pickupTime: '07:00',
   deliveryDate: '',
   freightValue: '',
+  driverCommission: '',
   notes: '',
 };
 
@@ -131,6 +132,17 @@ export const CargoScheduleView: React.FC<Props> = ({
     driver: (id?: string | null) => drivers.find((d) => d.id === id)?.name ?? 'A definir',
   };
 
+  // Comissão sugerida: % padrão do motorista × valor do frete
+  const selectedDriverPct = useMemo(() => {
+    const d = drivers.find((x) => x.id === form.driverId);
+    const pct = d?.commissionPercent;
+    return pct !== null && pct !== undefined ? Number(pct) : 10;
+  }, [drivers, form.driverId]);
+  const suggestedCommission = useMemo(
+    () => Number((((Number(form.freightValue) || 0) * selectedDriverPct) / 100).toFixed(2)),
+    [form.freightValue, selectedDriverPct]
+  );
+
   const openModal = () => {
     setEditingId(null);
     setForm({
@@ -159,6 +171,10 @@ export const CargoScheduleView: React.FC<Props> = ({
       pickupTime: timePart || '07:00',
       deliveryDate: s.deliveryDate ? s.deliveryDate.slice(0, 10) : '',
       freightValue: String(s.freightValue || ''),
+      driverCommission:
+        s.driverCommission !== null && s.driverCommission !== undefined
+          ? String(s.driverCommission)
+          : '',
       notes: s.notes ?? '',
     });
     setSaveError(null);
@@ -218,6 +234,10 @@ export const CargoScheduleView: React.FC<Props> = ({
       // 2) Agendamento (Criação ou Edição)
       const pickupIso = `${form.pickupDate}T${form.pickupTime || '07:00'}:00.000Z`;
       const deliveryIso = form.deliveryDate ? `${form.deliveryDate}T12:00:00.000Z` : null;
+      const commissionValue =
+        form.driverCommission.trim() !== ''
+          ? Math.max(0, Number(form.driverCommission) || 0)
+          : suggestedCommission;
 
       if (editingId) {
         onUpdate(editingId, {
@@ -232,6 +252,7 @@ export const CargoScheduleView: React.FC<Props> = ({
           pickupDate: pickupIso,
           deliveryDate: deliveryIso,
           freightValue: Number(form.freightValue),
+          driverCommission: commissionValue,
           notes: form.notes.trim(),
         });
         setOpen(false);
@@ -252,6 +273,7 @@ export const CargoScheduleView: React.FC<Props> = ({
         pickupDate: pickupIso,
         deliveryDate: deliveryIso,
         freightValue: Number(form.freightValue),
+        driverCommission: commissionValue,
         status: 'AGENDADA',
         notes: form.notes.trim(),
       };
@@ -334,6 +356,11 @@ export const CargoScheduleView: React.FC<Props> = ({
               <div className="sm:text-right">
                 <span className="text-xs text-slate-500 block">Frete</span>
                 <span className="text-xl font-bold text-sky-700">{formatBRL(s.freightValue)}</span>
+                {s.driverCommission !== null && s.driverCommission !== undefined && (
+                  <span className="text-xs font-bold text-emerald-700 block">
+                    Comissão motorista: {formatBRL(Number(s.driverCommission))}
+                  </span>
+                )}
               </div>
             </div>
 
@@ -542,6 +569,21 @@ export const CargoScheduleView: React.FC<Props> = ({
               </Field>
               <Field label="Valor do frete (R$)">
                 <input required type="number" inputMode="decimal" min="1" step="0.01" className={inputCls} value={form.freightValue} onChange={set('freightValue')} />
+              </Field>
+              <Field
+                label="Comissão do motorista (R$)"
+                hint={`Sugestão: ${formatBRL(suggestedCommission)} (${selectedDriverPct}% do frete). O motorista verá esse valor no app.`}
+              >
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  min="0"
+                  step="0.01"
+                  className={inputCls}
+                  value={form.driverCommission}
+                  onChange={set('driverCommission')}
+                  placeholder={suggestedCommission > 0 ? suggestedCommission.toFixed(2) : '0,00'}
+                />
               </Field>
               <Field
                 label="Instruções / Observações para o Motorista"

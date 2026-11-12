@@ -18,7 +18,7 @@ export async function GET() {
     await Promise.all([
       prisma.driver.findUnique({
         where: { id: profile.driverId },
-        select: { id: true, name: true, cnhExpiry: true },
+        select: { id: true, name: true, cnhExpiry: true, commissionPercent: true },
       }),
       prisma.truck.findMany({
         where: { id: { in: truckIds } },
@@ -103,7 +103,7 @@ export async function GET() {
       prisma.freightTrip.findMany({
         where: { driverId: profile.driverId },
         orderBy: { startDate: 'desc' },
-        take: 15,
+        take: 80,
         select: {
           id: true,
           truckId: true,
@@ -118,10 +118,43 @@ export async function GET() {
           distanceKm: true,
           status: true,
           startDate: true,
+          endDate: true,
           notes: true,
+          grossFreightValue: true,
+          driverCommission: true,
         },
       }),
     ]);
+
+  // % padrão de comissão do motorista (definido pelo admin)
+  const commissionPct =
+    driver?.commissionPercent !== null && driver?.commissionPercent !== undefined
+      ? Number(driver.commissionPercent)
+      : 10;
+
+  /** Comissão da viagem: valor definido no agendamento, ou estimativa pelo % do motorista. */
+  const calcCommission = (fixed: unknown, gross: unknown) => {
+    if (fixed !== null && fixed !== undefined) {
+      return { commission: Number(fixed) || 0, commissionIsEstimate: false };
+    }
+    return {
+      commission: Number((((Number(gross) || 0) * commissionPct) / 100).toFixed(2)),
+      commissionIsEstimate: true,
+    };
+  };
+
+  // Mapa de comissão por viagem (para cargas ativas também)
+  const commissionByTrip = new Map(
+    allDriverTrips.map((t) => [t.id, calcCommission(t.driverCommission, t.grossFreightValue)])
+  );
+
+  // Histórico do motorista para a dashboard (sem expor valores de frete)
+  const tripHistory = allDriverTrips
+    .filter((t) => t.status !== 'CANCELADO')
+    .map(({ grossFreightValue: _g, driverCommission: _d, ...rest }) => ({
+      ...rest,
+      ...(commissionByTrip.get(rest.id) ?? { commission: 0, commissionIsEstimate: true }),
+    }));
 
   // Contagem de uso de cada caminhão pelo motorista (abastecimentos + viagens)
   const usageMap = new Map<string, number>();
@@ -166,11 +199,17 @@ export async function GET() {
     serialize({
       userName: profile.name,
       role: profile.role,
-      driver,
+      driver: driver
+        ? { id: driver.id, name: driver.name, cnhExpiry: driver.cnhExpiry, commissionPercent: commissionPct }
+        : null,
       preferredTruckId,
       trucks,
-      trips,
-      recentTrips: allDriverTrips.slice(0, 8),
+      trips: trips.map((t) => ({
+        ...t,
+        ...(commissionByTrip.get(t.id) ?? {}),
+      })),
+      recentTrips: tripHistory.slice(0, 8),
+      tripHistory,
       scheduledLoads: scheduledLoads.map((s) => ({
         id: s.id,
         truckId: s.truckId,
@@ -185,6 +224,7 @@ export async function GET() {
         distanceKm: s.distanceKm,
         status: s.status,
         notes: s.notes ?? '',
+        ...calcCommission(s.driverCommission, s.freightValue),
       })),
       expenses,
       recentFuelLogs: driverFuelLogs.slice(0, 8),

@@ -29,6 +29,7 @@ export const DriverSchema = z.object({
   cnhCategory: z.string().default('E'),
   phone: z.string().min(8),
   status: z.enum(['ATIVO', 'INATIVO', 'FERIAS']).default('ATIVO'),
+  commissionPercent: z.number().min(0).max(100).optional().nullable(),
 });
 
 export const CustomerSchema = z.object({
@@ -113,6 +114,7 @@ export const FreightTripSchema = z.object({
   loadingUnloadingCosts: money.default(0),
   otherExpenses: money.default(0),
   netFreightValue: z.number().optional(),
+  driverCommission: money.optional().nullable(),
 });
 
 export const CargoScheduleSchema = z.object({
@@ -127,6 +129,7 @@ export const CargoScheduleSchema = z.object({
   pickupDate: isoDate,
   deliveryDate: isoDate.optional().nullable(),
   freightValue: z.number().positive(),
+  driverCommission: money.optional().nullable(),
   status: z.enum(['AGENDADA', 'EM_TRANSITO', 'CONCLUIDA', 'CANCELADA']).default('AGENDADA'),
   notes: optionalText,
 });
