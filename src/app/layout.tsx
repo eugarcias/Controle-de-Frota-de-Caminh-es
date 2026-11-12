@@ -16,7 +16,7 @@ export const metadata: Metadata = {
 
 // viewportFit 'cover' libera env(safe-area-inset-*) para o menu inferior não ficar sob a barra do iPhone
 export const viewport: Viewport = {
-  themeColor: '#000000',
+  themeColor: '#0b111a',
   width: 'device-width',
   initialScale: 1,
   viewportFit: 'cover',
@@ -28,8 +28,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="pt-BR" suppressHydrationWarning>
-      <body className="antialiased bg-slate-50 text-slate-800 dark:bg-zinc-950 dark:text-zinc-100 transition-colors">
+    <html lang="pt-BR" className="dark" suppressHydrationWarning>
+      <body className="antialiased bg-slate-50 text-slate-800 dark:bg-[#0b111a] dark:text-slate-100 transition-colors">
         <ThemeProvider>
           <InstallAppBanner />
           {children}

@@ -112,16 +112,16 @@ function LoginForm() {
   };
 
   return (
-    <div className="w-full max-w-sm sm:max-w-md bg-white border border-zinc-200 rounded-2xl shadow-xl p-5 sm:p-7 text-zinc-900">
+    <div className="w-full max-w-sm sm:max-w-md bg-[#111926]/95 backdrop-blur-md border border-emerald-500/30 rounded-2xl shadow-2xl shadow-emerald-950/50 p-5 sm:p-7 text-slate-100">
       {/* Botões explícitos: Motorista vs Administrador */}
-      <div className="grid grid-cols-2 gap-2 p-1 bg-zinc-100 rounded-xl mb-6">
+      <div className="grid grid-cols-2 gap-2 p-1 bg-[#0b111a] border border-slate-800 rounded-xl mb-6">
         <button
           type="button"
           onClick={() => handleModeChange('DRIVER')}
-          className={`flex items-center justify-center gap-2 py-3 px-3 rounded-lg text-sm font-bold transition-all ${
+          className={`flex items-center justify-center gap-2 py-3 px-3 rounded-lg text-sm font-extrabold transition-all ${
             mode === 'DRIVER'
-              ? 'bg-black text-white shadow-sm'
-              : 'text-zinc-600 hover:text-black hover:bg-zinc-200/60'
+              ? 'bg-gradient-to-r from-emerald-500 to-teal-400 text-slate-950 shadow-md shadow-emerald-500/20'
+              : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
           }`}
         >
           <Truck className="w-4 h-4 shrink-0" />
@@ -131,10 +131,10 @@ function LoginForm() {
         <button
           type="button"
           onClick={() => handleModeChange('ADMIN')}
-          className={`flex items-center justify-center gap-2 py-3 px-3 rounded-lg text-sm font-bold transition-all ${
+          className={`flex items-center justify-center gap-2 py-3 px-3 rounded-lg text-sm font-extrabold transition-all ${
             mode === 'ADMIN'
-              ? 'bg-black text-white shadow-sm'
-              : 'text-zinc-600 hover:text-black hover:bg-zinc-200/60'
+              ? 'bg-gradient-to-r from-emerald-500 to-teal-400 text-slate-950 shadow-md shadow-emerald-500/20'
+              : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
           }`}
         >
           <Shield className="w-4 h-4 shrink-0" />
@@ -143,12 +143,12 @@ function LoginForm() {
       </div>
 
       <div className="mb-5">
-        <h2 className="text-xl font-extrabold text-black tracking-tight">
+        <h2 className="text-xl font-extrabold text-white tracking-tight">
           {mode === 'DRIVER' ? 'Entrar como Motorista' : 'Entrar como Administrador'}
         </h2>
-        <p className="text-xs text-zinc-500 mt-1">
+        <p className="text-xs text-slate-400 mt-1">
           {mode === 'DRIVER'
-            ? 'Acesso direto ao lançamento de abastecimento e despesas'
+            ? 'Acesso direto ao lançamento de abastecimento, cargas e despesas'
             : 'Acesso completo ao painel financeiro e gestão de fretes'}
         </p>
       </div>
@@ -156,16 +156,16 @@ function LoginForm() {
       {(error || noProfile) && (
         <div
           role="alert"
-          className="flex items-start gap-2.5 rounded-xl bg-zinc-100 border border-zinc-300 text-zinc-900 p-3.5 mb-5 text-xs font-semibold"
+          className="flex items-start gap-2.5 rounded-xl bg-rose-950/60 border border-rose-500/40 text-rose-200 p-3.5 mb-5 text-xs font-semibold"
         >
-          <AlertCircle className="w-4 h-4 mt-0.5 shrink-0 text-black" />
+          <AlertCircle className="w-4 h-4 mt-0.5 shrink-0 text-rose-400" />
           <span>{error ?? 'Usuário sem perfil liberado no sistema.'}</span>
         </div>
       )}
 
       <form onSubmit={onSubmit} className="space-y-4" noValidate>
         <div>
-          <label htmlFor="login-username" className="block text-xs font-bold uppercase tracking-wider text-zinc-700 mb-1.5">
+          <label htmlFor="login-username" className="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-1.5">
             Usuário
           </label>
           <input
@@ -178,13 +178,13 @@ function LoginForm() {
             required
             value={username}
             onChange={(e) => setUsername(e.target.value)}
-            className="w-full h-12 sm:h-14 text-base font-semibold px-4 rounded-xl bg-white text-black border-2 border-zinc-300 placeholder:text-zinc-400 focus:border-black focus:outline-none transition-colors"
+            className="w-full h-12 sm:h-14 text-base font-semibold px-4 rounded-xl bg-[#0b111a] text-white border border-slate-700 placeholder:text-slate-500 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-500/20 focus:outline-none transition-all"
             placeholder="Digite seu usuário"
           />
         </div>
 
         <div>
-          <label htmlFor="login-password" className="block text-xs font-bold uppercase tracking-wider text-zinc-700 mb-1.5">
+          <label htmlFor="login-password" className="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-1.5">
             Senha
           </label>
           <div className="relative">
@@ -195,13 +195,13 @@ function LoginForm() {
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full h-12 sm:h-14 text-base font-semibold px-4 pr-20 rounded-xl bg-white text-black border-2 border-zinc-300 placeholder:text-zinc-400 focus:border-black focus:outline-none transition-colors"
+              className="w-full h-12 sm:h-14 text-base font-semibold px-4 pr-20 rounded-xl bg-[#0b111a] text-white border border-slate-700 placeholder:text-slate-500 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-500/20 focus:outline-none transition-all"
               placeholder="Digite sua senha"
             />
             <button
               type="button"
               onClick={() => setShowPassword((s) => !s)}
-              className="absolute right-2 top-1/2 -translate-y-1/2 px-3 py-1.5 rounded-lg text-xs font-bold text-zinc-600 hover:text-black hover:bg-zinc-100"
+              className="absolute right-2 top-1/2 -translate-y-1/2 px-3 py-1.5 rounded-lg text-xs font-bold text-slate-400 hover:text-emerald-300 hover:bg-slate-800"
             >
               {showPassword ? (
                 <span className="flex items-center gap-1">
@@ -219,7 +219,7 @@ function LoginForm() {
         <button
           type="submit"
           disabled={loading || !username.trim() || !password}
-          className="w-full h-12 sm:h-14 mt-2 inline-flex items-center justify-center gap-2 rounded-xl bg-black text-white hover:bg-zinc-800 text-sm sm:text-base font-bold shadow-md transition-all active:scale-[0.99] disabled:opacity-40 disabled:cursor-not-allowed"
+          className="w-full h-12 sm:h-14 mt-2 inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-400 hover:from-emerald-400 hover:to-teal-300 text-slate-950 text-sm sm:text-base font-extrabold shadow-lg shadow-emerald-500/25 transition-all active:scale-[0.99] disabled:opacity-40 disabled:cursor-not-allowed"
         >
           {loading ? (
             <Loader2 className="w-5 h-5 animate-spin" />
@@ -241,25 +241,33 @@ function LoginForm() {
 
 export default function LoginPage() {
   return (
-    <main className="min-h-[100dvh] w-full flex flex-col items-center justify-center bg-zinc-950 px-4 py-8">
-      {/* Logo com alto contraste e moldura limpa */}
-      <div className="bg-white rounded-2xl px-5 py-3 shadow-md mb-6">
-        <Image
-          src="/logo.png"
-          alt="VSM Garcia"
-          width={950}
-          height={440}
-          priority
-          className="h-12 sm:h-14 w-auto object-contain"
-        />
+    <main className="min-h-[100dvh] w-full flex flex-col items-center justify-center bg-[#0b111a] relative overflow-hidden px-4 py-8">
+      {/* Glow Esmeralda de fundo inspirado na logo VSM Garcia */}
+      <div
+        className="pointer-events-none absolute top-0 left-1/2 -translate-x-1/2 w-[500px] h-[300px] rounded-full bg-emerald-500/15 blur-[110px]"
+        aria-hidden="true"
+      />
+
+      {/* Nova Logo Oficial VSM Garcia */}
+      <div className="relative mb-5">
+        <div className="w-36 h-36 sm:w-44 sm:h-44 rounded-3xl overflow-hidden border-2 border-emerald-500/40 shadow-2xl shadow-emerald-500/20 bg-[#111926]">
+          <Image
+            src="/logo.png"
+            alt="VSM Garcia - Controle de Frota"
+            width={512}
+            height={512}
+            priority
+            className="w-full h-full object-cover"
+          />
+        </div>
       </div>
 
-      <div className="text-center mb-6">
-        <h1 className="text-xl sm:text-2xl font-extrabold text-white tracking-tight">
-          Controle de Frota
+      <div className="relative text-center mb-6">
+        <h1 className="text-2xl sm:text-3xl font-black tracking-tight bg-gradient-to-r from-emerald-400 via-teal-200 to-white bg-clip-text text-transparent">
+          VSM Garcia • Controle de Frota
         </h1>
-        <p className="text-xs sm:text-sm text-zinc-400 mt-1">
-          Selecione seu perfil e digite seu usuário e senha
+        <p className="text-xs sm:text-sm text-slate-400 mt-1">
+          Selecione seu perfil e acesse o sistema
         </p>
       </div>
 
@@ -267,8 +275,8 @@ export default function LoginPage() {
         <LoginForm />
       </Suspense>
 
-      <footer className="mt-8 text-center text-[11px] text-zinc-500">
-        VSM Garcia • Controle de Frota
+      <footer className="relative mt-8 text-center text-[11px] text-slate-500">
+        VSM Garcia • Gestão Inteligente de Frota
       </footer>
     </main>
   );

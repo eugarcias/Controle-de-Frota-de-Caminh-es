@@ -80,7 +80,7 @@ export default function Home() {
 
   if (loading && data.trucks.length === 0) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-950 text-emerald-400 text-sm font-semibold">
+      <div className="min-h-screen flex items-center justify-center bg-[#0b111a] text-emerald-400 text-sm font-semibold">
         <div className="flex items-center gap-2">
           <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping" />
           <span>Carregando dados da frota...</span>
@@ -90,7 +90,7 @@ export default function Home() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-zinc-950 text-slate-900 dark:text-zinc-100 flex flex-col transition-colors">
+    <div className="min-h-screen bg-slate-50 dark:bg-[#0b111a] text-slate-900 dark:text-slate-100 flex flex-col transition-colors">
       <Navbar activeTab={activeTab} setActiveTab={setActiveTab} />
 
       {error && (
@@ -207,8 +207,8 @@ export default function Home() {
         )}
       </main>
 
-      <footer className="hidden lg:block bg-slate-950 text-slate-400 border-t-2 border-emerald-500 py-4 text-center text-xs">
-        <span className="text-emerald-400 font-bold">VSM Garcia</span> • Gestão de Frota • &copy; 2026
+      <footer className="hidden lg:block bg-[#0b111a] text-slate-400 border-t border-emerald-500/30 py-4 text-center text-xs">
+        <span className="text-emerald-400 font-extrabold">VSM Garcia</span> • Controle de Frota • &copy; 2026
       </footer>
     </div>
   );

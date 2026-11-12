@@ -69,28 +69,38 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab }) => {
 
   return (
     <>
-      <header className="sticky top-0 z-50 bg-black text-white shadow-md border-b border-zinc-800 pt-[env(safe-area-inset-top)]">
+      <header className="sticky top-0 z-50 bg-[#0b111a]/95 backdrop-blur-md text-white shadow-lg shadow-black/40 border-b border-emerald-500/20 pt-[env(safe-area-inset-top)]">
         <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-14 sm:h-20 gap-3">
-            {/* Logo */}
+          <div className="flex items-center justify-between h-16 sm:h-20 gap-3">
+            {/* Logo Oficial VSM Garcia */}
             <button
               type="button"
               onClick={() => go('dashboard')}
               aria-label="VSM Garcia - Ir para início"
-              className="bg-white rounded-xl px-2 py-1 shrink-0"
+              className="flex items-center gap-2.5 rounded-xl px-1.5 py-1 hover:bg-slate-800/60 transition shrink-0 group"
             >
-              <Image
-                src="/logo.png"
-                alt="VSM Garcia"
-                width={950}
-                height={440}
-                priority
-                className="h-9 sm:h-12 w-auto object-contain"
-              />
+              <div className="relative h-11 sm:h-14 w-11 sm:w-14 rounded-xl overflow-hidden border border-emerald-500/40 shadow-md shadow-emerald-500/10 bg-[#0f1722]">
+                <Image
+                  src="/logo.png"
+                  alt="VSM Garcia"
+                  width={512}
+                  height={512}
+                  priority
+                  className="h-full w-full object-cover group-hover:scale-105 transition-transform"
+                />
+              </div>
+              <div className="hidden sm:flex flex-col text-left">
+                <span className="text-base font-black tracking-tight bg-gradient-to-r from-emerald-400 via-teal-300 to-emerald-200 bg-clip-text text-transparent leading-none">
+                  VSM GARCIA
+                </span>
+                <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mt-1">
+                  Controle de Frota
+                </span>
+              </div>
             </button>
 
             {/* Título da aba atual no celular */}
-            <span className="lg:hidden flex-1 truncate text-sm font-bold text-zinc-200">
+            <span className="lg:hidden flex-1 truncate text-sm font-bold text-slate-200">
               {navItems.find((n) => n.id === activeTab)?.label}
             </span>
 
@@ -104,10 +114,10 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab }) => {
                     key={item.id}
                     onClick={() => go(item.id)}
                     aria-current={isActive ? 'page' : undefined}
-                    className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-sm font-bold transition-colors ${
+                    className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-sm font-bold transition-all ${
                       isActive
-                        ? 'bg-white text-black shadow-sm'
-                        : 'text-zinc-300 hover:text-white hover:bg-zinc-900'
+                        ? 'bg-gradient-to-r from-emerald-500 to-teal-400 text-slate-950 shadow-md shadow-emerald-500/20'
+                        : 'text-slate-300 hover:text-emerald-300 hover:bg-slate-800/70'
                     }`}
                   >
                     <Icon className="w-4 h-4 shrink-0" />
@@ -124,12 +134,12 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab }) => {
                 onClick={toggleTheme}
                 aria-label={theme === 'dark' ? 'Ativar modo claro' : 'Ativar modo escuro'}
                 title={theme === 'dark' ? 'Modo Claro' : 'Modo Escuro'}
-                className="p-2 rounded-xl text-zinc-300 hover:text-white hover:bg-zinc-900 border border-zinc-800 transition"
+                className="p-2 rounded-xl text-slate-300 hover:text-emerald-400 hover:bg-slate-800/80 border border-slate-700/80 transition"
               >
                 {theme === 'dark' ? (
                   <Sun className="w-4 h-4 text-amber-400" />
                 ) : (
-                  <Moon className="w-4 h-4 text-zinc-300" />
+                  <Moon className="w-4 h-4 text-emerald-400" />
                 )}
               </button>
 
@@ -138,9 +148,9 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab }) => {
                 type="button"
                 onClick={() => setProfileOpen(true)}
                 title="Meu Perfil"
-                className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-white text-xs font-bold transition"
+                className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-emerald-500/30 text-white text-xs font-bold transition"
               >
-                <div className="w-6 h-6 rounded-full overflow-hidden bg-zinc-700 flex items-center justify-center shrink-0 border border-emerald-500">
+                <div className="w-6 h-6 rounded-full overflow-hidden bg-slate-800 flex items-center justify-center shrink-0 border border-emerald-400">
                   {myProfile?.avatarUrl ? (
                     <img
                       src={myProfile.avatarUrl}
@@ -148,7 +158,7 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab }) => {
                       className="w-full h-full object-cover"
                     />
                   ) : (
-                    <User className="w-3.5 h-3.5 text-zinc-300" />
+                    <User className="w-3.5 h-3.5 text-emerald-300" />
                   )}
                 </div>
                 <span className="hidden sm:inline truncate max-w-[100px]">
@@ -159,7 +169,7 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab }) => {
               <Link
                 href="/app/driver"
                 title="Abrir App do Motorista"
-                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-white text-xs font-bold transition"
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/40 text-emerald-300 text-xs font-bold transition"
               >
                 <Smartphone className="w-4 h-4 shrink-0" />
                 <span className="hidden sm:inline">Modo Motorista</span>
@@ -171,7 +181,7 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab }) => {
                 disabled={leaving}
                 aria-label="Sair do sistema"
                 title="Sair do sistema"
-                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-zinc-300 hover:text-white hover:bg-zinc-900 disabled:opacity-50 text-xs font-bold transition"
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-slate-300 hover:text-white hover:bg-slate-800 disabled:opacity-50 text-xs font-bold transition"
               >
                 {leaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <LogOut className="w-4 h-4" />}
                 <span className="hidden sm:inline">Sair</span>
@@ -183,7 +193,7 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab }) => {
 
       {/* Menu inferior no celular */}
       <nav
-        className="lg:hidden fixed bottom-0 inset-x-0 z-50 bg-black border-t border-zinc-800 pb-[env(safe-area-inset-bottom)]"
+        className="lg:hidden fixed bottom-0 inset-x-0 z-50 bg-[#0b111a]/95 backdrop-blur-md border-t border-emerald-500/20 pb-[env(safe-area-inset-bottom)]"
         aria-label="Menu móvel"
       >
         <div className="grid grid-cols-7 max-w-2xl mx-auto">
@@ -197,12 +207,14 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab }) => {
                 aria-current={isActive ? 'page' : undefined}
                 aria-label={item.label}
                 className={`flex flex-col items-center justify-center gap-1 min-h-[56px] px-0.5 text-[10px] font-bold transition-colors ${
-                  isActive ? 'text-white' : 'text-zinc-400 active:text-white'
+                  isActive ? 'text-emerald-400' : 'text-slate-400 active:text-white'
                 }`}
               >
                 <span
                   className={`flex items-center justify-center w-10 h-6 rounded-full transition-colors ${
-                    isActive ? 'bg-zinc-800 text-white' : 'text-zinc-400'
+                    isActive
+                      ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                      : 'text-slate-400'
                   }`}
                 >
                   <Icon className="w-4 h-4" />

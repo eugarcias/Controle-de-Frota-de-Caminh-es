@@ -11,31 +11,27 @@ interface ThemeContextType {
 }
 
 const ThemeContext = createContext<ThemeContextType>({
-  theme: 'light',
+  theme: 'dark',
   toggleTheme: () => {},
   setTheme: () => {},
 });
 
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [theme, setThemeState] = useState<Theme>('light');
+  const [theme, setThemeState] = useState<Theme>('dark');
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     try {
       const saved = localStorage.getItem('vsm.theme') as Theme | null;
-      if (saved === 'dark' || saved === 'light') {
-        setThemeState(saved);
-        if (saved === 'dark') {
-          document.documentElement.classList.add('dark');
-        } else {
-          document.documentElement.classList.remove('dark');
-        }
-      } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+      if (saved === 'light') {
+        setThemeState('light');
+        document.documentElement.classList.remove('dark');
+      } else {
         setThemeState('dark');
         document.documentElement.classList.add('dark');
       }
     } catch {
-      // ignore
+      document.documentElement.classList.add('dark');
     }
     setMounted(true);
   }, []);

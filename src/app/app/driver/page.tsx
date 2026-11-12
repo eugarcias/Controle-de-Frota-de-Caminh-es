@@ -460,31 +460,31 @@ export default function DriverPage() {
   }, [ctx?.expenses, activeTrip]);
 
   return (
-    <div className="min-h-[100dvh] bg-zinc-100 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 pb-[calc(5.25rem+env(safe-area-inset-bottom))] transition-colors">
-      {/* Header com contraste máximo */}
-      <header className="sticky top-0 z-30 bg-black text-white px-4 py-3 flex items-center justify-between border-b border-zinc-800 pt-[env(safe-area-inset-top)]">
+    <div className="min-h-[100dvh] bg-slate-100 dark:bg-[#0b111a] text-slate-900 dark:text-slate-100 pb-[calc(5.25rem+env(safe-area-inset-bottom))] transition-colors">
+      {/* Header com a nova identidade visual VSM Garcia */}
+      <header className="sticky top-0 z-30 bg-[#0b111a]/95 backdrop-blur-md text-white px-4 py-3 flex items-center justify-between border-b border-emerald-500/20 shadow-lg shadow-black/40 pt-[env(safe-area-inset-top)]">
         <div className="flex items-center gap-3 min-w-0">
-          <div className="bg-white rounded-lg px-2 py-0.5 shrink-0">
+          <div className="w-10 h-10 rounded-xl overflow-hidden border border-emerald-500/40 bg-[#111926] shadow-md shadow-emerald-500/10 shrink-0">
             <Image
               src="/logo.png"
               alt="VSM Garcia"
-              width={950}
-              height={440}
-              className="h-7 w-auto object-contain"
+              width={512}
+              height={512}
+              className="w-full h-full object-cover"
             />
           </div>
           <div className="min-w-0">
             <div className="flex items-center gap-1.5">
               <span
                 className={`w-2 h-2 rounded-full ${
-                  online ? 'bg-emerald-400' : 'bg-amber-400'
+                  online ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'
                 }`}
               />
-              <p className="text-[10px] text-zinc-400 uppercase tracking-wider leading-none">
+              <p className="text-[10px] text-emerald-300/90 font-bold uppercase tracking-wider leading-none">
                 {online ? 'Motorista Online' : 'Modo Offline'}
               </p>
             </div>
-            <p className="text-sm font-bold truncate mt-0.5 text-white">
+            <p className="text-sm font-extrabold truncate mt-0.5 text-white">
               {ctx?.driver?.name ?? ctx?.userName ?? 'Carregando…'}
             </p>
           </div>
@@ -843,7 +843,7 @@ export default function DriverPage() {
 
       {/* Navegação inferior (6 abas diretas e claras) */}
       <nav
-        className="fixed bottom-0 inset-x-0 z-30 bg-white dark:bg-zinc-900 border-t border-zinc-200 dark:border-zinc-800 grid grid-cols-6 pb-[env(safe-area-inset-bottom)] transition-colors"
+        className="fixed bottom-0 inset-x-0 z-30 bg-white dark:bg-[#0b111a]/95 backdrop-blur-md border-t border-slate-200 dark:border-emerald-500/20 grid grid-cols-6 pb-[env(safe-area-inset-bottom)] transition-colors"
         aria-label="Ações do motorista"
       >
         {tabs.map(({ id, label: l, icon: Icon, badge }) => {
@@ -855,8 +855,8 @@ export default function DriverPage() {
               aria-current={active ? 'page' : undefined}
               className={`relative flex flex-col items-center justify-center gap-1 min-h-[58px] py-2 text-[10px] sm:text-[11px] font-bold transition ${
                 active
-                  ? 'text-black dark:text-emerald-400 bg-zinc-100 dark:bg-zinc-800/80 border-t-2 border-black dark:border-emerald-400'
-                  : 'text-zinc-500 dark:text-zinc-400 active:bg-zinc-50 dark:active:bg-zinc-800/50'
+                  ? 'text-emerald-600 dark:text-emerald-400 bg-emerald-50/70 dark:bg-emerald-500/10 border-t-2 border-emerald-500 dark:border-emerald-400'
+                  : 'text-slate-500 dark:text-slate-400 active:bg-slate-50 dark:active:bg-slate-800/50'
               }`}
             >
               <div className="relative">
@@ -900,28 +900,28 @@ function TruckAndStatusHeader({
   const [open, setOpen] = useState(false);
 
   return (
-    <div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-sm overflow-hidden transition-colors">
+    <div className="bg-white dark:bg-[#111926] rounded-xl border border-slate-200 dark:border-emerald-500/20 shadow-sm overflow-hidden transition-colors">
       {/* Linha do Caminhão */}
       <div className="p-3.5 flex items-center justify-between gap-2">
         <div className="flex items-center gap-3 min-w-0">
-          <div className="p-2.5 rounded-xl bg-black dark:bg-emerald-500 text-white dark:text-black shrink-0">
+          <div className="p-2.5 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-400 text-slate-950 shadow-sm shrink-0">
             <TruckIcon className="w-5 h-5" />
           </div>
           <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-emerald-400/90">
                 Caminhão Atual
               </p>
               {!canChangeTruck && (
-                <span className="text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-zinc-200 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300">
+                <span className="text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
                   Fixo pelo Admin
                 </span>
               )}
             </div>
-            <p className="text-base font-extrabold text-black dark:text-white truncate">
+            <p className="text-base font-extrabold text-slate-900 dark:text-white truncate">
               {selectedTruck.plate} — {selectedTruck.model}
             </p>
-            <p className="text-xs text-zinc-600 dark:text-zinc-400 font-semibold">
+            <p className="text-xs text-slate-600 dark:text-slate-400 font-semibold">
               Painel: {selectedTruck.currentOdometer.toLocaleString('pt-BR')} km
             </p>
           </div>
@@ -931,7 +931,7 @@ function TruckAndStatusHeader({
           <button
             type="button"
             onClick={() => setOpen((o) => !o)}
-            className="px-3 py-2 rounded-lg bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-xs font-bold text-black dark:text-white border border-zinc-300 dark:border-zinc-700 shrink-0 transition"
+            className="px-3 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-xs font-bold text-slate-900 dark:text-emerald-300 border border-slate-300 dark:border-emerald-500/30 shrink-0 transition"
           >
             {open ? 'Fechar' : 'Trocar'}
           </button>
@@ -940,8 +940,8 @@ function TruckAndStatusHeader({
 
       {/* Lista de troca de caminhão */}
       {open && trucks.length > 1 && canChangeTruck && (
-        <div className="px-3.5 pb-3.5 pt-2 border-t border-zinc-100 dark:border-zinc-800 space-y-1.5">
-          <p className="text-xs text-zinc-600 dark:text-zinc-400 font-medium">
+        <div className="px-3.5 pb-3.5 pt-2 border-t border-slate-100 dark:border-slate-800 space-y-1.5">
+          <p className="text-xs text-slate-600 dark:text-slate-400 font-medium">
             Selecione o caminhão que está com você:
           </p>
           <div className="grid grid-cols-1 gap-1.5">
@@ -957,14 +957,14 @@ function TruckAndStatusHeader({
                   }}
                   className={`w-full flex items-center justify-between p-3 rounded-lg text-left text-xs font-bold border transition ${
                     active
-                      ? 'bg-black text-white border-black dark:bg-emerald-500 dark:text-black dark:border-emerald-500'
-                      : 'bg-zinc-50 dark:bg-zinc-800/60 text-black dark:text-white border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-700'
+                      ? 'bg-gradient-to-r from-emerald-500 to-teal-400 text-slate-950 border-emerald-500'
+                      : 'bg-slate-50 dark:bg-slate-800/60 text-slate-900 dark:text-white border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700'
                   }`}
                 >
                   <span>
                     {t.plate} — {t.model}
                   </span>
-                  <span className={active ? 'text-zinc-300 dark:text-black font-extrabold' : 'text-zinc-600 dark:text-zinc-400'}>
+                  <span className={active ? 'text-slate-900 font-extrabold' : 'text-slate-600 dark:text-slate-400'}>
                     {t.currentOdometer.toLocaleString('pt-BR')} km
                   </span>
                 </button>
@@ -975,7 +975,7 @@ function TruckAndStatusHeader({
       )}
 
       {/* Faixa Inferior de Status: Carga Atual & Despesa Hoje */}
-      <div className="bg-zinc-50 border-t border-zinc-200 px-3.5 py-2.5 flex items-center justify-between gap-2 text-xs">
+      <div className="bg-slate-50 dark:bg-[#0b111a]/70 border-t border-slate-200 dark:border-slate-800 px-3.5 py-2.5 flex items-center justify-between gap-2 text-xs">
         <button
           type="button"
           onClick={onGoToCargo}
@@ -983,23 +983,23 @@ function TruckAndStatusHeader({
         >
           <span
             className={`w-2.5 h-2.5 rounded-full shrink-0 ${
-              activeTrip ? 'bg-emerald-500 animate-pulse' : 'bg-zinc-400'
+              activeTrip ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'
             }`}
           />
           <div className="min-w-0">
             {activeTrip ? (
               <>
-                <span className="font-extrabold text-black block truncate">
+                <span className="font-extrabold text-slate-900 dark:text-white block truncate">
                   Carga: {activeTrip.cargoDescription || 'Frete em Andamento'}
                 </span>
-                <span className="text-[11px] text-zinc-600 font-medium block truncate">
+                <span className="text-[11px] text-slate-600 dark:text-slate-400 font-medium block truncate">
                   {activeTrip.origin} → {activeTrip.destination}
                 </span>
               </>
             ) : (
               <>
-                <span className="font-bold text-zinc-800 block">Sem carga ativa informada</span>
-                <span className="text-[11px] text-zinc-500 underline">
+                <span className="font-bold text-slate-800 dark:text-slate-200 block">Sem carga ativa informada</span>
+                <span className="text-[11px] text-emerald-600 dark:text-emerald-400 underline">
                   Toque para informar sua carga atual
                 </span>
               </>
@@ -1010,12 +1010,12 @@ function TruckAndStatusHeader({
         <button
           type="button"
           onClick={onGoToExpense}
-          className="shrink-0 bg-white border border-zinc-200 rounded-lg px-2.5 py-1.5 text-right hover:border-black transition"
+          className="shrink-0 bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1.5 text-right hover:border-emerald-500 transition"
         >
-          <span className="text-[10px] font-bold uppercase text-zinc-500 block leading-none">
+          <span className="text-[10px] font-bold uppercase text-slate-500 dark:text-slate-400 block leading-none">
             Gasto Hoje
           </span>
-          <span className="text-xs font-extrabold text-black">
+          <span className="text-xs font-extrabold text-slate-900 dark:text-emerald-300">
             {formatBRL(todayExpenseTotal)}
           </span>
         </button>
@@ -2882,25 +2882,29 @@ function DriverDashboardView({
   return (
     <div className="space-y-3.5">
       {/* CARD DE GAMIFICAÇÃO: NÍVEL DO MOTORISTA NO TRANSPORTE */}
-      <div className="rounded-2xl bg-gradient-to-r from-zinc-900 via-zinc-950 to-zinc-900 border border-zinc-800 p-4 text-white shadow-md relative overflow-hidden">
+      <div className="rounded-2xl bg-gradient-to-r from-[#0f1722] via-[#111926] to-[#0f1722] border border-emerald-500/30 p-4 text-white shadow-lg shadow-emerald-950/30 relative overflow-hidden">
+        <div
+          className="pointer-events-none absolute -top-12 -left-12 w-36 h-36 rounded-full bg-emerald-500/15 blur-2xl"
+          aria-hidden="true"
+        />
         <div className="flex items-center justify-between gap-3 relative z-10">
           <div className="flex items-center gap-3 min-w-0">
-            <div className="w-12 h-12 rounded-2xl bg-zinc-800/90 border border-zinc-700/80 flex items-center justify-center text-2xl shadow-inner shrink-0">
+            <div className="w-12 h-12 rounded-2xl bg-[#0b111a] border border-emerald-500/40 flex items-center justify-center text-2xl shadow-inner shrink-0">
               {rankInfo.currentRank.badge}
             </div>
             <div className="min-w-0">
               <div className="flex items-center gap-2">
-                <span className="text-[10px] font-extrabold uppercase tracking-wider text-amber-400">
-                  Nível {rankInfo.currentRank.level} • Carreira
+                <span className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-400">
+                  Nível {rankInfo.currentRank.level} • Carreira VSM
                 </span>
-                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
                   {Math.round((rankInfo.currentRank.bonusMultiplier - 1) * 100)}% bônus
                 </span>
               </div>
               <h2 className="text-base font-extrabold truncate text-white">
                 {rankInfo.currentRank.title}
               </h2>
-              <p className="text-[11px] text-zinc-400 truncate">
+              <p className="text-[11px] text-slate-400 truncate">
                 {allDeliveredLoadsCount} cargas entregues no histórico
               </p>
             </div>
@@ -2909,7 +2913,7 @@ function DriverDashboardView({
           <button
             type="button"
             onClick={() => setShowReportModal(true)}
-            className="px-3 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-extrabold text-xs shrink-0 flex items-center gap-1.5 shadow-sm transition active:scale-95"
+            className="px-3 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-400 hover:from-emerald-400 hover:to-teal-300 text-slate-950 font-extrabold text-xs shrink-0 flex items-center gap-1.5 shadow-md shadow-emerald-500/20 transition active:scale-95"
           >
             <FileText className="w-3.5 h-3.5" />
             <span className="hidden sm:inline">Relatório</span>
@@ -2918,9 +2922,9 @@ function DriverDashboardView({
         </div>
 
         {/* Barra de Progresso para o próximo nível */}
-        <div className="mt-3.5 pt-3 border-t border-zinc-800/80 relative z-10 space-y-1.5">
+        <div className="mt-3.5 pt-3 border-t border-slate-800/80 relative z-10 space-y-1.5">
           <div className="flex items-center justify-between text-[11px]">
-            <span className="text-zinc-400 font-medium">
+            <span className="text-slate-400 font-medium">
               {rankInfo.nextRank ? (
                 <>
                   Próximo nível: <strong className="text-white font-bold">{rankInfo.nextRank.badge} {rankInfo.nextRank.title}</strong>
@@ -2934,9 +2938,9 @@ function DriverDashboardView({
             </span>
           </div>
 
-          <div className="w-full h-2 rounded-full bg-zinc-800 overflow-hidden">
+          <div className="w-full h-2 rounded-full bg-slate-800 overflow-hidden">
             <div
-              className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-emerald-300 transition-all duration-500"
+              className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-teal-300 transition-all duration-500"
               style={{ width: `${rankInfo.progressPercent}%` }}
             />
           </div>
@@ -2944,7 +2948,7 @@ function DriverDashboardView({
       </div>
 
       {/* HERO: Ganhos do mês */}
-      <div className="rounded-2xl bg-black dark:bg-zinc-900 text-white p-4 space-y-3 shadow-md relative overflow-hidden border border-zinc-800 transition-colors">
+      <div className="rounded-2xl bg-[#111926] text-white p-4 space-y-3 shadow-lg shadow-black/30 relative overflow-hidden border border-emerald-500/25 transition-colors">
         <div
           className="pointer-events-none absolute -top-16 -right-16 w-48 h-48 rounded-full bg-emerald-500/20 blur-3xl"
           aria-hidden="true"
@@ -2953,40 +2957,40 @@ function DriverDashboardView({
           <span className="text-[11px] font-extrabold uppercase tracking-wider text-emerald-400">
             Seus ganhos • {selectedLabel}
           </span>
-          <span className="text-[11px] font-bold bg-zinc-800 text-zinc-200 px-2 py-0.5 rounded-full">
+          <span className="text-[11px] font-bold bg-[#0b111a] border border-slate-700 text-slate-200 px-2.5 py-0.5 rounded-full">
             Comissão padrão: {pct}%
           </span>
         </div>
 
         <div className="relative">
           <p className="text-4xl font-extrabold tracking-tight">{formatBRL(stats.total)}</p>
-          <p className="text-xs text-zinc-400 mt-0.5">
+          <p className="text-xs text-slate-400 mt-0.5">
             {stats.doneCount + stats.runningCount} carga(s) no mês •{' '}
             {stats.km.toLocaleString('pt-BR')} km
           </p>
         </div>
 
         <div className="relative grid grid-cols-3 gap-2 text-xs">
-          <div className="rounded-xl bg-zinc-900/90 dark:bg-zinc-950/80 border border-zinc-800 p-2.5">
-            <span className="text-[10px] font-bold uppercase text-zinc-400 block">Confirmado</span>
+          <div className="rounded-xl bg-[#0b111a]/90 border border-slate-800 p-2.5">
+            <span className="text-[10px] font-bold uppercase text-slate-400 block">Confirmado</span>
             <span className="font-extrabold text-emerald-400 block">{formatBRL(stats.confirmed)}</span>
-            <span className="text-[10px] text-zinc-500">{stats.doneCount} entregue(s)</span>
+            <span className="text-[10px] text-slate-500">{stats.doneCount} entregue(s)</span>
           </div>
-          <div className="rounded-xl bg-zinc-900/90 dark:bg-zinc-950/80 border border-zinc-800 p-2.5">
-            <span className="text-[10px] font-bold uppercase text-zinc-400 block">Em viagem</span>
+          <div className="rounded-xl bg-[#0b111a]/90 border border-slate-800 p-2.5">
+            <span className="text-[10px] font-bold uppercase text-slate-400 block">Em viagem</span>
             <span className="font-extrabold text-amber-300 block">{formatBRL(stats.inProgress)}</span>
-            <span className="text-[10px] text-zinc-500">{stats.runningCount} ativa(s)</span>
+            <span className="text-[10px] text-slate-500">{stats.runningCount} ativa(s)</span>
           </div>
-          <div className="rounded-xl bg-zinc-900/90 dark:bg-zinc-950/80 border border-zinc-800 p-2.5">
-            <span className="text-[10px] font-bold uppercase text-zinc-400 block">Previsto</span>
-            <span className="font-extrabold text-sky-300 block">{formatBRL(forecast)}</span>
-            <span className="text-[10px] text-zinc-500">{schedules.length} agendada(s)</span>
+          <div className="rounded-xl bg-[#0b111a]/90 border border-slate-800 p-2.5">
+            <span className="text-[10px] font-bold uppercase text-slate-400 block">Previsto</span>
+            <span className="font-extrabold text-teal-300 block">{formatBRL(forecast)}</span>
+            <span className="text-[10px] text-slate-500">{schedules.length} agendada(s)</span>
           </div>
         </div>
       </div>
 
       {/* Gráfico: comissão dos últimos 6 meses (toque para filtrar) */}
-      <div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 p-4 shadow-sm space-y-3 transition-colors">
+      <div className="bg-white dark:bg-[#111926] rounded-xl border border-slate-200 dark:border-slate-800 p-4 shadow-sm space-y-3 transition-colors">
         <div className="flex items-center justify-between">
           <h3 className="text-xs font-extrabold uppercase tracking-wider text-zinc-800 dark:text-zinc-200">
             Comissão por mês
@@ -3036,17 +3040,17 @@ function DriverDashboardView({
         <button
           type="button"
           onClick={() => onGoTo('cargo')}
-          className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 p-3 text-left shadow-sm transition-colors"
+          className="bg-white dark:bg-[#111926] rounded-xl border border-slate-200 dark:border-slate-800 p-3 text-left shadow-sm transition-colors hover:border-emerald-500/40"
         >
-          <span className="text-[10px] font-bold uppercase text-zinc-500 dark:text-zinc-400 flex items-center gap-1">
-            <Package className="w-3.5 h-3.5" /> Carga atual
+          <span className="text-[10px] font-bold uppercase text-slate-500 dark:text-slate-400 flex items-center gap-1">
+            <Package className="w-3.5 h-3.5 text-emerald-500" /> Carga atual
           </span>
           {activeTrip ? (
             <>
-              <span className="text-sm font-extrabold text-black dark:text-white block truncate mt-1">
+              <span className="text-sm font-extrabold text-slate-900 dark:text-white block truncate mt-1">
                 {activeTrip.cargoDescription || 'Em viagem'}
               </span>
-              <span className="text-[11px] text-zinc-600 dark:text-zinc-400 block truncate">
+              <span className="text-[11px] text-slate-600 dark:text-slate-400 block truncate">
                 → {activeTrip.destination}
               </span>
               {Number(activeTrip.commission) > 0 && (
@@ -3056,21 +3060,21 @@ function DriverDashboardView({
               )}
             </>
           ) : (
-            <span className="text-sm font-bold text-zinc-700 dark:text-zinc-300 block mt-1">Nenhuma ativa</span>
+            <span className="text-sm font-bold text-slate-700 dark:text-slate-300 block mt-1">Nenhuma ativa</span>
           )}
         </button>
 
         <button
           type="button"
           onClick={() => onGoTo('agenda')}
-          className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 p-3 text-left shadow-sm transition-colors"
+          className="bg-white dark:bg-[#111926] rounded-xl border border-slate-200 dark:border-slate-800 p-3 text-left shadow-sm transition-colors hover:border-emerald-500/40"
         >
-          <span className="text-[10px] font-bold uppercase text-zinc-500 dark:text-zinc-400 flex items-center gap-1">
-            <CalendarClock className="w-3.5 h-3.5" /> Próxima carga
+          <span className="text-[10px] font-bold uppercase text-slate-500 dark:text-slate-400 flex items-center gap-1">
+            <CalendarClock className="w-3.5 h-3.5 text-emerald-500" /> Próxima carga
           </span>
           {nextSchedule ? (
             <>
-              <span className="text-sm font-extrabold text-black dark:text-white block mt-1">
+              <span className="text-sm font-extrabold text-slate-900 dark:text-white block mt-1">
                 {new Date(nextSchedule.pickupDate).toLocaleString('pt-BR', {
                   timeZone: 'UTC',
                   day: '2-digit',
@@ -3079,7 +3083,7 @@ function DriverDashboardView({
                   minute: '2-digit',
                 })}
               </span>
-              <span className="text-[11px] text-zinc-600 dark:text-zinc-400 block truncate">
+              <span className="text-[11px] text-slate-600 dark:text-slate-400 block truncate">
                 → {nextSchedule.destination}
               </span>
               {Number(nextSchedule.commission) > 0 && (
@@ -3089,50 +3093,50 @@ function DriverDashboardView({
               )}
             </>
           ) : (
-            <span className="text-sm font-bold text-zinc-700 dark:text-zinc-300 block mt-1">Sem agendamentos</span>
+            <span className="text-sm font-bold text-slate-700 dark:text-slate-300 block mt-1">Sem agendamentos</span>
           )}
         </button>
 
         <button
           type="button"
           onClick={() => onGoTo('expense')}
-          className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 p-3 text-left shadow-sm transition-colors"
+          className="bg-white dark:bg-[#111926] rounded-xl border border-slate-200 dark:border-slate-800 p-3 text-left shadow-sm transition-colors hover:border-emerald-500/40"
         >
-          <span className="text-[10px] font-bold uppercase text-zinc-500 dark:text-zinc-400 flex items-center gap-1">
-            <Receipt className="w-3.5 h-3.5" /> Despesas do mês
+          <span className="text-[10px] font-bold uppercase text-slate-500 dark:text-slate-400 flex items-center gap-1">
+            <Receipt className="w-3.5 h-3.5 text-emerald-500" /> Despesas do mês
           </span>
-          <span className="text-base font-extrabold text-black dark:text-white block mt-1">
+          <span className="text-base font-extrabold text-slate-900 dark:text-white block mt-1">
             {formatBRL(monthExpenseTotal)}
           </span>
-          <span className="text-[11px] text-zinc-500 dark:text-zinc-400">Lançadas por você</span>
+          <span className="text-[11px] text-slate-500 dark:text-slate-400">Lançadas por você</span>
         </button>
 
-        <div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 p-3 shadow-sm transition-colors">
-          <span className="text-[10px] font-bold uppercase text-zinc-500 dark:text-zinc-400 flex items-center gap-1">
-            <Gauge className="w-3.5 h-3.5" /> Média por carga
+        <div className="bg-white dark:bg-[#111926] rounded-xl border border-slate-200 dark:border-slate-800 p-3 shadow-sm transition-colors">
+          <span className="text-[10px] font-bold uppercase text-slate-500 dark:text-slate-400 flex items-center gap-1">
+            <Gauge className="w-3.5 h-3.5 text-emerald-500" /> Média por carga
           </span>
-          <span className="text-base font-extrabold text-black dark:text-white block mt-1">
+          <span className="text-base font-extrabold text-slate-900 dark:text-white block mt-1">
             {formatBRL(
               stats.doneCount + stats.runningCount > 0
                 ? stats.total / (stats.doneCount + stats.runningCount)
                 : 0
             )}
           </span>
-          <span className="text-[11px] text-zinc-500 dark:text-zinc-400">de comissão</span>
+          <span className="text-[11px] text-slate-500 dark:text-slate-400">de comissão</span>
         </div>
       </div>
 
       {/* Próximas cargas agendadas com comissão prevista */}
       {schedules.length > 0 && (
-        <div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 p-4 shadow-sm space-y-2.5 transition-colors">
+        <div className="bg-white dark:bg-[#111926] rounded-xl border border-slate-200 dark:border-slate-800 p-4 shadow-sm space-y-2.5 transition-colors">
           <div className="flex items-center justify-between">
-            <h3 className="text-xs font-extrabold uppercase tracking-wider text-zinc-800 dark:text-zinc-200">
+            <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-800 dark:text-slate-200">
               Quanto você vai ganhar nas próximas cargas
             </h3>
             <button
               type="button"
               onClick={() => onGoTo('agenda')}
-              className="text-[11px] font-bold underline text-zinc-600 dark:text-zinc-400"
+              className="text-[11px] font-bold underline text-emerald-600 dark:text-emerald-400"
             >
               Agenda
             </button>
@@ -3140,13 +3144,13 @@ function DriverDashboardView({
           {schedules.slice(0, 4).map((s) => (
             <div
               key={s.id}
-              className="flex items-center justify-between gap-2 p-3 rounded-xl bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700"
+              className="flex items-center justify-between gap-2 p-3 rounded-xl bg-slate-50 dark:bg-[#0b111a]/80 border border-slate-200 dark:border-slate-800"
             >
               <div className="min-w-0">
-                <p className="text-xs font-extrabold text-black dark:text-white truncate">
+                <p className="text-xs font-extrabold text-slate-900 dark:text-white truncate">
                   {s.origin} → {s.destination}
                 </p>
-                <p className="text-[11px] text-zinc-600 dark:text-zinc-400 truncate">
+                <p className="text-[11px] text-slate-600 dark:text-slate-400 truncate">
                   {new Date(s.pickupDate).toLocaleString('pt-BR', {
                     timeZone: 'UTC',
                     day: '2-digit',
@@ -3164,23 +3168,23 @@ function DriverDashboardView({
       )}
 
       {/* Extrato de comissão por viagem no mês */}
-      <div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 p-4 shadow-sm space-y-2.5 transition-colors">
+      <div className="bg-white dark:bg-[#111926] rounded-xl border border-slate-200 dark:border-slate-800 p-4 shadow-sm space-y-2.5 transition-colors">
         <div className="flex items-center justify-between">
-          <h3 className="text-xs font-extrabold uppercase tracking-wider text-zinc-800 dark:text-zinc-200">
+          <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-800 dark:text-slate-200">
             Comissão por viagem • {selectedLabel}
           </h3>
-          <span className="text-[11px] font-bold text-zinc-500 dark:text-zinc-400">{monthTrips.length} viagem(ns)</span>
+          <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400">{monthTrips.length} viagem(ns)</span>
         </div>
 
         {monthTrips.length === 0 ? (
-          <p className="text-xs text-zinc-500 dark:text-zinc-400 py-3 text-center">
+          <p className="text-xs text-slate-500 dark:text-slate-400 py-3 text-center">
             Nenhuma viagem registrada neste mês.
           </p>
         ) : (
           monthTrips.map((t) => (
             <div
               key={t.id}
-              className="flex items-center justify-between gap-2 p-3 rounded-xl bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700"
+              className="flex items-center justify-between gap-2 p-3 rounded-xl bg-slate-50 dark:bg-[#0b111a]/80 border border-slate-200 dark:border-slate-800"
             >
               <div className="min-w-0">
                 <div className="flex items-center gap-1.5">
@@ -3193,14 +3197,14 @@ function DriverDashboardView({
                   >
                     {t.status === 'EM_VIAGEM' ? 'Em viagem' : 'Entregue'}
                   </span>
-                  <span className="text-[11px] text-zinc-500 dark:text-zinc-400">
+                  <span className="text-[11px] text-slate-500 dark:text-slate-400">
                     {t.startDate ? formatDate(t.startDate) : ''}
                   </span>
                 </div>
-                <p className="text-xs font-extrabold text-black dark:text-white truncate mt-0.5">
+                <p className="text-xs font-extrabold text-slate-900 dark:text-white truncate mt-0.5">
                   {t.origin} → {t.destination}
                 </p>
-                <p className="text-[11px] text-zinc-600 dark:text-zinc-400 truncate">
+                <p className="text-[11px] text-slate-600 dark:text-slate-400 truncate">
                   {t.cargoDescription || 'Carga'} • {t.customerName}
                 </p>
               </div>
@@ -3209,7 +3213,7 @@ function DriverDashboardView({
           ))
         )}
 
-        <p className="text-[10px] text-zinc-500 dark:text-zinc-400 pt-1">
+        <p className="text-[10px] text-slate-500 dark:text-slate-400 pt-1">
           “Sua comissão” = valor definido pela administração no agendamento. “Estimada” = calculada
           pelo seu percentual padrão ({pct}%). Valores finais são confirmados no fechamento.
         </p>
@@ -3217,18 +3221,18 @@ function DriverDashboardView({
 
       {/* MODAL: RELATÓRIO MENSAL DE DESEMPENHO DO MOTORISTA */}
       {showReportModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fade-in">
-          <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 w-full max-w-lg max-h-[90vh] overflow-y-auto shadow-2xl p-5 space-y-4">
-            <div className="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800 pb-3">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white dark:bg-[#111926] rounded-2xl border border-slate-200 dark:border-emerald-500/30 w-full max-w-lg max-h-[90vh] overflow-y-auto shadow-2xl p-5 space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
               <div className="flex items-center gap-2.5">
-                <div className="p-2 rounded-xl bg-emerald-500 text-black">
+                <div className="p-2 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-400 text-slate-950">
                   <Award className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-extrabold text-black dark:text-white">
+                  <h3 className="text-sm font-extrabold text-slate-900 dark:text-white">
                     Relatório de Desempenho
                   </h3>
-                  <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
                     {ctx.driver?.name ?? ctx.userName} • {selectedLabel}
                   </p>
                 </div>
@@ -3236,7 +3240,7 @@ function DriverDashboardView({
               <button
                 type="button"
                 onClick={() => setShowReportModal(false)}
-                className="p-1.5 rounded-lg text-zinc-400 hover:text-black dark:hover:text-white"
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-900 dark:hover:text-white"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -3244,11 +3248,11 @@ function DriverDashboardView({
 
             {/* Resumo executivo do relatório */}
             <div className="grid grid-cols-2 gap-2 text-xs">
-              <div className="p-3 rounded-xl bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700">
-                <span className="text-[10px] font-bold uppercase text-zinc-500 dark:text-zinc-400 block">
+              <div className="p-3 rounded-xl bg-slate-50 dark:bg-[#0b111a]/80 border border-slate-200 dark:border-slate-800">
+                <span className="text-[10px] font-bold uppercase text-slate-500 dark:text-slate-400 block">
                   Cargas Realizadas
                 </span>
-                <span className="text-lg font-extrabold text-black dark:text-white block mt-0.5">
+                <span className="text-lg font-extrabold text-slate-900 dark:text-white block mt-0.5">
                   {stats.doneCount + stats.runningCount} viagem(ns)
                 </span>
                 <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold">
@@ -3256,78 +3260,78 @@ function DriverDashboardView({
                 </span>
               </div>
 
-              <div className="p-3 rounded-xl bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700">
-                <span className="text-[10px] font-bold uppercase text-zinc-500 dark:text-zinc-400 block">
+              <div className="p-3 rounded-xl bg-slate-50 dark:bg-[#0b111a]/80 border border-slate-200 dark:border-slate-800">
+                <span className="text-[10px] font-bold uppercase text-slate-500 dark:text-slate-400 block">
                   KM Rodado no Mês
                 </span>
-                <span className="text-lg font-extrabold text-black dark:text-white block mt-0.5">
+                <span className="text-lg font-extrabold text-slate-900 dark:text-white block mt-0.5">
                   {stats.km.toLocaleString('pt-BR')} km
                 </span>
-                <span className="text-[10px] text-zinc-500 dark:text-zinc-400 font-semibold">
+                <span className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold">
                   Média: {stats.doneCount + stats.runningCount > 0 ? Math.round(stats.km / (stats.doneCount + stats.runningCount)) : 0} km/viagem
                 </span>
               </div>
 
-              <div className="p-3 rounded-xl bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700">
-                <span className="text-[10px] font-bold uppercase text-zinc-500 dark:text-zinc-400 block">
+              <div className="p-3 rounded-xl bg-slate-50 dark:bg-[#0b111a]/80 border border-slate-200 dark:border-slate-800">
+                <span className="text-[10px] font-bold uppercase text-slate-500 dark:text-slate-400 block">
                   Comissão Líquida
                 </span>
                 <span className="text-lg font-extrabold text-emerald-600 dark:text-emerald-400 block mt-0.5">
                   {formatBRL(stats.total)}
                 </span>
-                <span className="text-[10px] text-zinc-500 dark:text-zinc-400">
+                <span className="text-[10px] text-slate-500 dark:text-slate-400">
                   {stats.confirmed > 0 ? `${formatBRL(stats.confirmed)} faturado` : 'Aguardando entrega'}
                 </span>
               </div>
 
-              <div className="p-3 rounded-xl bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700">
-                <span className="text-[10px] font-bold uppercase text-zinc-500 dark:text-zinc-400 block">
+              <div className="p-3 rounded-xl bg-slate-50 dark:bg-[#0b111a]/80 border border-slate-200 dark:border-slate-800">
+                <span className="text-[10px] font-bold uppercase text-slate-500 dark:text-slate-400 block">
                   Despesas Lançadas
                 </span>
                 <span className="text-lg font-extrabold text-rose-600 dark:text-rose-400 block mt-0.5">
                   {formatBRL(monthExpenseTotal)}
                 </span>
-                <span className="text-[10px] text-zinc-500 dark:text-zinc-400">
+                <span className="text-[10px] text-slate-500 dark:text-slate-400">
                   Alimentação, pedágio, etc.
                 </span>
               </div>
             </div>
 
             {/* Destaque da Carreira e Gamificação no Relatório */}
-            <div className="p-3.5 rounded-xl bg-gradient-to-r from-amber-500/10 to-transparent border border-amber-500/30 space-y-1.5">
+            <div className="p-3.5 rounded-xl bg-gradient-to-r from-emerald-500/15 to-transparent border border-emerald-500/30 space-y-1.5">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-extrabold text-amber-500 flex items-center gap-1.5">
+                <span className="text-xs font-extrabold text-emerald-400 flex items-center gap-1.5">
                   <span>{rankInfo.currentRank.badge}</span>
                   <span>{rankInfo.currentRank.title}</span>
                 </span>
-                <span className="text-[10px] font-extrabold text-zinc-400">
+                <span className="text-[10px] font-extrabold text-slate-400">
                   Nível {rankInfo.currentRank.level} de 5
                 </span>
               </div>
-              <p className="text-xs text-zinc-700 dark:text-zinc-300">
+              <p className="text-xs text-slate-700 dark:text-slate-300">
                 {rankInfo.currentRank.description}
               </p>
             </div>
 
             {/* Lista detalhada das viagens do mês no relatório */}
             <div className="space-y-2">
-              <h4 className="text-xs font-extrabold uppercase tracking-wider text-zinc-800 dark:text-zinc-200">
+              <h4 className="text-xs font-extrabold uppercase tracking-wider text-slate-800 dark:text-slate-200">
                 Detalhamento das Viagens
               </h4>
               <div className="space-y-1.5 max-h-48 overflow-y-auto">
                 {monthTrips.length === 0 ? (
-                  <p className="text-xs text-zinc-500 text-center py-2">Sem viagens no período selecionado.</p>
+                  <p className="text-xs text-slate-500 text-center py-2">Sem viagens no período selecionado.</p>
                 ) : (
                   monthTrips.map((t, idx) => (
                     <div
                       key={t.id}
-                      className="p-2.5 rounded-lg bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-200 dark:border-zinc-700/60 flex items-center justify-between text-xs"
+                      className="p-2.5 rounded-lg bg-slate-50 dark:bg-[#0b111a]/60 border border-slate-200 dark:border-slate-800 flex items-center justify-between text-xs"
                     >
                       <div className="min-w-0 pr-2">
-                        <p className="font-extrabold text-black dark:text-white truncate">
+                        <p className="font-extrabold text-slate-900 dark:text-white truncate">
                           {idx + 1}. {t.origin} → {t.destination}
                         </p>
-                        <p className="text-[10px] text-zinc-500 dark:text-zinc-400 truncate">
+                        <p className="text-[10px] text-slate-500 dark:text-slate-400 truncate">
                           {t.cargoDescription || 'Carga'} • {t.distanceKm || 0} km
                         </p>
                       </div>
@@ -3341,11 +3345,11 @@ function DriverDashboardView({
             </div>
 
             {/* Botões de Ação do Relatório */}
-            <div className="flex gap-2 pt-2 border-t border-zinc-200 dark:border-zinc-800">
+            <div className="flex gap-2 pt-2 border-t border-slate-200 dark:border-slate-800">
               <button
                 type="button"
                 onClick={() => window.print()}
-                className="flex-1 h-10 rounded-xl bg-black dark:bg-white text-white dark:text-black font-extrabold text-xs flex items-center justify-center gap-2 hover:opacity-90 transition"
+                className="flex-1 h-10 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-400 text-slate-950 font-extrabold text-xs flex items-center justify-center gap-2 hover:opacity-90 transition shadow-md shadow-emerald-500/20"
               >
                 <Printer className="w-4 h-4" />
                 <span>Imprimir / Salvar PDF</span>
@@ -3353,7 +3357,7 @@ function DriverDashboardView({
               <button
                 type="button"
                 onClick={() => setShowReportModal(false)}
-                className="px-4 h-10 rounded-xl bg-zinc-100 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 font-bold text-xs hover:bg-zinc-200 dark:hover:bg-zinc-700 transition"
+                className="px-4 h-10 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 font-bold text-xs hover:bg-slate-200 dark:hover:bg-slate-700 transition"
               >
                 Fechar
               </button>

@@ -361,13 +361,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   return (
     <div className="space-y-6">
       {/* 1. HERO COMMAND CENTER */}
-      <div className="relative overflow-hidden rounded-3xl bg-slate-950 text-white p-6 sm:p-7 shadow-xl border border-slate-800">
+      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#0b111a] via-[#111926] to-[#0b111a] text-white p-6 sm:p-7 shadow-xl border border-emerald-500/30">
         <div
-          className="pointer-events-none absolute -top-24 -right-24 w-96 h-96 rounded-full bg-emerald-500/10 blur-3xl"
+          className="pointer-events-none absolute -top-24 -right-24 w-96 h-96 rounded-full bg-emerald-500/15 blur-3xl"
           aria-hidden="true"
         />
         <div
-          className="pointer-events-none absolute -bottom-24 -left-24 w-80 h-80 rounded-full bg-sky-500/10 blur-3xl"
+          className="pointer-events-none absolute -bottom-24 -left-24 w-80 h-80 rounded-full bg-teal-500/10 blur-3xl"
           aria-hidden="true"
         />
 
@@ -388,7 +388,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
           <div className="flex flex-wrap items-center gap-3">
             <div className="grid grid-cols-2 sm:flex items-center gap-2.5 w-full sm:w-auto">
-              <div className="bg-slate-900/90 border border-slate-800 rounded-2xl px-4 py-2.5">
+              <div className="bg-[#0b111a]/90 border border-slate-800 rounded-2xl px-4 py-2.5">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
                   Cargas Ativas
                 </span>
@@ -396,7 +396,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   {activeLoadsCount} / {trucks.length} veíc.
                 </span>
               </div>
-              <div className="bg-slate-900/90 border border-slate-800 rounded-2xl px-4 py-2.5">
+              <div className="bg-[#0b111a]/90 border border-slate-800 rounded-2xl px-4 py-2.5">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
                   KM Monitorados
                 </span>
@@ -408,7 +408,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
             <button
               onClick={onOpenQuickEntry}
-              className="w-full sm:w-auto flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold px-5 py-3.5 rounded-2xl shadow-lg shadow-emerald-500/20 transition-all active:scale-95 text-sm"
+              className="w-full sm:w-auto flex items-center justify-center gap-2 bg-gradient-to-r from-emerald-500 to-teal-400 hover:from-emerald-400 hover:to-teal-300 text-slate-950 font-extrabold px-5 py-3.5 rounded-2xl shadow-lg shadow-emerald-500/25 transition-all active:scale-95 text-sm"
             >
               <Fuel className="w-4 h-4" />
               <span>+ Lançar Abastecimento</span>
@@ -418,23 +418,23 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       </div>
 
       {/* 2. RADAR DE CARGAS E OPERAÇÃO EM TEMPO REAL (O que cada caminhão/motorista está fazendo agora) */}
-      <section className="bg-white rounded-3xl p-5 sm:p-6 shadow-sm border border-slate-200/90 space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3.5">
+      <section className="bg-white dark:bg-[#111926] rounded-3xl p-5 sm:p-6 shadow-sm border border-slate-200/90 dark:border-slate-800 space-y-4 transition-colors">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 dark:border-slate-800 pb-3.5">
           <div className="flex items-center gap-2.5">
-            <div className="p-2 rounded-xl bg-slate-900 text-emerald-400">
+            <div className="p-2 rounded-xl bg-slate-900 dark:bg-emerald-500/15 text-emerald-400">
               <Navigation className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-base sm:text-lg font-extrabold text-slate-900">
+              <h2 className="text-base sm:text-lg font-extrabold text-slate-900 dark:text-white">
                 Status ao Vivo da Frota &amp; Cargas no Momento
               </h2>
-              <p className="text-xs text-slate-500">
+              <p className="text-xs text-slate-500 dark:text-slate-400">
                 Atualizado diretamente pelo aplicativo dos motoristas e programação de fretes
               </p>
             </div>
           </div>
           <div className="flex items-center gap-2 text-xs font-bold">
-            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 text-emerald-800 border border-emerald-200">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 dark:bg-emerald-500/15 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-500/30">
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
               {activeLoadsCount} em viagem agora
             </span>
@@ -452,10 +452,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   key={truck.id}
                   className={`rounded-2xl p-4 border transition-all flex flex-col justify-between gap-3 ${
                     isTraveling
-                      ? 'bg-gradient-to-br from-slate-900 to-slate-950 text-white border-slate-800 shadow-md'
+                      ? 'bg-gradient-to-br from-[#0b111a] to-[#111926] text-white border-emerald-500/40 shadow-md shadow-emerald-950/30'
                       : hasPlanned
-                      ? 'bg-sky-50/50 border-sky-200 text-slate-900'
-                      : 'bg-slate-50/80 border-slate-200 text-slate-900'
+                      ? 'bg-sky-50/50 dark:bg-sky-950/20 border-sky-200 dark:border-sky-800/50 text-slate-900 dark:text-slate-100'
+                      : 'bg-slate-50/80 dark:bg-[#0b111a]/70 border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100'
                   }`}
                 >
                   <div className="space-y-3">
@@ -465,15 +465,15 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                         <span
                           className={`px-2.5 py-1 rounded-lg text-xs font-extrabold tracking-wider ${
                             isTraveling
-                              ? 'bg-white text-slate-950'
-                              : 'bg-slate-900 text-white'
+                              ? 'bg-emerald-400 text-slate-950'
+                              : 'bg-slate-900 dark:bg-slate-800 text-white dark:text-emerald-300'
                           }`}
                         >
                           {truck.plate}
                         </span>
                         <span
                           className={`text-xs font-bold truncate ${
-                            isTraveling ? 'text-slate-300' : 'text-slate-600'
+                            isTraveling ? 'text-slate-300' : 'text-slate-600 dark:text-slate-400'
                           }`}
                         >
                           {truck.brand} {truck.model}
@@ -486,12 +486,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                           EM CARGA
                         </span>
                       ) : hasPlanned ? (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-sky-100 text-sky-900 text-[11px] font-bold">
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-sky-100 dark:bg-sky-900/40 text-sky-900 dark:text-sky-300 text-[11px] font-bold">
                           <Clock className="w-3 h-3" />
                           PROGRAMADO
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-slate-200 text-slate-700 text-[11px] font-bold">
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-[11px] font-bold">
                           <CheckCircle2 className="w-3 h-3" />
                           DISPONÍVEL
                         </span>
@@ -530,23 +530,23 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                         </div>
                       </div>
                     ) : plannedTrip || scheduled ? (
-                      <div className="rounded-xl bg-white p-3 border border-sky-200/80 space-y-1.5">
-                        <div className="flex items-center gap-1.5 text-xs font-bold text-sky-900">
-                          <Package className="w-3.5 h-3.5 text-sky-600" />
+                      <div className="rounded-xl bg-white dark:bg-[#111926] p-3 border border-sky-200/80 dark:border-sky-800/50 space-y-1.5">
+                        <div className="flex items-center gap-1.5 text-xs font-bold text-sky-900 dark:text-sky-300">
+                          <Package className="w-3.5 h-3.5 text-sky-600 dark:text-sky-400" />
                           <span>
                             {plannedTrip?.cargoDescription ||
                               scheduled?.cargoDescription ||
                               'Próxima Carga'}
                           </span>
                         </div>
-                        <div className="text-xs font-semibold text-slate-700 flex items-center gap-1">
+                        <div className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1">
                           <span>{plannedTrip?.origin || scheduled?.origin}</span>
                           <ArrowRight className="w-3 h-3 text-slate-400" />
                           <span>{plannedTrip?.destination || scheduled?.destination}</span>
                         </div>
                       </div>
                     ) : (
-                      <div className="rounded-xl bg-white p-3 border border-slate-200/80 text-xs text-slate-500">
+                      <div className="rounded-xl bg-white dark:bg-[#111926] p-3 border border-slate-200/80 dark:border-slate-800 text-xs text-slate-500 dark:text-slate-400">
                         Sem carga ativa no momento. Aguardando início de viagem pelo motorista ou
                         programação.
                       </div>
@@ -558,7 +558,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                     className={`flex items-center justify-between text-xs pt-2 border-t ${
                       isTraveling
                         ? 'border-slate-800 text-slate-300'
-                        : 'border-slate-200/80 text-slate-600'
+                        : 'border-slate-200/80 dark:border-slate-800 text-slate-600 dark:text-slate-400'
                     }`}
                   >
                     <span className="flex items-center gap-1.5 font-semibold truncate">
@@ -593,51 +593,51 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       {/* 4. CARDS DE KPIS EXECUTIVOS (HIGH-TECH) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* KPI 1: Receita Bruta */}
-        <div className="bg-white p-5 rounded-3xl shadow-sm border border-slate-200/90 flex flex-col justify-between relative overflow-hidden">
+        <div className="bg-white dark:bg-[#111926] p-5 rounded-3xl shadow-sm border border-slate-200/90 dark:border-slate-800 flex flex-col justify-between relative overflow-hidden transition-colors">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-extrabold text-slate-500 uppercase tracking-wider">
+            <span className="text-xs font-extrabold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
               Faturamento Bruto
             </span>
-            <div className="p-2.5 bg-emerald-500/10 rounded-2xl text-emerald-600">
+            <div className="p-2.5 bg-emerald-500/10 rounded-2xl text-emerald-600 dark:text-emerald-400">
               <TrendingUp className="w-5 h-5" />
             </div>
           </div>
           <div className="my-3">
-            <div className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
+            <div className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
               {formatBRL(metrics.totalRevenue)}
             </div>
-            <div className="text-xs text-emerald-700 font-bold mt-1.5 flex items-center gap-1">
+            <div className="text-xs text-emerald-700 dark:text-emerald-400 font-bold mt-1.5 flex items-center gap-1">
               <ArrowUpRight className="w-3.5 h-3.5" />
               <span>{filteredTrips.length} viagem(ns) contabilizada(s)</span>
             </div>
           </div>
-          <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
+          <div className="w-full bg-slate-100 dark:bg-slate-800 h-1.5 rounded-full overflow-hidden">
             <div className="bg-emerald-500 h-full rounded-full w-full" />
           </div>
         </div>
 
         {/* KPI 2: Custo Operacional Total */}
-        <div className="bg-white p-5 rounded-3xl shadow-sm border border-slate-200/90 flex flex-col justify-between">
+        <div className="bg-white dark:bg-[#111926] p-5 rounded-3xl shadow-sm border border-slate-200/90 dark:border-slate-800 flex flex-col justify-between transition-colors">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-extrabold text-slate-500 uppercase tracking-wider">
+            <span className="text-xs font-extrabold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
               Custo Operacional Total
             </span>
-            <div className="p-2.5 bg-rose-500/10 rounded-2xl text-rose-600">
+            <div className="p-2.5 bg-rose-500/10 rounded-2xl text-rose-600 dark:text-rose-400">
               <TrendingDown className="w-5 h-5" />
             </div>
           </div>
           <div className="my-3">
-            <div className="text-2xl sm:text-3xl font-extrabold text-rose-600 tracking-tight">
+            <div className="text-2xl sm:text-3xl font-extrabold text-rose-600 dark:text-rose-400 tracking-tight">
               {formatBRL(metrics.totalExpenses)}
             </div>
-            <div className="text-xs text-slate-600 font-semibold mt-1.5 flex items-center justify-between">
+            <div className="text-xs text-slate-600 dark:text-slate-400 font-semibold mt-1.5 flex items-center justify-between">
               <span>Soma de Diesel, Oficina e Diárias</span>
-              <span className="text-[11px] font-bold text-rose-700">
+              <span className="text-[11px] font-bold text-rose-700 dark:text-rose-300">
                 CPK: R$ {fmtCpk(metrics.fleetCpk)}/km
               </span>
             </div>
           </div>
-          <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
+          <div className="w-full bg-slate-100 dark:bg-slate-800 h-1.5 rounded-full overflow-hidden">
             <div
               className="bg-rose-500 h-full rounded-full"
               style={{
@@ -652,16 +652,16 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
 
         {/* KPI 3: Lucro Líquido Real */}
-        <div className="bg-white p-5 rounded-3xl shadow-sm border border-slate-200/90 flex flex-col justify-between">
+        <div className="bg-white dark:bg-[#111926] p-5 rounded-3xl shadow-sm border border-slate-200/90 dark:border-slate-800 flex flex-col justify-between transition-colors">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-extrabold text-slate-500 uppercase tracking-wider">
+            <span className="text-xs font-extrabold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
               Resultado Líquido
             </span>
             <div
               className={`p-2.5 rounded-2xl ${
                 metrics.netProfit >= 0
-                  ? 'bg-emerald-500/10 text-emerald-600'
-                  : 'bg-rose-500/10 text-rose-600'
+                  ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+                  : 'bg-rose-500/10 text-rose-600 dark:text-rose-400'
               }`}
             >
               <DollarSign className="w-5 h-5" />
@@ -670,7 +670,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           <div className="my-3">
             <div
               className={`text-2xl sm:text-3xl font-extrabold tracking-tight ${
-                metrics.netProfit >= 0 ? 'text-emerald-600' : 'text-rose-600'
+                metrics.netProfit >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'
               }`}
             >
               {formatBRL(metrics.netProfit)}
@@ -679,16 +679,16 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <span
                 className={`px-2 py-0.5 rounded-md font-extrabold text-xs ${
                   metrics.profitMarginPercent >= 0
-                    ? 'bg-emerald-100 text-emerald-800'
-                    : 'bg-rose-100 text-rose-800'
+                    ? 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300'
+                    : 'bg-rose-100 dark:bg-rose-950/60 text-rose-800 dark:text-rose-300'
                 }`}
               >
                 {metrics.profitMarginPercent}% margem
               </span>
-              <span className="text-slate-500">Lucro livre</span>
+              <span className="text-slate-500 dark:text-slate-400">Lucro livre</span>
             </div>
           </div>
-          <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
+          <div className="w-full bg-slate-100 dark:bg-slate-800 h-1.5 rounded-full overflow-hidden">
             <div
               className={`h-full rounded-full ${
                 metrics.netProfit >= 0 ? 'bg-emerald-500' : 'bg-rose-500'
@@ -701,29 +701,29 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
 
         {/* KPI 4: Telemetria de Combustível */}
-        <div className="bg-white p-5 rounded-3xl shadow-sm border border-slate-200/90 flex flex-col justify-between">
+        <div className="bg-white dark:bg-[#111926] p-5 rounded-3xl shadow-sm border border-slate-200/90 dark:border-slate-800 flex flex-col justify-between transition-colors">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-extrabold text-slate-500 uppercase tracking-wider">
+            <span className="text-xs font-extrabold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
               Eficiência &amp; Consumo
             </span>
-            <div className="p-2.5 bg-sky-500/10 rounded-2xl text-sky-600">
+            <div className="p-2.5 bg-sky-500/10 rounded-2xl text-sky-600 dark:text-sky-400">
               <Gauge className="w-5 h-5" />
             </div>
           </div>
           <div className="my-3">
-            <div className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
-              {fmtKmL(metrics.fleetAverageKmL)} <span className="text-base font-bold text-slate-500">km/L</span>
+            <div className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
+              {fmtKmL(metrics.fleetAverageKmL)} <span className="text-base font-bold text-slate-500 dark:text-slate-400">km/L</span>
             </div>
-            <div className="text-xs text-slate-600 font-semibold mt-1.5 flex items-center justify-between">
+            <div className="text-xs text-slate-600 dark:text-slate-400 font-semibold mt-1.5 flex items-center justify-between">
               <span>
-                Diesel/KM: <strong className="text-slate-900">R$ {fmtCpk(metrics.fleetFuelCpk)}</strong>
+                Diesel/KM: <strong className="text-slate-900 dark:text-white">R$ {fmtCpk(metrics.fleetFuelCpk)}</strong>
               </span>
-              <span className="text-slate-500">
+              <span className="text-slate-500 dark:text-slate-400">
                 {Math.round(totalLitersAll).toLocaleString('pt-BR')} L
               </span>
             </div>
           </div>
-          <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
+          <div className="w-full bg-slate-100 dark:bg-slate-800 h-1.5 rounded-full overflow-hidden">
             <div
               className="bg-sky-500 h-full rounded-full"
               style={{
@@ -735,31 +735,31 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       </div>
 
       {/* 4.1 PAINEL DE DADOS SEPARADOS: DIESEL vs OFICINA vs DIÁRIAS */}
-      <section className="bg-white rounded-3xl p-5 sm:p-6 shadow-sm border border-slate-200/90 space-y-4">
+      <section className="bg-white dark:bg-[#111926] rounded-3xl p-5 sm:p-6 shadow-sm border border-slate-200/90 dark:border-slate-800 space-y-4 transition-colors">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <div>
-            <h2 className="text-base sm:text-lg font-extrabold text-slate-900">
+            <h2 className="text-base sm:text-lg font-extrabold text-slate-900 dark:text-white">
               Detalhamento Separado de Custos: Diesel, Oficina e Diárias
             </h2>
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-slate-500 dark:text-slate-400">
               Visão isolada de cada centro de custo da frota no período filtrado
             </p>
           </div>
-          <span className="text-xs font-extrabold px-3 py-1.5 rounded-xl bg-slate-100 text-slate-700 self-start sm:self-auto">
+          <span className="text-xs font-extrabold px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 self-start sm:self-auto">
             Total Despesas: {formatBRL(separatedCosts.total)}
           </span>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {/* Card 1: DIESEL */}
-          <div className="rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50/70 to-white p-5 flex flex-col justify-between space-y-3">
+          <div className="rounded-2xl border border-emerald-200 dark:border-emerald-500/30 bg-gradient-to-br from-emerald-50/70 to-white dark:from-emerald-950/30 dark:to-[#0b111a] p-5 flex flex-col justify-between space-y-3">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <span className="inline-flex items-center gap-1.5 text-[11px] font-extrabold uppercase tracking-wider text-emerald-800 bg-emerald-100 px-2.5 py-0.5 rounded-md">
-                  <Fuel className="w-3.5 h-3.5 text-emerald-600" />
+                <span className="inline-flex items-center gap-1.5 text-[11px] font-extrabold uppercase tracking-wider text-emerald-800 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-500/20 px-2.5 py-0.5 rounded-md">
+                  <Fuel className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
                   1. Gasto com Diesel &amp; Arla
                 </span>
-                <div className="text-2xl sm:text-3xl font-extrabold text-slate-900 mt-2 tracking-tight">
+                <div className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white mt-2 tracking-tight">
                   {formatBRL(separatedCosts.diesel)}
                 </div>
               </div>
@@ -768,22 +768,22 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               </span>
             </div>
 
-            <div className="grid grid-cols-2 gap-2 pt-2 border-t border-emerald-200/60 text-xs">
+            <div className="grid grid-cols-2 gap-2 pt-2 border-t border-emerald-200/60 dark:border-emerald-500/20 text-xs">
               <div>
-                <span className="text-slate-500 block">Volume Abastecido</span>
-                <strong className="text-slate-900 font-extrabold">
+                <span className="text-slate-500 dark:text-slate-400 block">Volume Abastecido</span>
+                <strong className="text-slate-900 dark:text-white font-extrabold">
                   {Math.round(totalLitersAll).toLocaleString('pt-BR')} Litros
                 </strong>
               </div>
               <div>
-                <span className="text-slate-500 block">Abastecimentos</span>
-                <strong className="text-slate-900 font-extrabold">
+                <span className="text-slate-500 dark:text-slate-400 block">Abastecimentos</span>
+                <strong className="text-slate-900 dark:text-white font-extrabold">
                   {filteredFuelLogs.length} lançamento(s)
                 </strong>
               </div>
             </div>
 
-            <div className="w-full bg-emerald-100 h-2 rounded-full overflow-hidden">
+            <div className="w-full bg-emerald-100 dark:bg-slate-800 h-2 rounded-full overflow-hidden">
               <div
                 className="bg-emerald-500 h-full rounded-full transition-all"
                 style={{ width: `${Math.max(4, separatedCosts.dieselPct)}%` }}
@@ -792,14 +792,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
 
           {/* Card 2: OFICINA */}
-          <div className="rounded-2xl border border-sky-200 bg-gradient-to-br from-sky-50/70 to-white p-5 flex flex-col justify-between space-y-3">
+          <div className="rounded-2xl border border-sky-200 dark:border-sky-500/30 bg-gradient-to-br from-sky-50/70 to-white dark:from-sky-950/30 dark:to-[#0b111a] p-5 flex flex-col justify-between space-y-3">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <span className="inline-flex items-center gap-1.5 text-[11px] font-extrabold uppercase tracking-wider text-sky-900 bg-sky-100 px-2.5 py-0.5 rounded-md">
-                  <Wrench className="w-3.5 h-3.5 text-sky-600" />
+                <span className="inline-flex items-center gap-1.5 text-[11px] font-extrabold uppercase tracking-wider text-sky-900 dark:text-sky-300 bg-sky-100 dark:bg-sky-500/20 px-2.5 py-0.5 rounded-md">
+                  <Wrench className="w-3.5 h-3.5 text-sky-600 dark:text-sky-400" />
                   2. Gasto com Oficina
                 </span>
-                <div className="text-2xl sm:text-3xl font-extrabold text-slate-900 mt-2 tracking-tight">
+                <div className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white mt-2 tracking-tight">
                   {formatBRL(separatedCosts.oficina)}
                 </div>
               </div>
@@ -808,22 +808,22 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               </span>
             </div>
 
-            <div className="grid grid-cols-2 gap-2 pt-2 border-t border-sky-200/60 text-xs">
+            <div className="grid grid-cols-2 gap-2 pt-2 border-t border-sky-200/60 dark:border-sky-500/20 text-xs">
               <div>
-                <span className="text-slate-500 block">Manutenções</span>
-                <strong className="text-slate-900 font-extrabold">
+                <span className="text-slate-500 dark:text-slate-400 block">Manutenções</span>
+                <strong className="text-slate-900 dark:text-white font-extrabold">
                   {filteredData.filteredMaintenanceLogs.length} serviço(s)
                 </strong>
               </div>
               <div>
-                <span className="text-slate-500 block">Prev. / Corretiva</span>
-                <strong className="text-slate-900 font-extrabold">
+                <span className="text-slate-500 dark:text-slate-400 block">Prev. / Corretiva</span>
+                <strong className="text-slate-900 dark:text-white font-extrabold">
                   {separatedCosts.preventivaCount} prev. • {separatedCosts.corretivaCount} corr.
                 </strong>
               </div>
             </div>
 
-            <div className="w-full bg-sky-100 h-2 rounded-full overflow-hidden">
+            <div className="w-full bg-sky-100 dark:bg-slate-800 h-2 rounded-full overflow-hidden">
               <div
                 className="bg-sky-500 h-full rounded-full transition-all"
                 style={{ width: `${Math.max(4, separatedCosts.oficinaPct)}%` }}
@@ -832,14 +832,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
 
           {/* Card 3: DIÁRIAS & DESPESAS DE VIAGEM */}
-          <div className="rounded-2xl border border-amber-200 bg-gradient-to-br from-amber-50/70 to-white p-5 flex flex-col justify-between space-y-3">
+          <div className="rounded-2xl border border-amber-200 dark:border-amber-500/30 bg-gradient-to-br from-amber-50/70 to-white dark:from-amber-950/30 dark:to-[#0b111a] p-5 flex flex-col justify-between space-y-3">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <span className="inline-flex items-center gap-1.5 text-[11px] font-extrabold uppercase tracking-wider text-amber-900 bg-amber-100 px-2.5 py-0.5 rounded-md">
-                  <Receipt className="w-3.5 h-3.5 text-amber-600" />
+                <span className="inline-flex items-center gap-1.5 text-[11px] font-extrabold uppercase tracking-wider text-amber-900 dark:text-amber-300 bg-amber-100 dark:bg-amber-500/20 px-2.5 py-0.5 rounded-md">
+                  <Receipt className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
                   3. Diárias &amp; Despesas Viagem
                 </span>
-                <div className="text-2xl sm:text-3xl font-extrabold text-slate-900 mt-2 tracking-tight">
+                <div className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white mt-2 tracking-tight">
                   {formatBRL(separatedCosts.diariasTotal)}
                 </div>
               </div>
@@ -848,22 +848,22 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               </span>
             </div>
 
-            <div className="grid grid-cols-2 gap-2 pt-2 border-t border-amber-200/60 text-xs">
+            <div className="grid grid-cols-2 gap-2 pt-2 border-t border-amber-200/60 dark:border-amber-500/20 text-xs">
               <div>
-                <span className="text-slate-500 block">Diárias / Alimentação</span>
-                <strong className="text-slate-900 font-extrabold">
+                <span className="text-slate-500 dark:text-slate-400 block">Diárias / Alimentação</span>
+                <strong className="text-slate-900 dark:text-white font-extrabold">
                   {formatBRL(separatedCosts.dailyOnly)}
                 </strong>
               </div>
               <div>
-                <span className="text-slate-500 block">Pedágios / Chapa</span>
-                <strong className="text-slate-900 font-extrabold">
+                <span className="text-slate-500 dark:text-slate-400 block">Pedágios / Chapa</span>
+                <strong className="text-slate-900 dark:text-white font-extrabold">
                   {formatBRL(separatedCosts.tollsAndChapa)}
                 </strong>
               </div>
             </div>
 
-            <div className="w-full bg-amber-100 h-2 rounded-full overflow-hidden">
+            <div className="w-full bg-amber-100 dark:bg-slate-800 h-2 rounded-full overflow-hidden">
               <div
                 className="bg-amber-500 h-full rounded-full transition-all"
                 style={{ width: `${Math.max(4, separatedCosts.diariasPct)}%` }}
