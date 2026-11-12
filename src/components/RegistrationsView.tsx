@@ -257,6 +257,7 @@ function DriverForm({
 }) {
   const [name, setName] = useState(initial?.name ?? '');
   const [phone, setPhone] = useState(initial?.phone ?? '');
+  const [cpf, setCpf] = useState(initial?.cpf ?? '');
   const [cnhNumber, setCnhNumber] = useState(initial?.cnhNumber ?? '');
   const [cnhCategory, setCnhCategory] = useState(initial?.cnhCategory || 'E');
   const [status, setStatus] = useState<DriverStatus>(initial?.status ?? 'ATIVO');
@@ -274,7 +275,17 @@ function DriverForm({
     e.preventDefault();
     setError('');
     if (name.trim().length < 2) return setError('Informe o nome do motorista.');
-    if (digits(phone).length < 8) return setError('Informe um telefone válido com DDD.');
+    if (digits(phone).length < 8 && phone.trim() !== 'Não informado') {
+      return setError('Informe um telefone válido com DDD.');
+    }
+
+    const cleanCpf = digits(cpf);
+    if (
+      cleanCpf &&
+      drivers.some((d) => d.id !== initial?.id && digits(d.cpf) === cleanCpf)
+    ) {
+      return setError('Já existe outro motorista com este CPF.');
+    }
 
     const cleanCnh = digits(cnhNumber);
     if (
@@ -294,9 +305,10 @@ function DriverForm({
         {
           id: initial?.id ?? newId(),
           name: name.trim(),
+          cpf: cleanCpf || null,
           cnhNumber: cleanCnh || null,
           cnhCategory,
-          phone: phone.trim(),
+          phone: phone.trim() || 'Não informado',
           status,
         },
         login.trim()
@@ -325,6 +337,15 @@ function DriverForm({
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="Nome do motorista"
+          />
+        </Field>
+        <Field label="CPF (Opcional)">
+          <input
+            inputMode="numeric"
+            className={inputCls}
+            value={cpf}
+            onChange={(e) => setCpf(e.target.value)}
+            placeholder="000.000.000-00"
           />
         </Field>
         <Field label="Telefone / WhatsApp *">
@@ -1113,6 +1134,11 @@ export const RegistrationsView: React.FC<Props> = (p) => {
                   }
                   lines={[
                     <>
+                      {d.cpf ? (
+                        <span>
+                          CPF: {d.cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4')} •{' '}
+                        </span>
+                      ) : null}
                       <Phone className="w-3.5 h-3.5 text-slate-400" />
                       <span>{d.phone}</span>
                       {d.cnhNumber ? (

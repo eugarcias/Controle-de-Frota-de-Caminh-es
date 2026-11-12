@@ -30,6 +30,7 @@ export interface Driver {
   id: string;
   name: string;
   avatarUrl?: string | null;
+  cpf?: string | null;
   cnhNumber?: string | null;
   cnhCategory: string;
   phone: string;
