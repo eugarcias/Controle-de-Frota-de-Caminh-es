@@ -13,6 +13,7 @@ import {
   LogOut,
   Loader2,
   Smartphone,
+  Award,
 } from 'lucide-react';
 import { createSupabaseBrowser } from '@/lib/supabase/browser';
 
@@ -29,6 +30,7 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab }) => {
     { id: 'quick-entry', label: 'Lançar Abastecimento', short: 'Lançar', icon: Fuel },
     { id: 'trips', label: 'Fretes', short: 'Fretes', icon: Navigation },
     { id: 'schedule', label: 'Agenda de Cargas', short: 'Agenda', icon: CalendarClock },
+    { id: 'production', label: 'Comissões & Produção', short: 'Comissão', icon: Award },
     { id: 'maintenance', label: 'Oficina', short: 'Oficina', icon: Wrench },
     { id: 'registrations', label: 'Cadastros e Senhas', short: 'Cadastros', icon: Users },
   ];
@@ -129,7 +131,7 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab }) => {
         className="lg:hidden fixed bottom-0 inset-x-0 z-50 bg-black border-t border-zinc-800 pb-[env(safe-area-inset-bottom)]"
         aria-label="Menu móvel"
       >
-        <div className="grid grid-cols-6 max-w-xl mx-auto">
+        <div className="grid grid-cols-7 max-w-2xl mx-auto">
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = activeTab === item.id;

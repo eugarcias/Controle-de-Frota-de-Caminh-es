@@ -62,11 +62,11 @@ export async function GET() {
       }),
       prisma.cargoSchedule.findMany({
         where: {
-          status: 'AGENDADA',
+          status: { in: ['AGENDADA', 'EM_TRANSITO'] },
           OR: [{ driverId: profile.driverId }, { driverId: null }],
         },
         orderBy: { pickupDate: 'asc' },
-        take: 10,
+        take: 15,
         include: {
           customer: { select: { name: true } },
         },
@@ -103,8 +103,23 @@ export async function GET() {
       prisma.freightTrip.findMany({
         where: { driverId: profile.driverId },
         orderBy: { startDate: 'desc' },
-        take: 30,
-        select: { truckId: true, startDate: true },
+        take: 15,
+        select: {
+          id: true,
+          truckId: true,
+          driverId: true,
+          origin: true,
+          destination: true,
+          customerName: true,
+          cargoDescription: true,
+          cargoWeightKg: true,
+          initialKm: true,
+          finalKm: true,
+          distanceKm: true,
+          status: true,
+          startDate: true,
+          notes: true,
+        },
       }),
     ]);
 
@@ -155,6 +170,7 @@ export async function GET() {
       preferredTruckId,
       trucks,
       trips,
+      recentTrips: allDriverTrips.slice(0, 8),
       scheduledLoads: scheduledLoads.map((s) => ({
         id: s.id,
         truckId: s.truckId,
@@ -165,7 +181,10 @@ export async function GET() {
         cargoDescription: s.cargoDescription,
         cargoWeightKg: s.cargoWeightKg,
         pickupDate: s.pickupDate,
+        deliveryDate: s.deliveryDate,
         distanceKm: s.distanceKm,
+        status: s.status,
+        notes: s.notes ?? '',
       })),
       expenses,
       recentFuelLogs: driverFuelLogs.slice(0, 8),

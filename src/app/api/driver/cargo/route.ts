@@ -23,9 +23,15 @@ const StartCargoSchema = z.object({
 
 const UpdateCargoSchema = z.object({
   tripId: z.string().uuid(),
-  status: z.enum(['EM_VIAGEM', 'CONCLUIDO', 'CANCELADO']),
+  status: z.enum(['PLANEJADO', 'EM_VIAGEM', 'CONCLUIDO', 'CANCELADO']).optional(),
+  origin: z.string().trim().min(2).optional(),
+  destination: z.string().trim().min(2).optional(),
+  customerName: z.string().trim().max(150).optional(),
+  cargoDescription: z.string().trim().min(2).optional(),
+  cargoWeightKg: z.number().int().min(0).optional().nullable(),
+  initialKm: z.number().int().min(0).optional().nullable(),
   finalKm: z.number().int().min(0).optional().nullable(),
-  notes: z.string().trim().max(300).optional(),
+  notes: z.string().trim().max(500).optional(),
 });
 
 /**
@@ -177,19 +183,41 @@ export async function PATCH(req: Request) {
       return NextResponse.json({ error: 'Carga/Viagem não encontrada.' }, { status: 404 });
     }
 
+    const nextInitialKm =
+      body.initialKm !== undefined && body.initialKm !== null && body.initialKm >= 0
+        ? body.initialKm
+        : trip.initialKm;
     const finalKm =
-      body.finalKm && body.finalKm >= trip.initialKm ? body.finalKm : trip.finalKm;
+      body.finalKm && body.finalKm >= nextInitialKm ? body.finalKm : trip.finalKm;
     const distanceKm =
-      finalKm && finalKm > trip.initialKm ? finalKm - trip.initialKm : trip.distanceKm;
+      finalKm && finalKm > nextInitialKm ? finalKm - nextInitialKm : trip.distanceKm;
+
+    const parsedDest = body.destination ? splitDestination(body.destination) : null;
 
     const updated = await prisma.freightTrip.update({
       where: { id: trip.id },
       data: {
-        status: body.status,
+        ...(body.status ? { status: body.status } : {}),
         ...(body.status === 'CONCLUIDO' ? { endDate: new Date() } : {}),
+        ...(body.origin ? { origin: body.origin } : {}),
+        ...(body.destination
+          ? {
+              destination: body.destination,
+              destinationCity: parsedDest?.city ?? body.destination,
+              destinationState: parsedDest?.state ?? trip.destinationState,
+            }
+          : {}),
+        ...(body.customerName !== undefined
+          ? { customerName: body.customerName.trim() || 'À definir (Informado pelo Motorista)' }
+          : {}),
+        ...(body.cargoDescription ? { cargoDescription: body.cargoDescription } : {}),
+        ...(body.cargoWeightKg !== undefined ? { cargoWeightKg: body.cargoWeightKg } : {}),
+        ...(body.initialKm !== undefined && body.initialKm !== null
+          ? { initialKm: nextInitialKm }
+          : {}),
         ...(finalKm ? { finalKm } : {}),
         ...(distanceKm ? { distanceKm } : {}),
-        ...(body.notes !== undefined ? { notes: body.notes } : {}),
+        ...(body.notes !== undefined ? { notes: body.notes || null } : {}),
       },
     });
 

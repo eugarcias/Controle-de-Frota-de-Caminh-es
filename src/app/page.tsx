@@ -8,6 +8,7 @@ import { FreightTripsView } from '@/components/FreightTripsView';
 import { MaintenanceView } from '@/components/MaintenanceView';
 import { CargoScheduleView } from '@/components/CargoScheduleView';
 import { RegistrationsView } from '@/components/RegistrationsView';
+import { DriverProductionView } from '@/components/DriverProductionView';
 import { computeDashboardMetrics } from '@/mock-data';
 import { useFleetStore } from '@/lib/store';
 import { newId } from '@/components/ui';
@@ -163,6 +164,15 @@ export default function Home() {
             onUpdate={(id, patch) => updateItem('schedules', id, patch)}
             onRemove={(id) => removeItem('schedules', id)}
             onConvert={convertScheduleToTrip}
+          />
+        )}
+
+        {activeTab === 'production' && (
+          <DriverProductionView
+            drivers={data.drivers}
+            trips={data.trips}
+            trucks={data.trucks}
+            travelExpenses={data.travelExpenses}
           />
         )}
 

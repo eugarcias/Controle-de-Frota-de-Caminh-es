@@ -15,6 +15,8 @@ import {
   MapPin,
   TrendingUp,
   Trash2,
+  Pencil,
+  MessageSquare,
 } from 'lucide-react';
 import { FreightTrip, Truck, Driver, Customer, TripStatus, FuelLog } from '@/types';
 import {
@@ -83,8 +85,11 @@ const emptyForm = {
   otherExpenses: '',
   startDate: '',
   endDate: '',
+  initialKm: '',
+  finalKm: '',
   paymentTerms: '',
   notes: '',
+  status: 'PLANEJADO' as TripStatus,
 };
 
 export const FreightTripsView: React.FC<FreightTripsViewProps> = ({
@@ -104,6 +109,7 @@ export const FreightTripsView: React.FC<FreightTripsViewProps> = ({
 }) => {
   const [selectedTruck, setSelectedTruck] = useState<string>('ALL');
   const [open, setOpen] = useState(false);
+  const [editingTripId, setEditingTripId] = useState<string | null>(null);
   const [form, setForm] = useState(emptyForm);
 
   // Sub-modais de criação rápida (Inline Creation)
@@ -152,14 +158,47 @@ export const FreightTripsView: React.FC<FreightTripsViewProps> = ({
   }, [form, estKmL, estDieselPrice]);
 
   const openModal = () => {
+    setEditingTripId(null);
+    const defaultTruck = trucks[0];
     setForm({
       ...emptyForm,
-      truckId: trucks[0]?.id ?? '',
+      truckId: defaultTruck?.id ?? '',
       driverId: drivers[0]?.id ?? '',
       customerId: customers[0]?.id ?? '',
       destinationState: 'SP',
       startDate: new Date().toISOString().slice(0, 10),
+      initialKm: defaultTruck ? String(defaultTruck.currentOdometer) : '',
       paymentTerms: customers[0] ? `${customers[0].paymentTermsDays} dias` : '',
+      status: 'PLANEJADO',
+    });
+    setOpen(true);
+  };
+
+  const openEditModal = (trip: FreightTrip) => {
+    setEditingTripId(trip.id);
+    const parsedDest = splitDestination(trip.destination);
+    setForm({
+      customerId: trip.customerId || '',
+      truckId: trip.truckId,
+      driverId: trip.driverId,
+      origin: trip.origin,
+      destinationCity: trip.destinationCity || parsedDest?.city || trip.destination,
+      destinationState: trip.destinationState || parsedDest?.state || 'RS',
+      destination: trip.destination,
+      distanceKm: trip.distanceKm ? String(trip.distanceKm) : '',
+      cargoDescription: trip.cargoDescription || '',
+      cargoWeightKg: trip.cargoWeightKg ? String(trip.cargoWeightKg) : '',
+      grossFreightValue: String(trip.grossFreightValue || 0),
+      tollCosts: String(trip.tollCosts || 0),
+      loadingUnloadingCosts: String(trip.loadingUnloadingCosts || 0),
+      otherExpenses: String(trip.otherExpenses || 0),
+      startDate: trip.startDate ? trip.startDate.slice(0, 10) : new Date().toISOString().slice(0, 10),
+      endDate: trip.endDate ? trip.endDate.slice(0, 10) : '',
+      initialKm: String(trip.initialKm || 0),
+      finalKm: trip.finalKm ? String(trip.finalKm) : '',
+      paymentTerms: trip.paymentTerms || '',
+      notes: trip.notes || '',
+      status: trip.status || 'EM_VIAGEM',
     });
     setOpen(true);
   };
@@ -240,29 +279,63 @@ export const FreightTripsView: React.FC<FreightTripsViewProps> = ({
     e.preventDefault();
     const customer = customers.find((c) => c.id === form.customerId);
     const truck = trucks.find((t) => t.id === form.truckId);
-    if (!customer || !truck) return;
+    if (!truck) return;
 
     const city = form.destinationCity.trim();
     const state = form.destinationState.trim().toUpperCase();
     if (!city || !state) return;
 
     const fullDestination = `${city} - ${state}`;
-    const km = Number(form.distanceKm);
+    const km = Number(form.distanceKm) || 0;
+    const initKm = form.initialKm ? Number(form.initialKm) : truck.currentOdometer;
+    const finKm = form.finalKm ? Number(form.finalKm) : null;
+
+    if (editingTripId) {
+      const existingTrip = trips.find((t) => t.id === editingTripId);
+      onUpdate(editingTripId, {
+        truckId: form.truckId,
+        driverId: form.driverId,
+        customerId: customer?.id ?? existingTrip?.customerId ?? '',
+        customerName: customer?.name ?? existingTrip?.customerName ?? 'Cliente',
+        origin: form.origin.trim(),
+        destination: fullDestination,
+        destinationCity: city,
+        destinationState: state,
+        startDate: `${form.startDate}T00:00:00.000Z`,
+        endDate: form.endDate ? `${form.endDate}T00:00:00.000Z` : null,
+        initialKm: initKm,
+        finalKm: finKm,
+        distanceKm: km || (finKm && initKm && finKm > initKm ? finKm - initKm : 0),
+        cargoDescription: form.cargoDescription.trim(),
+        cargoWeightKg: Number(form.cargoWeightKg) || 0,
+        grossFreightValue: Number(form.grossFreightValue) || 0,
+        tollCosts: Number(form.tollCosts) || 0,
+        loadingUnloadingCosts: Number(form.loadingUnloadingCosts) || 0,
+        otherExpenses: Number(form.otherExpenses) || 0,
+        netFreightValue: Number(preview.net.toFixed(2)),
+        paymentTerms: form.paymentTerms.trim(),
+        notes: form.notes.trim(),
+        status: form.status || 'EM_VIAGEM',
+      });
+      setOpen(false);
+      setEditingTripId(null);
+      return;
+    }
 
     const trip: FreightTrip = {
       id: newId(),
       truckId: form.truckId,
       driverId: form.driverId,
-      customerId: customer.id,
-      customerName: customer.name,
+      customerId: customer?.id ?? '',
+      customerName: customer?.name ?? 'Cliente',
       origin: form.origin.trim(),
       destination: fullDestination,
       destinationCity: city,
       destinationState: state,
       startDate: `${form.startDate}T00:00:00.000Z`,
       endDate: form.endDate ? `${form.endDate}T00:00:00.000Z` : null,
-      initialKm: truck.currentOdometer,
-      finalKm: null,
+      initialKm: initKm,
+      finalKm: finKm,
       distanceKm: km,
       cargoDescription: form.cargoDescription.trim(),
       cargoWeightKg: Number(form.cargoWeightKg) || 0,
@@ -273,7 +346,7 @@ export const FreightTripsView: React.FC<FreightTripsViewProps> = ({
       netFreightValue: Number(preview.net.toFixed(2)),
       paymentTerms: form.paymentTerms.trim(),
       notes: form.notes.trim(),
-      status: 'PLANEJADO',
+      status: form.status || 'PLANEJADO',
     };
     onAdd(trip);
     setOpen(false);
@@ -433,19 +506,38 @@ export const FreightTripsView: React.FC<FreightTripsViewProps> = ({
                 </div>
               </div>
 
-              {trip.notes && <p className="text-xs text-slate-500 italic">Obs.: {trip.notes}</p>}
+              {trip.notes && (
+                <div className="flex items-start gap-2 text-xs text-amber-900 bg-amber-50 border border-amber-200 px-3.5 py-2.5 rounded-xl">
+                  <MessageSquare className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                  <div>
+                    <span className="font-bold block text-[11px] uppercase tracking-wider text-amber-800">
+                      Observação do Frete / Motorista
+                    </span>
+                    <span className="font-medium text-amber-950">{trip.notes}</span>
+                  </div>
+                </div>
+              )}
 
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
-                <div className="flex flex-wrap items-center gap-3 text-xs text-slate-600">
+                <div className="flex flex-wrap items-center gap-2 text-xs text-slate-600">
                   <span>
                     Custos deduzidos: <strong className="text-rose-600">{formatBRL(costsTotal)}</strong>
                   </span>
-                  {trip.paymentTerms && <span>Pagamento: {trip.paymentTerms}</span>}
+                  {trip.paymentTerms && <span>• Pagamento: {trip.paymentTerms}</span>}
+                  <button
+                    type="button"
+                    onClick={() => openEditModal(trip)}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-sky-50 hover:bg-sky-100 text-sky-800 border border-sky-200 font-bold text-xs transition"
+                    title="Corrigir ou editar informações deste frete"
+                  >
+                    <Pencil className="w-3.5 h-3.5" />
+                    Corrigir / Editar
+                  </button>
                   <select
                     aria-label="Alterar status do frete"
                     value={status}
                     onChange={(e) => onUpdate(trip.id, { status: e.target.value as TripStatus })}
-                    className="text-xs p-1.5 border border-slate-200 rounded-lg bg-white focus:outline-none"
+                    className="text-xs p-1.5 border border-slate-200 rounded-lg bg-white focus:outline-none font-semibold"
                   >
                     {(Object.keys(statusLabel) as TripStatus[]).map((s) => (
                       <option key={s} value={s}>
@@ -490,12 +582,19 @@ export const FreightTripsView: React.FC<FreightTripsViewProps> = ({
         })}
       </div>
 
-      {/* Modal Principal de Lançamento de Frete */}
+      {/* Modal Principal de Lançamento / Edição de Frete */}
       {open && (
         <Modal
-          title="Novo Frete"
-          subtitle="Preencha cliente, rota e valores para análise de lucro em tempo real."
-          onClose={() => setOpen(false)}
+          title={editingTripId ? 'Corrigir / Editar Frete' : 'Novo Frete'}
+          subtitle={
+            editingTripId
+              ? 'Altere qualquer informação do frete lançado para corrigir eventuais erros.'
+              : 'Preencha cliente, rota e valores para análise de lucro em tempo real.'
+          }
+          onClose={() => {
+            setOpen(false);
+            setEditingTripId(null);
+          }}
         >
           <form onSubmit={handleSubmit} className="space-y-5">
             {/* Seção 1: Cliente, Veículo e Motorista com Combobox + Criação Inline */}
@@ -569,7 +668,7 @@ export const FreightTripsView: React.FC<FreightTripsViewProps> = ({
                   className={inputCls}
                   value={form.origin}
                   onChange={set('origin')}
-                  placeholder="Ex: Campinas - SP"
+                  placeholder="Cidade de origem"
                 />
               </Field>
 
@@ -579,7 +678,7 @@ export const FreightTripsView: React.FC<FreightTripsViewProps> = ({
                   className={inputCls}
                   value={form.destinationCity}
                   onChange={set('destinationCity')}
-                  placeholder="Ex: Belo Horizonte"
+                  placeholder="Cidade de destino"
                 />
               </Field>
 
@@ -603,11 +702,11 @@ export const FreightTripsView: React.FC<FreightTripsViewProps> = ({
                 <input
                   required
                   type="number"
-                  min="1"
+                  min="0"
                   className={inputCls}
                   value={form.distanceKm}
                   onChange={set('distanceKm')}
-                  placeholder="Ex: 600"
+                  placeholder="KM da viagem"
                 />
               </Field>
 
@@ -621,13 +720,50 @@ export const FreightTripsView: React.FC<FreightTripsViewProps> = ({
                 />
               </Field>
 
-              <Field label="Previsão de Entrega">
+              <Field label="Previsão / Data Entrega">
                 <input
                   type="date"
                   className={inputCls}
                   value={form.endDate}
                   onChange={set('endDate')}
                 />
+              </Field>
+
+              <Field label="KM Inicial (Odômetro)">
+                <input
+                  type="number"
+                  min="0"
+                  className={inputCls}
+                  value={form.initialKm}
+                  onChange={set('initialKm')}
+                  placeholder="KM na saída"
+                />
+              </Field>
+
+              <Field label="KM Final (Odômetro)">
+                <input
+                  type="number"
+                  min="0"
+                  className={inputCls}
+                  value={form.finalKm}
+                  onChange={set('finalKm')}
+                  placeholder="KM na chegada"
+                />
+              </Field>
+
+              <Field label="Status do Frete">
+                <select
+                  aria-label="Status do Frete"
+                  className={inputCls}
+                  value={form.status}
+                  onChange={set('status')}
+                >
+                  {(Object.keys(statusLabel) as TripStatus[]).map((s) => (
+                    <option key={s} value={s}>
+                      {statusLabel[s]}
+                    </option>
+                  ))}
+                </select>
               </Field>
             </fieldset>
 
@@ -640,7 +776,7 @@ export const FreightTripsView: React.FC<FreightTripsViewProps> = ({
                   className={inputCls}
                   value={form.cargoDescription}
                   onChange={set('cargoDescription')}
-                  placeholder="Ex: Soja a granel, Bobinas de aço, Bebidas..."
+                  placeholder="Produto / mercadoria transportada"
                 />
               </Field>
               <Field label="Peso da Carga (kg)">
@@ -650,7 +786,7 @@ export const FreightTripsView: React.FC<FreightTripsViewProps> = ({
                   className={inputCls}
                   value={form.cargoWeightKg}
                   onChange={set('cargoWeightKg')}
-                  placeholder="Ex: 27000"
+                  placeholder="Peso em kg"
                 />
               </Field>
             </fieldset>
@@ -664,7 +800,7 @@ export const FreightTripsView: React.FC<FreightTripsViewProps> = ({
                 <input
                   required
                   type="number"
-                  min="1"
+                  min="0"
                   step="0.01"
                   className={inputCls}
                   value={form.grossFreightValue}
@@ -710,15 +846,15 @@ export const FreightTripsView: React.FC<FreightTripsViewProps> = ({
                   className={inputCls}
                   value={form.paymentTerms}
                   onChange={set('paymentTerms')}
-                  placeholder="Ex: 30 dias, 50% adiantado"
+                  placeholder="Prazo ou condição de pagamento"
                 />
               </Field>
-              <Field label="Observações" className="col-span-2">
+              <Field label="Observações (Admin / Motorista)" className="col-span-2">
                 <input
                   className={inputCls}
                   value={form.notes}
                   onChange={set('notes')}
-                  placeholder="Ex: Exige agendamento prévio, descarga rápida"
+                  placeholder="Observações da viagem ou carga"
                 />
               </Field>
             </fieldset>
@@ -759,11 +895,18 @@ export const FreightTripsView: React.FC<FreightTripsViewProps> = ({
             </div>
 
             <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 pt-2">
-              <button type="button" className={secondaryBtn} onClick={() => setOpen(false)}>
+              <button
+                type="button"
+                className={secondaryBtn}
+                onClick={() => {
+                  setOpen(false);
+                  setEditingTripId(null);
+                }}
+              >
                 Cancelar
               </button>
               <button type="submit" className={primaryBtn}>
-                Salvar Frete
+                {editingTripId ? 'Salvar Correções' : 'Salvar Frete'}
               </button>
             </div>
           </form>

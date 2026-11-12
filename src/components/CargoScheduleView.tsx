@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useMemo, useState } from 'react';
-import { CalendarClock, Plus, ArrowRight, Package, Route, Play, Trash2, AlertTriangle, UserPlus, UserCheck, Loader2 } from 'lucide-react';
+import { CalendarClock, Plus, ArrowRight, Package, Route, Play, Trash2, AlertTriangle, UserPlus, UserCheck, Loader2, BellRing, Pencil, MessageSquare } from 'lucide-react';
 import { CargoSchedule, Customer, Driver, ScheduleStatus, Truck } from '@/types';
 import {
   Field,
@@ -76,10 +76,19 @@ export const CargoScheduleView: React.FC<Props> = ({
   onConvert,
 }) => {
   const [open, setOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState(emptyForm);
   const [filter, setFilter] = useState<'ATIVAS' | 'TODAS'>('ATIVAS');
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+
+  const quickInstructions = [
+    '⛽ Abastecer antes de carregar',
+    '⚖️ Passar na balança',
+    '⏰ Chegar com 30 min de antecedência',
+    '📄 Conferir nota fiscal na portaria',
+    '🔧 Conferir calibragem dos pneus',
+  ];
 
   const set = (k: keyof typeof emptyForm) => (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
@@ -123,12 +132,48 @@ export const CargoScheduleView: React.FC<Props> = ({
   };
 
   const openModal = () => {
+    setEditingId(null);
     setForm({
       ...emptyForm,
       pickupDate: new Date().toISOString().slice(0, 10),
     });
     setSaveError(null);
     setOpen(true);
+  };
+
+  const openEditModal = (s: CargoSchedule) => {
+    setEditingId(s.id);
+    const cust = customers.find((c) => c.id === s.customerId);
+    const timePart = s.pickupDate.includes('T') ? s.pickupDate.slice(11, 16) : '07:00';
+    setForm({
+      ...emptyForm,
+      customerName: cust?.name ?? '',
+      truckId: s.truckId ?? '',
+      driverId: s.driverId ?? '',
+      origin: s.origin,
+      destination: s.destination,
+      distanceKm: String(s.distanceKm || ''),
+      cargoDescription: s.cargoDescription,
+      cargoWeightKg: String(s.cargoWeightKg || ''),
+      pickupDate: s.pickupDate.slice(0, 10),
+      pickupTime: timePart || '07:00',
+      deliveryDate: s.deliveryDate ? s.deliveryDate.slice(0, 10) : '',
+      freightValue: String(s.freightValue || ''),
+      notes: s.notes ?? '',
+    });
+    setSaveError(null);
+    setOpen(true);
+  };
+
+  const appendQuickInstruction = (text: string) => {
+    setForm((f) => {
+      const current = f.notes.trim();
+      if (current.includes(text)) return f;
+      return {
+        ...f,
+        notes: current ? `${current} | ${text}` : text,
+      };
+    });
   };
 
   const submit = async (e: React.FormEvent) => {
@@ -170,7 +215,30 @@ export const CargoScheduleView: React.FC<Props> = ({
         customerId = created.id;
       }
 
-      // 2) Agendamento
+      // 2) Agendamento (Criação ou Edição)
+      const pickupIso = `${form.pickupDate}T${form.pickupTime || '07:00'}:00.000Z`;
+      const deliveryIso = form.deliveryDate ? `${form.deliveryDate}T12:00:00.000Z` : null;
+
+      if (editingId) {
+        onUpdate(editingId, {
+          customerId,
+          truckId: form.truckId || null,
+          driverId: form.driverId || null,
+          origin: form.origin.trim(),
+          destination: form.destination.trim(),
+          distanceKm: Number(form.distanceKm),
+          cargoDescription: form.cargoDescription.trim(),
+          cargoWeightKg: Number(form.cargoWeightKg) || 0,
+          pickupDate: pickupIso,
+          deliveryDate: deliveryIso,
+          freightValue: Number(form.freightValue),
+          notes: form.notes.trim(),
+        });
+        setOpen(false);
+        setEditingId(null);
+        return;
+      }
+
       const s: CargoSchedule = {
         id: newId(),
         customerId,
@@ -181,15 +249,14 @@ export const CargoScheduleView: React.FC<Props> = ({
         distanceKm: Number(form.distanceKm),
         cargoDescription: form.cargoDescription.trim(),
         cargoWeightKg: Number(form.cargoWeightKg) || 0,
-        pickupDate: `${form.pickupDate}T${form.pickupTime || '07:00'}:00.000Z`,
-        deliveryDate: form.deliveryDate ? `${form.deliveryDate}T12:00:00.000Z` : null,
+        pickupDate: pickupIso,
+        deliveryDate: deliveryIso,
         freightValue: Number(form.freightValue),
         status: 'AGENDADA',
         notes: form.notes.trim(),
       };
       const saved = await onAdd(s);
       if (!saved) {
-        // O cliente (se novo) já ficou salvo; ao tentar de novo ele é reconhecido pelo nome.
         setSaveError('Não foi possível salvar o agendamento. Verifique a conexão e tente novamente.');
         return;
       }
@@ -270,11 +337,31 @@ export const CargoScheduleView: React.FC<Props> = ({
               </div>
             </div>
 
+            {s.notes && (
+              <div className="flex items-start gap-2.5 text-xs bg-amber-50 border border-amber-200 text-amber-950 p-3 rounded-xl">
+                <MessageSquare className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                <div>
+                  <span className="font-extrabold uppercase tracking-wider text-[10px] text-amber-800 block">
+                    Instrução / Observação do Admin para o Motorista
+                  </span>
+                  <span className="font-semibold">{s.notes}</span>
+                </div>
+              </div>
+            )}
+
             <div className="flex flex-wrap items-center justify-between gap-3 text-xs bg-slate-50 border border-slate-100 rounded-xl p-3">
-              <span>
-                Caminhão: <strong>{name.truck(s.truckId)}</strong> • Motorista: <strong>{name.driver(s.driverId)}</strong>
-              </span>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <span>
+                  Caminhão: <strong>{name.truck(s.truckId)}</strong> • Motorista: <strong>{name.driver(s.driverId)}</strong>
+                </span>
+                {s.status === 'AGENDADA' && (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold text-[11px]">
+                    <BellRing className="w-3 h-3 text-emerald-600" />
+                    Notificado no App do Motorista
+                  </span>
+                )}
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
                 {s.status === 'AGENDADA' && (
                   <button
                     type="button"
@@ -286,11 +373,19 @@ export const CargoScheduleView: React.FC<Props> = ({
                     <Play className="w-3.5 h-3.5" /> Iniciar viagem
                   </button>
                 )}
+                <button
+                  type="button"
+                  onClick={() => openEditModal(s)}
+                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-sky-50 hover:bg-sky-100 text-sky-800 border border-sky-200 font-bold"
+                >
+                  <Pencil className="w-3.5 h-3.5" />
+                  Editar
+                </button>
                 <select
                   aria-label="Alterar status"
                   value={s.status}
                   onChange={(e) => onUpdate(s.id, { status: e.target.value as ScheduleStatus })}
-                  className="p-1.5 border border-slate-300 rounded-lg bg-white"
+                  className="p-1.5 border border-slate-300 rounded-lg bg-white font-semibold"
                 >
                   {(Object.keys(statusLabel) as ScheduleStatus[]).map((k) => (
                     <option key={k} value={k}>
@@ -308,13 +403,19 @@ export const CargoScheduleView: React.FC<Props> = ({
                 </button>
               </div>
             </div>
-            {s.notes && <p className="text-xs text-slate-500 italic">Obs.: {s.notes}</p>}
           </div>
         ))}
       </div>
 
       {open && (
-        <Modal title="Agendar Carga" subtitle="Reserve caminhão e motorista para uma coleta futura." onClose={() => setOpen(false)}>
+        <Modal
+          title={editingId ? 'Editar Agendamento de Carga' : 'Agendar Carga'}
+          subtitle="Defina horário, destino, motorista e instruções — o motorista será notificado imediatamente no painel dele."
+          onClose={() => {
+            setOpen(false);
+            setEditingId(null);
+          }}
+        >
           <form onSubmit={submit} className="space-y-4">
             {/* Cliente: escolhe um existente pela lista ou digita um novo nome */}
             <div className="space-y-3">
@@ -442,8 +543,29 @@ export const CargoScheduleView: React.FC<Props> = ({
               <Field label="Valor do frete (R$)">
                 <input required type="number" inputMode="decimal" min="1" step="0.01" className={inputCls} value={form.freightValue} onChange={set('freightValue')} />
               </Field>
-              <Field label="Observações" className="sm:col-span-2">
-                <input className={inputCls} value={form.notes} onChange={set('notes')} />
+              <Field
+                label="Instruções / Observações para o Motorista"
+                hint="Aparece em destaque na agenda e na notificação do motorista."
+                className="sm:col-span-2"
+              >
+                <input
+                  className={inputCls}
+                  value={form.notes}
+                  onChange={set('notes')}
+                  placeholder="Avisos sobre abastecimento, horário ou portaria"
+                />
+                <div className="flex flex-wrap gap-1.5 pt-2">
+                  {quickInstructions.map((inst) => (
+                    <button
+                      key={inst}
+                      type="button"
+                      onClick={() => appendQuickInstruction(inst)}
+                      className="text-[11px] font-bold px-2.5 py-1 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 transition"
+                    >
+                      + {inst}
+                    </button>
+                  ))}
+                </div>
               </Field>
             </div>
 
@@ -462,12 +584,25 @@ export const CargoScheduleView: React.FC<Props> = ({
             )}
 
             <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
-              <button type="button" className={secondaryBtn} onClick={() => setOpen(false)}>
+              <button
+                type="button"
+                className={secondaryBtn}
+                onClick={() => {
+                  setOpen(false);
+                  setEditingId(null);
+                }}
+              >
                 Cancelar
               </button>
               <button type="submit" disabled={saving} className={primaryBtn}>
                 {saving && <Loader2 className="w-4 h-4 animate-spin" />}
-                {saving ? 'Salvando…' : isNewCustomer ? 'Cadastrar cliente e agendar' : 'Salvar agendamento'}
+                {saving
+                  ? 'Salvando…'
+                  : editingId
+                    ? 'Salvar alterações'
+                    : isNewCustomer
+                      ? 'Cadastrar cliente e agendar'
+                      : 'Salvar e notificar motorista'}
               </button>
             </div>
           </form>

@@ -31,6 +31,11 @@ import {
   MoreHorizontal,
   ArrowRight,
   Calendar,
+  CalendarClock,
+  BellRing,
+  Pencil,
+  MessageSquare,
+  Clock,
 } from 'lucide-react';
 import { createSupabaseBrowser } from '@/lib/supabase/browser';
 import { formatBRL, formatDate } from '@/components/ui';
@@ -80,7 +85,10 @@ interface ScheduledLoadItem {
   cargoDescription: string;
   cargoWeightKg: number;
   pickupDate: string;
+  deliveryDate?: string | null;
   distanceKm: number;
+  status?: string;
+  notes?: string | null;
 }
 
 interface DriverExpenseItem {
@@ -111,6 +119,7 @@ interface Ctx {
   preferredTruckId?: string | null;
   trucks: DriverTruck[];
   trips: DriverTrip[];
+  recentTrips?: DriverTrip[];
   scheduledLoads?: ScheduledLoadItem[];
   expenses: DriverExpenseItem[];
   recentFuelLogs?: DriverFuelItem[];
@@ -118,6 +127,7 @@ interface Ctx {
 
 const CTX_CACHE_KEY = 'vsm.driver.ctx.v4';
 const PREF_TRUCK_KEY = 'vsm.driver.preferredTruckId.v2';
+const SEEN_SCHEDULES_KEY = 'vsm.driver.seenSchedules.v1';
 
 const CATEGORIES = [
   { value: 'ALIMENTACAO', label: 'Alimentação', short: 'Refeição', icon: Utensils },
@@ -176,7 +186,7 @@ async function postDriverAction(
   return data;
 }
 
-type Tab = 'cargo' | 'expense' | 'fuel' | 'odometer';
+type Tab = 'cargo' | 'agenda' | 'expense' | 'fuel' | 'odometer';
 
 export default function DriverPage() {
   const [ctx, setCtx] = useState<Ctx | null>(null);
@@ -186,6 +196,28 @@ export default function DriverPage() {
   const [toast, setToast] = useState<{ ok: boolean; text: string } | null>(null);
   const [online, setOnline] = useState(true);
   const [pending, setPending] = useState(0);
+  const [seenScheduleIds, setSeenScheduleIds] = useState<string[]>([]);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(SEEN_SCHEDULES_KEY);
+      if (raw) setSeenScheduleIds(JSON.parse(raw));
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  const markScheduleSeen = (ids: string[]) => {
+    setSeenScheduleIds((prev) => {
+      const next = Array.from(new Set([...prev, ...ids]));
+      try {
+        localStorage.setItem(SEEN_SCHEDULES_KEY, JSON.stringify(next));
+      } catch {
+        /* ignore */
+      }
+      return next;
+    });
+  };
 
   const applySmartTruckSelection = useCallback((data: Ctx) => {
     if (!data.trucks || data.trucks.length === 0) return;
@@ -246,6 +278,12 @@ export default function DriverPage() {
 
   useEffect(() => {
     load();
+    const timer = setInterval(() => {
+      if (typeof navigator !== 'undefined' && navigator.onLine) {
+        load();
+      }
+    }, 25000);
+    return () => clearInterval(timer);
   }, [load]);
 
   const notify = (ok: boolean, text: string) => {
@@ -327,9 +365,25 @@ export default function DriverPage() {
     window.location.assign('/login');
   };
 
-  const tabs: { id: Tab; label: string; icon: React.ElementType }[] = [
+  const activeSchedules = useMemo(
+    () => (ctx?.scheduledLoads ?? []).filter((s) => (s.status ?? 'AGENDADA') === 'AGENDADA'),
+    [ctx?.scheduledLoads]
+  );
+
+  const unseenSchedules = useMemo(
+    () => activeSchedules.filter((s) => !seenScheduleIds.includes(s.id)),
+    [activeSchedules, seenScheduleIds]
+  );
+
+  const tabs: { id: Tab; label: string; icon: React.ElementType; badge?: number }[] = [
     { id: 'cargo', label: 'Carga Atual', icon: Package },
-    { id: 'expense', label: 'Despesa Diária', icon: Receipt },
+    {
+      id: 'agenda',
+      label: 'Agenda',
+      icon: CalendarClock,
+      badge: activeSchedules.length > 0 ? activeSchedules.length : undefined,
+    },
+    { id: 'expense', label: 'Despesa', icon: Receipt },
     { id: 'fuel', label: 'Abastecer', icon: Fuel },
     { id: 'odometer', label: 'Hodômetro', icon: Gauge },
   ];
@@ -489,6 +543,85 @@ export default function DriverPage() {
 
         {ctx && currentTruck && (
           <>
+            {/* Notificação ao vivo quando o Admin agenda uma nova carga para o motorista */}
+            {unseenSchedules.length > 0 && (
+              <div
+                role="alert"
+                className="rounded-2xl bg-black text-white p-4 border-2 border-emerald-400 shadow-lg space-y-2.5 animate-in fade-in"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-center gap-2 text-emerald-400 text-xs font-extrabold uppercase tracking-wider">
+                    <BellRing className="w-4 h-4 animate-bounce shrink-0" />
+                    <span>Nova Carga Agendada pela Administração!</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => markScheduleSeen(unseenSchedules.map((s) => s.id))}
+                    className="text-zinc-400 hover:text-white p-1"
+                    aria-label="Fechar aviso"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                {unseenSchedules.slice(0, 2).map((s) => {
+                  const dt = new Date(s.pickupDate).toLocaleString('pt-BR', {
+                    timeZone: 'UTC',
+                    day: '2-digit',
+                    month: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  });
+                  return (
+                    <div
+                      key={s.id}
+                      className="rounded-xl bg-zinc-900 border border-zinc-800 p-3 space-y-1.5 text-xs"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-extrabold text-emerald-300 flex items-center gap-1">
+                          <Clock className="w-3.5 h-3.5" />
+                          {dt}
+                        </span>
+                        <span className="text-zinc-300 font-bold truncate">{s.customerName}</span>
+                      </div>
+                      <p className="text-sm font-extrabold text-white">
+                        {s.origin} → {s.destination}
+                      </p>
+                      <p className="text-zinc-300">
+                        Carga: <strong className="text-white">{s.cargoDescription}</strong>
+                      </p>
+                      {s.notes && (
+                        <div className="bg-amber-500/20 border border-amber-400/40 text-amber-200 rounded-lg px-2.5 py-1.5 font-bold">
+                          ⚠️ Obs. da Administração: {s.notes}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+
+                <div className="flex gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      markScheduleSeen(unseenSchedules.map((s) => s.id));
+                      setTab('agenda');
+                    }}
+                    className="flex-1 h-10 rounded-xl bg-emerald-400 text-black font-extrabold text-xs flex items-center justify-center gap-1.5"
+                  >
+                    <CalendarClock className="w-4 h-4" />
+                    <span>Abrir Minha Agenda</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => markScheduleSeen(unseenSchedules.map((s) => s.id))}
+                    className="px-3 h-10 rounded-xl bg-zinc-800 text-zinc-200 font-bold text-xs"
+                  >
+                    Ciente
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* Barra de Caminhão + Resumo Rápido da Carga Atual e Gasto do Dia */}
             <TruckAndStatusHeader
               trucks={ctx.trucks}
@@ -513,6 +646,20 @@ export default function DriverPage() {
                 }}
                 onError={(m) => notify(false, m)}
                 onOpenExpense={() => setTab('expense')}
+                onOpenAgenda={() => setTab('agenda')}
+              />
+            )}
+
+            {tab === 'agenda' && (
+              <AgendaTabView
+                ctx={ctx}
+                truck={currentTruck}
+                onStartSuccess={(msg) => {
+                  notify(true, msg);
+                  setTab('cargo');
+                  load();
+                }}
+                onError={(m) => notify(false, m)}
               />
             )}
 
@@ -560,26 +707,33 @@ export default function DriverPage() {
         )}
       </main>
 
-      {/* Navegação inferior (4 abas diretas e claras) */}
+      {/* Navegação inferior (5 abas diretas e claras) */}
       <nav
-        className="fixed bottom-0 inset-x-0 z-30 bg-white border-t border-zinc-200 grid grid-cols-4 pb-[env(safe-area-inset-bottom)]"
+        className="fixed bottom-0 inset-x-0 z-30 bg-white border-t border-zinc-200 grid grid-cols-5 pb-[env(safe-area-inset-bottom)]"
         aria-label="Ações do motorista"
       >
-        {tabs.map(({ id, label: l, icon: Icon }) => {
+        {tabs.map(({ id, label: l, icon: Icon, badge }) => {
           const active = tab === id;
           return (
             <button
               key={id}
               onClick={() => setTab(id)}
               aria-current={active ? 'page' : undefined}
-              className={`flex flex-col items-center justify-center gap-1 min-h-[58px] py-2 text-[11px] font-bold transition ${
+              className={`relative flex flex-col items-center justify-center gap-1 min-h-[58px] py-2 text-[10px] sm:text-[11px] font-bold transition ${
                 active
                   ? 'text-black bg-zinc-100 border-t-2 border-black'
                   : 'text-zinc-500 active:bg-zinc-50'
               }`}
             >
-              <Icon className="w-5 h-5 shrink-0" />
-              <span className="truncate max-w-full px-1">{l}</span>
+              <div className="relative">
+                <Icon className="w-5 h-5 shrink-0" />
+                {badge && badge > 0 ? (
+                  <span className="absolute -top-1.5 -right-2.5 min-w-[16px] h-4 px-1 rounded-full bg-emerald-500 text-black text-[10px] font-extrabold flex items-center justify-center">
+                    {badge}
+                  </span>
+                ) : null}
+              </div>
+              <span className="truncate max-w-full px-0.5">{l}</span>
             </button>
           );
         })}
@@ -737,6 +891,7 @@ function CargoTabView({
   onDone,
   onError,
   onOpenExpense,
+  onOpenAgenda,
 }: {
   ctx: Ctx;
   truck: DriverTruck;
@@ -745,10 +900,12 @@ function CargoTabView({
   onDone: (msg: string, newOdo?: number) => void;
   onError: (msg: string) => void;
   onOpenExpense: () => void;
+  onOpenAgenda: () => void;
 }) {
   const [showNewForm, setShowNewForm] = useState(!activeTrip);
   const [finishing, setFinishing] = useState(false);
   const [finalKm, setFinalKm] = useState('');
+  const [finishNotes, setFinishNotes] = useState('');
   const [busy, setBusy] = useState(false);
 
   // Campos para informar nova carga atual
@@ -760,10 +917,75 @@ function CargoTabView({
   const [initialKm, setInitialKm] = useState(
     truck.currentOdometer > 0 ? String(truck.currentOdometer) : ''
   );
+  const [notes, setNotes] = useState('');
+
+  // Estado para Corrigir / Editar informações de um frete lançado (ativo ou recente)
+  const [editingTrip, setEditingTrip] = useState<DriverTrip | null>(null);
+  const [editCargo, setEditCargo] = useState('');
+  const [editOrigin, setEditOrigin] = useState('');
+  const [editDestination, setEditDestination] = useState('');
+  const [editCustomer, setEditCustomer] = useState('');
+  const [editWeightTons, setEditWeightTons] = useState('');
+  const [editInitialKm, setEditInitialKm] = useState('');
+  const [editFinalKm, setEditFinalKm] = useState('');
+  const [editNotes, setEditNotes] = useState('');
 
   useEffect(() => {
     setShowNewForm(!activeTrip);
   }, [activeTrip]);
+
+  const openEditTrip = (trip: DriverTrip) => {
+    setEditingTrip(trip);
+    setEditCargo(trip.cargoDescription || '');
+    setEditOrigin(trip.origin || '');
+    setEditDestination(trip.destination || '');
+    setEditCustomer(trip.customerName || '');
+    setEditWeightTons(
+      trip.cargoWeightKg ? String(Number((trip.cargoWeightKg / 1000).toFixed(2))) : ''
+    );
+    setEditInitialKm(trip.initialKm ? String(trip.initialKm) : '');
+    setEditFinalKm(trip.finalKm ? String(trip.finalKm) : '');
+    setEditNotes(trip.notes || '');
+    setFinishing(false);
+  };
+
+  const handleSaveCorrection = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingTrip || busy) return;
+    if (!editCargo.trim() || !editOrigin.trim() || !editDestination.trim()) {
+      onError('Preencha o produto, origem e destino para salvar a correção.');
+      return;
+    }
+
+    setBusy(true);
+    try {
+      const weightKg = editWeightTons ? Math.round(Number(editWeightTons) * 1000) : null;
+      const initKmNum = editInitialKm ? Number(editInitialKm) : undefined;
+      const finKmNum = editFinalKm ? Number(editFinalKm) : undefined;
+
+      await postDriverAction(
+        '/api/driver/cargo',
+        {
+          tripId: editingTrip.id,
+          cargoDescription: editCargo.trim(),
+          origin: editOrigin.trim(),
+          destination: editDestination.trim(),
+          customerName: editCustomer.trim(),
+          cargoWeightKg: weightKg,
+          initialKm: initKmNum,
+          finalKm: finKmNum,
+          notes: editNotes.trim(),
+        },
+        'PATCH'
+      );
+      setEditingTrip(null);
+      onDone('Informações do frete corrigidas com sucesso!', finKmNum || initKmNum);
+    } catch (err) {
+      onError(err instanceof Error ? err.message : 'Erro ao corrigir informações do frete.');
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const startScheduledLoad = async (sched: ScheduledLoadItem) => {
     if (busy) return;
@@ -778,6 +1000,7 @@ function CargoTabView({
         cargoDescription: sched.cargoDescription,
         cargoWeightKg: sched.cargoWeightKg,
         initialKm: truck.currentOdometer,
+        notes: sched.notes || '',
       });
       onDone(`Carga "${sched.cargoDescription}" iniciada!`);
     } catch (e) {
@@ -833,6 +1056,7 @@ function CargoTabView({
         cargoDescription: cargoDescription.trim(),
         cargoWeightKg: numWeightKg,
         initialKm: numKm,
+        notes: notes.trim(),
       });
 
       setCargoDescription('');
@@ -840,6 +1064,7 @@ function CargoTabView({
       setDestination('');
       setCustomerName('');
       setWeightTons('');
+      setNotes('');
       setShowNewForm(false);
 
       if (res.queued) {
@@ -871,11 +1096,13 @@ function CargoTabView({
           tripId: activeTrip.id,
           status: 'CONCLUIDO',
           finalKm: numFinal > 0 ? numFinal : undefined,
+          notes: finishNotes.trim() || activeTrip.notes || undefined,
         },
         'PATCH'
       );
       setFinishing(false);
       setFinalKm('');
+      setFinishNotes('');
       onDone('Entrega concluída com sucesso!', numFinal > 0 ? numFinal : undefined);
     } catch (err) {
       onError(err instanceof Error ? err.message : 'Erro ao concluir carga.');
@@ -885,12 +1112,158 @@ function CargoTabView({
   };
 
   const plannedTrips = (ctx.trips ?? []).filter((t) => t.status === 'PLANEJADO');
-  const scheduledLoads = ctx.scheduledLoads ?? [];
+  const scheduledLoads = (ctx.scheduledLoads ?? []).filter(
+    (s) => (s.status ?? 'AGENDADA') === 'AGENDADA'
+  );
+  const recentCompletedTrips = (ctx.recentTrips ?? []).filter(
+    (t) => t.id !== activeTrip?.id && t.status === 'CONCLUIDO'
+  );
 
   return (
     <div className="space-y-3.5">
+      {/* Modal/Painel de Correção de Informações do Frete */}
+      {editingTrip && (
+        <form
+          onSubmit={handleSaveCorrection}
+          className="bg-white rounded-xl border-2 border-black p-4 space-y-3.5 shadow-md"
+        >
+          <div className="flex items-center justify-between border-b border-zinc-200 pb-2.5">
+            <div>
+              <span className="text-[10px] font-extrabold uppercase tracking-wider text-zinc-500 block">
+                Correção de Lançamento
+              </span>
+              <h3 className="text-base font-extrabold text-black flex items-center gap-1.5">
+                <Pencil className="w-4 h-4" />
+                Corrigir Informações do Frete
+              </h3>
+            </div>
+            <button
+              type="button"
+              onClick={() => setEditingTrip(null)}
+              className="p-1.5 rounded-lg bg-zinc-100 text-zinc-700 hover:text-black"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+
+          <div>
+            <label className={labelCls}>Carga / Produto Transportado *</label>
+            <input
+              required
+              className={fieldCls}
+              value={editCargo}
+              onChange={(e) => setEditCargo(e.target.value)}
+              placeholder="Produto transportado"
+            />
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className={labelCls}>Cidade de Saída (Origem) *</label>
+              <input
+                required
+                className={fieldCls}
+                value={editOrigin}
+                onChange={(e) => setEditOrigin(e.target.value)}
+              />
+            </div>
+            <div>
+              <label className={labelCls}>Cidade de Entrega (Destino) *</label>
+              <input
+                required
+                className={fieldCls}
+                value={editDestination}
+                onChange={(e) => setEditDestination(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className={labelCls}>Peso (Toneladas)</label>
+              <input
+                type="number"
+                inputMode="decimal"
+                step="0.1"
+                min="0"
+                className={fieldCls}
+                value={editWeightTons}
+                onChange={(e) => setEditWeightTons(e.target.value)}
+                placeholder="Toneladas"
+              />
+            </div>
+            <div>
+              <label className={labelCls}>Cliente / Empresa</label>
+              <input
+                className={fieldCls}
+                value={editCustomer}
+                onChange={(e) => setEditCustomer(e.target.value)}
+                placeholder="Cliente"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className={labelCls}>KM Inicial (Saída)</label>
+              <input
+                type="number"
+                inputMode="numeric"
+                className={fieldCls}
+                value={editInitialKm}
+                onChange={(e) => setEditInitialKm(e.target.value)}
+              />
+            </div>
+            <div>
+              <label className={labelCls}>KM Final (Chegada)</label>
+              <input
+                type="number"
+                inputMode="numeric"
+                className={fieldCls}
+                value={editFinalKm}
+                onChange={(e) => setEditFinalKm(e.target.value)}
+                placeholder="Se já entregou"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className={labelCls}>Observação do Motorista</label>
+            <textarea
+              rows={2}
+              className="w-full text-base font-semibold p-3 rounded-xl bg-white text-black border-2 border-zinc-300 placeholder:text-zinc-400 focus:border-black focus:outline-none"
+              value={editNotes}
+              onChange={(e) => setEditNotes(e.target.value)}
+              placeholder="Alguma observação sobre a carga, balança, estrada ou entrega"
+            />
+          </div>
+
+          <div className="flex gap-2 pt-1">
+            <button
+              type="button"
+              onClick={() => setEditingTrip(null)}
+              className="flex-1 h-12 rounded-xl bg-zinc-100 border border-zinc-300 text-xs font-bold text-zinc-800"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              disabled={busy}
+              className="flex-1 h-12 rounded-xl bg-black text-white text-xs font-bold flex items-center justify-center gap-1.5"
+            >
+              {busy ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <CheckCircle2 className="w-4 h-4" />
+              )}
+              <span>Salvar Correção</span>
+            </button>
+          </div>
+        </form>
+      )}
+
       {/* Cartão da Carga em Andamento */}
-      {activeTrip && (
+      {activeTrip && !editingTrip && (
         <div className="bg-white rounded-xl border-2 border-black p-4 shadow-sm space-y-3.5">
           <div className="flex items-start justify-between gap-2 border-b border-zinc-100 pb-3">
             <div>
@@ -907,11 +1280,21 @@ function CargoTabView({
                 </p>
               )}
             </div>
-            {activeTrip.cargoWeightKg ? (
-              <span className="bg-zinc-100 text-black font-extrabold text-xs px-2.5 py-1 rounded-lg border border-zinc-200">
-                {(activeTrip.cargoWeightKg / 1000).toFixed(1).replace('.', ',')} t
-              </span>
-            ) : null}
+            <div className="flex flex-col items-end gap-1.5">
+              {activeTrip.cargoWeightKg ? (
+                <span className="bg-zinc-100 text-black font-extrabold text-xs px-2.5 py-1 rounded-lg border border-zinc-200">
+                  {(activeTrip.cargoWeightKg / 1000).toFixed(1).replace('.', ',')} t
+                </span>
+              ) : null}
+              <button
+                type="button"
+                onClick={() => openEditTrip(activeTrip)}
+                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-zinc-100 hover:bg-zinc-200 text-black border border-zinc-300 text-[11px] font-bold"
+              >
+                <Pencil className="w-3 h-3" />
+                <span>Corrigir / Editar</span>
+              </button>
+            </div>
           </div>
 
           <div className="bg-zinc-50 rounded-xl p-3 border border-zinc-200 space-y-2">
@@ -935,6 +1318,18 @@ function CargoTabView({
             </div>
           </div>
 
+          {activeTrip.notes && (
+            <div className="flex items-start gap-2 rounded-xl bg-amber-50 border border-amber-200 p-3 text-xs text-amber-950">
+              <MessageSquare className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+              <div>
+                <span className="font-extrabold uppercase text-[10px] text-amber-800 block">
+                  Observação da Carga
+                </span>
+                <span className="font-semibold">{activeTrip.notes}</span>
+              </div>
+            </div>
+          )}
+
           {!finishing ? (
             <div className="grid grid-cols-2 gap-2.5 pt-1">
               <button
@@ -950,6 +1345,7 @@ function CargoTabView({
                 onClick={() => {
                   setFinishing(true);
                   setFinalKm('');
+                  setFinishNotes(activeTrip.notes || '');
                 }}
                 className="h-12 rounded-xl bg-black hover:bg-zinc-800 text-white font-bold text-xs flex items-center justify-center gap-1.5"
               >
@@ -976,6 +1372,15 @@ function CargoTabView({
                   placeholder={`Maior que ${(activeTrip.initialKm || truck.currentOdometer).toLocaleString('pt-BR')} km`}
                 />
               </div>
+              <div>
+                <label className={labelCls}>Observação da Entrega (Opcional)</label>
+                <input
+                  className={fieldCls}
+                  value={finishNotes}
+                  onChange={(e) => setFinishNotes(e.target.value)}
+                  placeholder="Observação final ou ocorrência"
+                />
+              </div>
               <div className="flex gap-2">
                 <button
                   type="button"
@@ -998,20 +1403,70 @@ function CargoTabView({
         </div>
       )}
 
-      {/* Cargas Agendadas ou Planejadas pela Administração */}
+      {/* Atalho para Cargas Agendadas pela Administração */}
       {(plannedTrips.length > 0 || scheduledLoads.length > 0) && (
         <div className="bg-white rounded-xl border border-zinc-200 p-4 space-y-3 shadow-sm">
           <div className="flex items-center justify-between">
-            <h3 className="text-xs font-extrabold text-zinc-800 uppercase tracking-wider">
-              Cargas Programadas pela Empresa
+            <h3 className="text-xs font-extrabold text-zinc-800 uppercase tracking-wider flex items-center gap-1.5">
+              <CalendarClock className="w-4 h-4 text-black" />
+              <span>Sua Agenda de Cargas ({plannedTrips.length + scheduledLoads.length})</span>
             </h3>
-            <span className="text-[11px] font-bold bg-zinc-100 px-2 py-0.5 rounded text-zinc-700">
-              {plannedTrips.length + scheduledLoads.length} disponível(is)
-            </span>
+            <button
+              type="button"
+              onClick={onOpenAgenda}
+              className="text-xs font-extrabold text-black underline"
+            >
+              Ver agenda completa
+            </button>
           </div>
 
           <div className="space-y-2">
-            {plannedTrips.map((t) => (
+            {scheduledLoads.slice(0, 3).map((s) => {
+              const dt = new Date(s.pickupDate).toLocaleString('pt-BR', {
+                timeZone: 'UTC',
+                day: '2-digit',
+                month: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit',
+              });
+              return (
+                <div
+                  key={s.id}
+                  className="p-3 rounded-xl bg-zinc-50 border border-zinc-200 space-y-2"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="min-w-0">
+                      <span className="inline-flex items-center gap-1 text-[11px] font-extrabold bg-black text-white px-2 py-0.5 rounded mb-1">
+                        <Clock className="w-3 h-3 text-emerald-400" />
+                        {dt}
+                      </span>
+                      <p className="text-xs font-extrabold text-black truncate">
+                        {s.cargoDescription} • {s.customerName}
+                      </p>
+                      <p className="text-xs text-zinc-700 font-semibold truncate">
+                        {s.origin} → {s.destination}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => startScheduledLoad(s)}
+                      className="shrink-0 inline-flex items-center gap-1 px-3 py-2 rounded-lg bg-black text-white text-xs font-bold"
+                    >
+                      <Play className="w-3.5 h-3.5" />
+                      <span>Iniciar</span>
+                    </button>
+                  </div>
+                  {s.notes && (
+                    <div className="text-xs bg-amber-50 border border-amber-200 text-amber-950 rounded-lg px-2.5 py-1.5 font-semibold">
+                      ⚠️ Obs. Admin: {s.notes}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+
+            {plannedTrips.slice(0, 2).map((t) => (
               <div
                 key={t.id}
                 className="p-3 rounded-xl bg-zinc-50 border border-zinc-200 flex items-center justify-between gap-2"
@@ -1023,6 +1478,11 @@ function CargoTabView({
                   <p className="text-xs text-zinc-600 truncate">
                     {t.origin} → {t.destination}
                   </p>
+                  {t.notes && (
+                    <p className="text-[11px] font-bold text-amber-800 mt-0.5">
+                      ⚠️ Obs: {t.notes}
+                    </p>
+                  )}
                 </div>
                 <button
                   type="button"
@@ -1035,37 +1495,12 @@ function CargoTabView({
                 </button>
               </div>
             ))}
-
-            {scheduledLoads.map((s) => (
-              <div
-                key={s.id}
-                className="p-3 rounded-xl bg-zinc-50 border border-zinc-200 flex items-center justify-between gap-2"
-              >
-                <div className="min-w-0">
-                  <p className="text-xs font-extrabold text-black truncate">
-                    {s.cargoDescription} • {s.customerName}
-                  </p>
-                  <p className="text-xs text-zinc-600 truncate">
-                    {s.origin} → {s.destination}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  disabled={busy}
-                  onClick={() => startScheduledLoad(s)}
-                  className="shrink-0 inline-flex items-center gap-1 px-3 py-2 rounded-lg bg-black text-white text-xs font-bold"
-                >
-                  <Play className="w-3.5 h-3.5" />
-                  <span>Iniciar</span>
-                </button>
-              </div>
-            ))}
           </div>
         </div>
       )}
 
       {/* Botão para abrir formulário caso já exista uma carga ativa mas ele queira trocar */}
-      {activeTrip && !showNewForm && (
+      {activeTrip && !showNewForm && !editingTrip && (
         <button
           type="button"
           onClick={() => setShowNewForm(true)}
@@ -1077,7 +1512,7 @@ function CargoTabView({
       )}
 
       {/* Formulário para o Motorista dizer qual carga está realizando no momento */}
-      {showNewForm && (
+      {showNewForm && !editingTrip && (
         <form
           onSubmit={submitNewCargo}
           className="bg-white rounded-xl border border-zinc-200 p-4 space-y-3.5 shadow-sm"
@@ -1088,7 +1523,7 @@ function CargoTabView({
                 Qual carga você está realizando?
               </h2>
               <p className="text-xs text-zinc-500">
-                Informe o produto e o trajeto atual
+                Informe o produto, trajeto e observações da viagem
               </p>
             </div>
             {activeTrip && (
@@ -1193,6 +1628,17 @@ function CargoTabView({
             />
           </div>
 
+          <div>
+            <label className={labelCls}>Observação do Motorista (Opcional)</label>
+            <textarea
+              rows={2}
+              className="w-full text-base font-semibold p-3 rounded-xl bg-white text-black border-2 border-zinc-300 placeholder:text-zinc-400 focus:border-black focus:outline-none transition-colors"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Algum detalhe sobre a carga, balança, estrada ou horário"
+            />
+          </div>
+
           <button type="submit" disabled={busy} className={submitBtnCls}>
             {busy ? (
               <Loader2 className="w-5 h-5 animate-spin" />
@@ -1203,6 +1649,295 @@ function CargoTabView({
           </button>
         </form>
       )}
+
+      {/* Últimas Cargas Realizadas pelo Motorista (com opção de Corrigir Informações) */}
+      {recentCompletedTrips.length > 0 && !editingTrip && (
+        <div className="bg-white rounded-xl border border-zinc-200 p-4 space-y-2.5 shadow-sm">
+          <div className="flex items-center justify-between">
+            <h3 className="text-xs font-extrabold text-zinc-700 uppercase tracking-wider">
+              Suas Últimas Cargas Lançadas
+            </h3>
+            <span className="text-[11px] text-zinc-500">Toque em Corrigir se precisar ajustar</span>
+          </div>
+
+          <div className="space-y-2">
+            {recentCompletedTrips.slice(0, 4).map((t) => (
+              <div
+                key={t.id}
+                className="p-3 rounded-xl bg-zinc-50 border border-zinc-200 flex items-center justify-between gap-2 text-xs"
+              >
+                <div className="min-w-0">
+                  <p className="font-extrabold text-black truncate">
+                    {t.cargoDescription || 'Frete'} • {t.origin} → {t.destination}
+                  </p>
+                  <p className="text-zinc-500 truncate">
+                    {t.startDate ? formatDate(t.startDate) : ''} • {t.customerName}
+                  </p>
+                  {t.notes && (
+                    <p className="text-amber-800 font-medium truncate mt-0.5">
+                      Obs: {t.notes}
+                    </p>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => openEditTrip(t)}
+                  className="shrink-0 inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-white border border-zinc-300 text-black font-bold hover:border-black"
+                >
+                  <Pencil className="w-3 h-3" />
+                  <span>Corrigir</span>
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ---------------- ABA 2: PAINEL DE AGENDA DO MOTORISTA (Horários, Destinos e Observações do Admin) ---------------- */
+
+function AgendaTabView({
+  ctx,
+  truck,
+  onStartSuccess,
+  onError,
+}: {
+  ctx: Ctx;
+  truck: DriverTruck;
+  onStartSuccess: (msg: string) => void;
+  onError: (msg: string) => void;
+}) {
+  const [busyId, setBusyId] = useState<string | null>(null);
+
+  const schedules = useMemo(() => ctx.scheduledLoads ?? [], [ctx.scheduledLoads]);
+  const plannedTrips = useMemo(
+    () => (ctx.trips ?? []).filter((t) => t.status === 'PLANEJADO'),
+    [ctx.trips]
+  );
+
+  const getTruckLabel = (id?: string | null) => {
+    if (!id) return truck.plate;
+    return ctx.trucks.find((t) => t.id === id)?.plate ?? truck.plate;
+  };
+
+  const handleStartSchedule = async (s: ScheduledLoadItem) => {
+    if (busyId) return;
+    setBusyId(s.id);
+    try {
+      await postDriverAction('/api/driver/cargo', {
+        scheduleId: s.id,
+        truckId: s.truckId || truck.id,
+        origin: s.origin,
+        destination: s.destination,
+        customerName: s.customerName,
+        cargoDescription: s.cargoDescription,
+        cargoWeightKg: s.cargoWeightKg,
+        initialKm: truck.currentOdometer,
+        notes: s.notes || '',
+      });
+      onStartSuccess(`Carga "${s.cargoDescription}" iniciada! Boa viagem!`);
+    } catch (e) {
+      onError(e instanceof Error ? e.message : 'Erro ao iniciar carga da agenda.');
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const handleStartPlanned = async (t: DriverTrip) => {
+    if (busyId) return;
+    setBusyId(t.id);
+    try {
+      await postDriverAction('/api/driver/cargo', {
+        tripId: t.id,
+        truckId: t.truckId || truck.id,
+        origin: t.origin,
+        destination: t.destination,
+        cargoDescription: t.cargoDescription || 'Carga Geral',
+        initialKm: truck.currentOdometer,
+      });
+      onStartSuccess('Viagem iniciada! Boa viagem!');
+    } catch (e) {
+      onError(e instanceof Error ? e.message : 'Erro ao iniciar viagem.');
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const fmtFullDateTime = (iso: string) =>
+    new Date(iso).toLocaleString('pt-BR', {
+      timeZone: 'UTC',
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+
+  return (
+    <div className="space-y-3.5">
+      <div className="bg-black text-white rounded-xl p-4 space-y-1 shadow-sm">
+        <div className="flex items-center justify-between">
+          <span className="inline-flex items-center gap-1.5 text-[11px] font-extrabold uppercase tracking-wider text-emerald-400">
+            <CalendarClock className="w-4 h-4" />
+            Painel de Agenda do Motorista
+          </span>
+          <span className="text-xs font-bold bg-zinc-800 px-2.5 py-0.5 rounded-full text-zinc-200">
+            {schedules.length + plannedTrips.length} programada(s)
+          </span>
+        </div>
+        <h2 className="text-base font-extrabold">Suas Próximas Cargas e Horários</h2>
+        <p className="text-xs text-zinc-400">
+          Confira horários de coleta, destinos prontos e recomendações da administração.
+        </p>
+      </div>
+
+      {schedules.length === 0 && plannedTrips.length === 0 && (
+        <div className="bg-white rounded-xl border border-zinc-200 p-6 text-center space-y-2">
+          <CalendarClock className="w-8 h-8 text-zinc-400 mx-auto" />
+          <p className="text-sm font-extrabold text-zinc-800">
+            Nenhuma carga agendada para você no momento.
+          </p>
+          <p className="text-xs text-zinc-500">
+            Assim que a administração programar uma nova coleta, você receberá um aviso aqui no topo da tela.
+          </p>
+        </div>
+      )}
+
+      {schedules.map((s) => {
+        const isInTransit = s.status === 'EM_TRANSITO';
+        return (
+          <div
+            key={s.id}
+            className="bg-white rounded-xl border-2 border-zinc-200 p-4 space-y-3 shadow-sm"
+          >
+            <div className="flex items-start justify-between gap-2 border-b border-zinc-100 pb-2.5">
+              <div>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="inline-flex items-center gap-1 bg-black text-white text-xs font-extrabold px-2.5 py-1 rounded-lg">
+                    <Clock className="w-3.5 h-3.5 text-emerald-400" />
+                    {fmtFullDateTime(s.pickupDate)}
+                  </span>
+                  <span
+                    className={`text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-md ${
+                      isInTransit
+                        ? 'bg-emerald-100 text-emerald-900'
+                        : 'bg-amber-100 text-amber-900'
+                    }`}
+                  >
+                    {isInTransit ? 'Em Trânsito' : 'Agendada'}
+                  </span>
+                </div>
+                <p className="text-xs font-bold text-zinc-500 mt-1.5">
+                  Cliente: <strong className="text-black">{s.customerName}</strong> • Caminhão:{' '}
+                  <strong className="text-black">{getTruckLabel(s.truckId)}</strong>
+                </p>
+              </div>
+              {s.cargoWeightKg > 0 && (
+                <span className="text-xs font-extrabold bg-zinc-100 border border-zinc-200 px-2.5 py-1 rounded-lg text-black shrink-0">
+                  {(s.cargoWeightKg / 1000).toFixed(1).replace('.', ',')} t
+                </span>
+              )}
+            </div>
+
+            {/* Rota e Carga Prontas */}
+            <div className="bg-zinc-50 rounded-xl p-3 border border-zinc-200 space-y-1.5">
+              <div className="flex items-center gap-1.5 text-sm font-extrabold text-black">
+                <MapPin className="w-4 h-4 text-zinc-700 shrink-0" />
+                <span>{s.origin}</span>
+                <ArrowRight className="w-4 h-4 text-zinc-400 shrink-0" />
+                <span>{s.destination}</span>
+              </div>
+              <div className="flex flex-wrap items-center justify-between text-xs text-zinc-600 pt-1 border-t border-zinc-200/70">
+                <span>
+                  Carga: <strong className="text-black">{s.cargoDescription}</strong>
+                </span>
+                {s.distanceKm > 0 && (
+                  <span>
+                    Distância: <strong className="text-black">{s.distanceKm} km</strong>
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Observação / Instrução do Admin (ex: Precisa Abastecer) */}
+            {s.notes && (
+              <div className="rounded-xl bg-amber-50 border-2 border-amber-300 p-3 flex items-start gap-2.5 text-xs text-amber-950">
+                <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                <div>
+                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-amber-800 block">
+                    Orientação da Administração para Esta Viagem
+                  </span>
+                  <span className="font-bold text-sm">{s.notes}</span>
+                </div>
+              </div>
+            )}
+
+            {!isInTransit && (
+              <button
+                type="button"
+                disabled={busyId === s.id}
+                onClick={() => handleStartSchedule(s)}
+                className={submitBtnCls}
+              >
+                {busyId === s.id ? (
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                ) : (
+                  <Play className="w-5 h-5" />
+                )}
+                <span>INICIAR ESTA CARGA AGORA</span>
+              </button>
+            )}
+          </div>
+        );
+      })}
+
+      {plannedTrips.map((t) => (
+        <div
+          key={t.id}
+          className="bg-white rounded-xl border-2 border-zinc-200 p-4 space-y-3 shadow-sm"
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-extrabold bg-zinc-900 text-white px-2.5 py-1 rounded-lg">
+              Viagem Planejada • {t.startDate ? formatDate(t.startDate) : 'Hoje'}
+            </span>
+            <span className="text-xs font-bold text-zinc-600">{t.customerName}</span>
+          </div>
+
+          <div className="bg-zinc-50 rounded-xl p-3 border border-zinc-200 space-y-1">
+            <p className="text-sm font-extrabold text-black">
+              {t.origin} → {t.destination}
+            </p>
+            <p className="text-xs text-zinc-600">
+              Carga: <strong className="text-black">{t.cargoDescription || 'Carga Geral'}</strong>
+            </p>
+          </div>
+
+          {t.notes && (
+            <div className="rounded-xl bg-amber-50 border-2 border-amber-300 p-3 text-xs text-amber-950">
+              <span className="text-[10px] font-extrabold uppercase tracking-wider text-amber-800 block">
+                Orientação da Administração
+              </span>
+              <span className="font-bold">{t.notes}</span>
+            </div>
+          )}
+
+          <button
+            type="button"
+            disabled={busyId === t.id}
+            onClick={() => handleStartPlanned(t)}
+            className={submitBtnCls}
+          >
+            {busyId === t.id ? (
+              <Loader2 className="w-5 h-5 animate-spin" />
+            ) : (
+              <Play className="w-5 h-5" />
+            )}
+            <span>INICIAR VIAGEM</span>
+          </button>
+        </div>
+      ))}
     </div>
   );
 }
